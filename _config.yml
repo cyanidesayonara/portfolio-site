@@ -14,12 +14,12 @@ timezone:
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Your Portfolio # the main title
+title: Santtu Nykänen # the main title
 
-tagline: Developer & Creator # it will display as the subtitle
+tagline: Software Developer # it will display as the subtitle
 
 description: >- # used by seo meta and the atom feed
-  A showcase of my work, thoughts, and experiences
+  Personal portfolio and blog of Santtu Nykänen, featuring software development projects and technical writing.
 
 # Fill in the protocol & hostname for your site.
 # E.g. 'https://username.github.io', note that it does not end with a '/'.
@@ -34,8 +34,8 @@ twitter:
 social:
   # Change to your full name.
   # It will be displayed as the default author of the posts and the copyright owner in the Footer
-  name: Your Name
-  email: your-email@example.com # change to your email address
+  name: Santtu Nykänen
+  email: # change to your email address
   links:
     # The first element serves as the copyright owner's link
     - https://github.com/cyanidesayonara # change to your GitHub homepage
