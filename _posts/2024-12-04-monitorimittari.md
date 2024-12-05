@@ -1,14 +1,14 @@
 ---
-title: Monitorimittari - Display Luminance Logger
-date: 2024-12-04 12:30:45 +0100
+title: monitorimittari
+date: 2024-12-04 13:30:15 +0100
 categories: [Projects]
-tags: [python, pyqt5, gui, excel]
+tags: [python, hardware, raspberry-pi]
 ---
 
-# Monitorimittari - Display Luminance Logger
+# Monitorimittari - Luminance Logger
 
-![Monitorimittari Screenshot](/assets/img/projects/monitorimittari.png)
-_Screenshot of the Monitorimittari application_
+![Monitorimittari Screenshot]({{ site.baseurl }}/assets/img/projects/monitorimittari.png)
+_Screenshot of the Monitorimittari interface_
 
 A Python GUI application developed for the Hospital District of Helsinki's engineering team. The program interfaces with an LXscan spot luminance meter to log display test results directly into Excel templates, significantly reducing the time needed for manual data entry.
 
