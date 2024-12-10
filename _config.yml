@@ -14,12 +14,13 @@ timezone: Europe/Madrid
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Santtu Nykänen # the main title
+title: Santtu Nykänen
 
-tagline: Software Developer # it will display as the subtitle
+tagline: Full-Stack Developer
 
-description: >- # used by seo meta and the atom feed
-  Personal portfolio and blog of Santtu Nykänen, featuring software development projects and technical writing.
+description: >-
+  Full-Stack Developer specializing in Java, Python, JavaScript, and mobile development.
+  Building elegant solutions for complex problems.
 
 # Fill in the protocol & hostname for your site.
 # E.g. 'https://username.github.io', note that it does not end with a '/'.
@@ -36,8 +37,7 @@ social:
   links:
     # The first element serves as the copyright owner's link
     - https://github.com/cyanidesayonara # change to your GitHub homepage
-    # - https://www.facebook.com/username
-    # - https://www.linkedin.com/in/username
+    - https://www.linkedin.com/in/santtu-nykanen
 
 # Site Verification Settings
 webmaster_verifications:
@@ -83,7 +83,6 @@ pageviews:
 #     light — Use the light color scheme
 #     dark — Use the dark color scheme
 #
-theme_mode: # [light | dark]
 
 # The CDN endpoint for media resources.
 # Notice that once it is assigned, the CDN url
@@ -123,6 +122,44 @@ comments:
     input_position: # optional, default to 'bottom'
     lang: # optional, default to the value of `site.lang`
     reactions_enabled: # optional, default to the value of `1`
+
+# Theme Settings
+sidebar:
+  desktop:
+    enabled: true
+    position: left
+  mobile:
+    enabled: true
+
+# Site Verification Settings
+webmaster_verifications:
+  google: # fill in your Google verification code
+  bing: # fill in your Bing verification code
+  alexa: # fill in your Alexa verification code
+  yandex: # fill in your Yandex verification code
+  baidu: # fill in your Baidu verification code
+  facebook: # fill in your Facebook verification code
+
+# Web Analytics Settings
+analytics:
+  google:
+    id: # fill in your Google Analytics ID
+  goatcounter:
+    id: # fill in your GoatCounter ID
+  umami:
+    id: # fill in your Umami ID
+    domain: # fill in your Umami domain
+  matomo:
+    id: # fill in your Matomo ID
+    domain: # fill in your Matomo domain
+  cloudflare:
+    id: # fill in your Cloudflare Web Analytics token
+  fathom:
+    id: # fill in your Fathom Site ID
+
+# Page views settings
+pageviews:
+  provider: # now only supports 'goatcounter'
 
 # Self-hosted static assets, optional › https://github.com/cotes2020/chirpy-static-assets
 assets:
