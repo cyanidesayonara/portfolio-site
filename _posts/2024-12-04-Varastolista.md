@@ -1,11 +1,9 @@
 ---
-title: Varastolista
+title: Varastolista - Inventory Management App
 date: 2024-12-04 11:30:00 +0100
 categories: [Projects]
 tags: [javascript, react, node, inventory]
 ---
-
-# Varastolista
 
 ![Varastolista Screenshot](/assets/img/projects/varastolista.png)
 _Screenshot of the Varastolista interface_

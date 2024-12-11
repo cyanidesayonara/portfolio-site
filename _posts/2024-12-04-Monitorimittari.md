@@ -1,11 +1,9 @@
 ---
-title: Monitorimittari
+title: Monitorimittari - Luminance Logger
 date: 2024-12-04 13:30:15 +0100
 categories: [Projects]
 tags: [python, hardware, raspberry-pi]
 ---
-
-# Monitorimittari
 
 ![Monitorimittari Screenshot](/assets/img/projects/monitorimittari.png)
 _Screenshot of the Monitorimittari interface_
