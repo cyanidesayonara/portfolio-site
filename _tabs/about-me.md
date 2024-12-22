@@ -18,12 +18,12 @@ After nearly two years of self-study and dedicated learning, I landed my first c
 ## Work Experience
 
 ### Full-Stack Developer
-**Gofore** (2019 - Present)
+**Gofore** (2022 - Present)
 - Full-stack software development as a consultant on various client projects
 - Technologies: Python, Java, JavaScript
 
 ### Full-Stack Developer
-**Solidabis** (Previous)
+**Solidabis** (2019 - 2022)
 - Full-stack software development as a consultant on various client projects
 - Focus on web application development and system integration
 
@@ -64,14 +64,14 @@ After nearly two years of self-study and dedicated learning, I landed my first c
 
 ## Education
 
-### Business Information Technology
-**Haaga-Helia University of Applied Sciences** (2020 - Present)
+### Bachelor of Business Administration - Business Information Technology
+**Haaga-Helia University of Applied Sciences** (2018 - 2021)
 - Bachelor's degree program focusing on software development and business
 - Practical application of IT skills through company collaboration
 - Part-time studies alongside work
 
 ### Full Stack Open
-**University of Helsinki** (2019)
+**University of Helsinki** (Online, 2019)
 - Modern web development with JavaScript
 - React, Redux, Node.js, MongoDB
 - Building single page applications
@@ -79,7 +79,7 @@ After nearly two years of self-study and dedicated learning, I landed my first c
 - TypeScript and React Native
 
 ### Java Programming MOOC
-**University of Helsinki** (2018)
+**University of Helsinki** (Online, 2018)
 - Comprehensive Java programming course
 - Object-oriented programming principles
 - Data structures and algorithms
