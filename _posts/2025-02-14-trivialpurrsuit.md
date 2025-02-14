@@ -1,6 +1,6 @@
 ---
 title: Trivial Purrsuit - Interactive Cat Toy
-date: 2024-02-14 15:30:00 +0100
+date: 2025-02-14 15:30:00 +0100
 categories: [Projects]
 tags: [flutter, dart, game, cats, mobile, android, ios]
 ---
