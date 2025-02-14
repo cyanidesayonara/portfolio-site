@@ -5,10 +5,10 @@ categories: [Projects]
 tags: [flutter, dart, game, cats, mobile, android, ios]
 ---
 
+An interactive mobile game designed specifically for cats! Built with Flutter, this cross-platform app features various moving objects that cats can chase and "catch" on the screen, each with unique behaviors and feedback. It's the perfect digital toy for keeping your feline friend entertained and active.
+
 ![Trivial Purrsuit Screenshot](/assets/img/projects/trivialpurrsuit.png)
 _Title screen of Trivial Purrsuit_
-
-An interactive mobile game designed specifically for cats! Built with Flutter, this cross-platform app features various moving objects that cats can chase and "catch" on the screen, each with unique behaviors and feedback. It's the perfect digital toy for keeping your feline friend entertained and active.
 
 ## Features
 
