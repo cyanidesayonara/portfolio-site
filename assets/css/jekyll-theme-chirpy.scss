@@ -1,4 +1,13 @@
-@use 'main.bundle';
+---
+---
+
+@use 'main
+{%- if jekyll.environment == 'production' -%}
+  .bundle
+{%- endif -%}
+';
+
+/* Custom styles for Chirpy theme */
 
 /* Color variables */
 :root[data-mode='light'] {
