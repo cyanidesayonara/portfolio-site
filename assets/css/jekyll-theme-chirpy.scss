@@ -69,20 +69,45 @@
   }
 }
 
-/* Tag styling */
+/* Tag styling - high contrast approach */
 .post-tag {
-  background: linear-gradient(120deg, var(--theme-color), var(--link-color));
-  color: white;
+  /* Dark background for both themes */
+  background-color: #4338ca; /* Deep indigo that will be visible in both themes */
+  color: #ffffff !important; /* White text */
   border: none;
   border-radius: 9999px;
-  padding: 0.25rem 0.75rem;
-  transition: transform 0.2s ease;
+  padding: 0.3rem 0.8rem;
+  transition: all 0.2s ease;
+  text-decoration: none !important;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  display: inline-block;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
 
   &:hover {
     transform: scale(1.05);
-    color: white;
-    text-decoration: none;
+    background-color: #3730a3; /* Darker indigo on hover */
+    color: #ffffff !important;
+    text-decoration: none !important;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25);
   }
+}
+
+/* Additional styling for light mode to ensure visibility */
+:root[data-mode='light'] .post-tag {
+  background-color: #4338ca;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  text-shadow: 0px 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+/* Styling for dark mode */
+:root[data-mode='dark'] .post-tag {
+  background-color: #6366f1; /* Slightly lighter in dark mode */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 /* Code blocks */
