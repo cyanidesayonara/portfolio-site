@@ -4,8 +4,6 @@ icon: fas fa-info-circle
 order: 4
 ---
 
-# About Me
-
 I'm Santtu Nykänen, a thirty-something full-stack developer from Helsinki, now based in Barcelona. My path to becoming a developer began in June 2017 with a simple decision to try an online programming course with a friend. After reading about the high demand for developers and driven by a natural competitive streak, I enrolled in Harvard's CS50x course.
 
 What started with creating [a simple basketball game in Scratch](https://scratch.mit.edu/projects/164378114/) turned into a passionate pursuit of programming knowledge. Even though the path to becoming employable seemed challenging, the joy of problem-solving and creating through code made every step worthwhile.
