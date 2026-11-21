@@ -18,7 +18,9 @@ I didn't type most of that code. I wrote briefs, ran agents in parallel, and rev
 
 The first weeks looked like most people's experience of AI coding. One agent, one conversation, short tasks: make the pole wrapping a real leash constraint, make the human slow down when the leash is taut, add a cafe terrace. The physics needed constant hands-on tuning, so this stayed a tight loop of ask, play, adjust.
 
-<!-- TODO: what surprised you about this phase? What did the agent get wrong about game feel? -->
+The biggest surprise was how quickly an agent will invent extra state when physics feels slightly off. Early on, we went through three separate generations of pivot and angle bookkeeping layers to track leash wraps around lampposts. Every one of them looked tidy on paper and immediately drifted out of sync with the drawn rope in real play. That only stopped once we made it a hard rule in `entities/leash.gd`: the visible Verlet rope *is* the constraint—segment-vs-circle collisions, stick-slip friction, and the rendered `visible_path()` all read the same solver points, with no shadow state behind them.
+
+Game feel also resisted delegation. Knowing on paper that the human is four times the dog's weight, that tension eases across a 1.00–1.05 stretch ratio, that planting multiplies resistance 14×, or that every owner pull needs a 0.8-second speech-bubble telegraph doesn't tell you whether a tug feels fair or muddy. An agent can wire up those constants and write tests for them; figuring out which numbers feel right still means picking up the controller and playing.
 
 ## Writing it down: AGENTS.md and PROJECT.md
 
@@ -44,13 +46,13 @@ None of this works without a gate that nothing skips. Every pull request has to 
 - a "feel card": three to five things to try by hand, which I play;
 - a changelog fragment, checked by a script.
 
-<!-- TODO: how much do you actually read line by line? Where did the review catch real problems? -->
+With several branches landing a day, the real trap isn't bad syntax—it's shipping player-facing changes faster than you can play them. To keep quality from drifting, the repo enforces a hard WIP limit of **eight** merged player-facing changes in the "Awaiting acceptance" column on the project board. Merging a PR is not acceptance; once the queue hits eight, only bug fixes, tests, tooling, or refactors can land until I've played through the feel cards and signed off on them.
+
+Automated checks catch structural drift before I ever launch a build. Any refactor of `main.gd` has to leave `tools/behaviour_snapshot.sh` byte-identical. `tools/bench_leash.gd` and `tools/bench_leash_draw.gd` guard solver microsecond budgets and geometry hashes. `tools/surface_check.py` overlays the physics surface map onto screenshots to catch spots where pavement was drawn like grass or sand reads like water, and `tools/shot_diff.py` compares deterministic render sweeps pixel for pixel. That frees my review time for reading tricky state transitions line by line and actually playing the feel cards.
 
 ## What I'd tell someone starting out
 
-<!-- TODO: your conclusions. Some candidates:
-- The bottleneck moves from typing to deciding and reviewing.
-- Write rules down the moment you repeat yourself.
-- Structure the codebase so parallel work doesn't collide.
-- Keep game feel in human hands.
--->
+- **The bottleneck moves from typing to deciding and reviewing.** Generating code is fast; knowing whether a change makes the game better, and capping unplayed work at a firm WIP limit, is what actually protects the product.
+- **Write rules down the moment you repeat yourself.** Every correction that stays only in chat gets lost on the next context window. Put it in `AGENTS.md` or the batch preamble once, and it holds across every future branch.
+- **Structure the codebase so parallel work doesn't collide.** Central registries, shared test manifests, and top-of-file changelogs turn parallel branches into merge conflicts. Per-module `HOOKS`, per-feature test files under `tests/ci.d/`, and `changelog.d/` fragments let independent tasks land cleanly.
+- **Keep game feel in human hands.** Let agents implement the physics solver, deterministic benchmarks, and screenshot harnesses, while keeping tuning constants and feel cards on your side of the loop.
