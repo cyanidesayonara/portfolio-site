@@ -16,6 +16,20 @@ const STOPS = [
   { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
   { id: 'park', label: 'The park', short: 'Park', kind: 'Coming soon', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
 ];
+// The same keys as Path of Leash Resistance's default layout.
+const KEYS = [
+  { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
+  { keys: ['Shift'], label: 'Run' },
+  { keys: ['Space'], label: 'Dig in' },
+  { keys: ['Q'], label: 'Mark' },
+  { keys: ['F'], label: 'Squat' },
+  { keys: ['G'], label: 'Pick up' },
+  { keys: ['E'], label: 'Bark' },
+  { keys: ['Enter'], label: 'Go in' },
+  { keys: ['Tab'], label: 'Goals' },
+  { keys: ['R'], label: 'Restart' },
+  { keys: ['Esc'], label: 'Leave' },
+];
 ---
 
 <figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street, with the same controls as Path of Leash Resistance: WASD or arrows move, Shift runs, Space digs in, Q marks a spot, F squats, G picks up, E barks, Tab shows the goals and Enter goes into a shop." aria-describedby="street-caption">
@@ -30,6 +44,20 @@ const STOPS = [
         <button class="sound" type="button" data-fullscreen aria-pressed="false">Fullscreen</button>
       </div>
     </div>
+    <ul class="keys" aria-label="Controls">
+      {
+        KEYS.map((k) => (
+          <li>
+            <span class="caps">
+              {k.keys.map((key) => (
+                <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+              ))}
+            </span>
+            <span class="what">{k.label}</span>
+          </li>
+        ))
+      }
+    </ul>
     <ul class="stops" aria-label="Stops on the street">
       {
         STOPS.map((s) => (
@@ -117,6 +145,65 @@ const STOPS = [
   .tools {
     display: flex;
     gap: 8px;
+  }
+  /* Keycaps for the controls: shown once the game runs, on keyboards only. */
+  .keys {
+    display: none;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 0;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+  }
+  .street:global(.live) .keys {
+    display: flex;
+  }
+  @media (pointer: coarse) {
+    .street:global(.live) .keys {
+      display: none;
+    }
+  }
+  .keys li {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .caps {
+    display: inline-flex;
+    gap: 3px;
+  }
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--line);
+    border-bottom-width: 3px;
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  kbd.wide {
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .what {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .street:fullscreen .keys,
+  .street:global(.immersive) .keys {
+    padding-top: 8px;
   }
   .bar {
     display: flex;
