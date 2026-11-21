@@ -19,7 +19,7 @@ npm run build    # type-checks, then builds to dist/
 - `src/content/projects/*.md`: one file per project. The frontmatter schema is in `src/content.config.ts`; `featured: true` puts a project on the home page, and `order` sorts them.
 - `src/content/blog/*.md`: blog posts. `draft: true` hides one.
 - `src/pages/`: home, projects, blog, about, how-i-build, walk (the teaser for the walkable version), 404 and the RSS feed.
-- `src/components/StreetMap.astro`: the playable street on the home page (canvas, rope physics, the stops row of links).
+- `src/components/StreetMap.astro`: the playable street on the home page and its row of stop links. The game itself is in `src/scripts/street/`: `world.ts` (layout and the pre-rendered static layer) and `game.ts` (physics, NPCs, traffic, input, HUD). Add `?streettest` to the URL to get a frame-stepping test hook on `window.__street`.
 - `public/`: images, favicon, `CNAME` and the social share image (`img/og.png`).
 
 Old Jekyll URLs (`/posts/...`, `/about-me`) redirect to their new homes; the list is in `astro.config.mjs`.
