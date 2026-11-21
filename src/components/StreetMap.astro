@@ -1,0 +1,789 @@
+---
+/*
+  The home page's playable street: one block of storefronts, a nod to
+  Path of Leash Resistance. You are Millie; your human is glued to their
+  phone on the other end of the leash. Every shop is a page of the site.
+
+  - Arrow keys or WASD walk Millie, a tap or click sends her somewhere,
+    Enter (or a second tap) goes into the shop she is sniffing at.
+  - The leash is a rope: it lies slack, pulls taut, and wraps around
+    lampposts and trees. Wind it round a pole and the human is held fast.
+  - The human follows the leash's path, not a straight line, so they
+    walk round poles instead of getting stuck behind them.
+
+  The row of links under the street is the real navigation: it works
+  without JavaScript, and it lights up when Millie reaches a shop.
+*/
+const STOPS = [
+  { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Game', href: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
+  { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'Music app', href: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
+  { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'LED wall', href: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
+  { id: 'blog', label: 'Blog', short: 'Blog', kind: 'Kiosk', href: '/blog', color: '#e5487a', ink: '#0b1430' },
+  { id: 'how', label: 'How I build', short: 'How I build', kind: 'Workshop', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
+  { id: 'about', label: 'About', short: 'About', kind: 'Café', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
+  { id: 'park', label: 'The park', short: 'Park', kind: 'Coming soon', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
+];
+---
+
+<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street. Use the arrow keys to walk Millie and Enter to go into a shop." aria-describedby="street-caption">
+  <div class="stage">
+    <canvas aria-hidden="true"></canvas>
+    <p class="hint" data-hint aria-hidden="true"></p>
+  </div>
+  <figcaption>
+    <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
+    <ul class="stops" aria-label="Stops on the street">
+      {
+        STOPS.map((s) => (
+          <li>
+            <a href={s.href} data-stop={s.id} style={`--c:${s.color};--i:${s.ink}`}>
+              {s.short}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </figcaption>
+</figure>
+
+<script>
+  type Vec = { x: number; y: number };
+  type Stop = { id: string; label: string; kind: string; href: string; color: string; ink: string };
+  type Lot =
+    | { type: 'shop'; x: number; w: number; stop: Stop }
+    | { type: 'park'; x: number; w: number; stop: Stop }
+    | { type: 'house'; x: number; w: number; tone: number };
+  type Pole = { x: number; y: number; r: number; kind: 'lamp' | 'tree' };
+
+  // World units. The view is scaled so the street is always WH tall.
+  const WH = 300;
+  const FACADE = 120; // bottom of the buildings
+  const WALK_TOP = 128;
+  const WALK_BOT = 206;
+  const CURB = 214;
+  const LANE = 238; // bike lane center
+  const ROPE_N = 18;
+  const ROPE_LEN = 130;
+  const DOG_R = 9;
+  const HUMAN_R = 13;
+
+  const KEYS: Record<string, Vec> = {
+    ArrowUp: { x: 0, y: -1 }, KeyW: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 }, KeyS: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 }, KeyA: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 }, KeyD: { x: 1, y: 0 },
+  };
+  const HOUSE_TONES = ['#e3d3b4', '#d8b98f', '#cf8f6c', '#b9c3c9', '#e8dcc6'];
+
+  function init(fig: HTMLElement, stops: Stop[]) {
+    const canvas = fig.querySelector('canvas')!;
+    const ctx = canvas.getContext('2d');
+    const caption = fig.querySelector<HTMLElement>('[data-caption]')!;
+    const hint = fig.querySelector<HTMLElement>('[data-hint]')!;
+    const links = new Map(
+      [...fig.querySelectorAll<HTMLAnchorElement>('[data-stop]')].map((a) => [a.dataset.stop!, a]),
+    );
+    if (!ctx) return;
+    fig.classList.add('live');
+
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const darkMq = matchMedia('(prefers-color-scheme: dark)');
+    const isNight = () => {
+      const t = document.documentElement.dataset.theme;
+      return t ? t === 'dark' : darkMq.matches;
+    };
+
+    // ---- Lay out the street -------------------------------------------
+    const lots: Lot[] = [];
+    let x = 0;
+    const house = (w: number) => { lots.push({ type: 'house', x, w, tone: lots.length % HOUSE_TONES.length }); x += w; };
+    house(150);
+    stops.forEach((stop, i) => {
+      if (stop.id === 'park') {
+        house(110);
+        lots.push({ type: 'park', x, w: 300, stop });
+        x += 300;
+        return;
+      }
+      lots.push({ type: 'shop', x, w: 190, stop });
+      x += 190;
+      if (i % 2 === 1) house(120);
+    });
+    const WORLD_W = x;
+    const doorX = (l: Lot) => (l.type === 'park' ? l.x + 70 : l.x + l.w / 2);
+    const stopLots = lots.filter((l): l is Extract<Lot, { stop: Stop }> => l.type !== 'house');
+
+    const poles: Pole[] = [];
+    for (let px = 120, i = 0; px < WORLD_W - 330; px += 170, i++) {
+      poles.push(i % 3 === 1
+        ? { x: px, y: 196, r: 7, kind: 'tree' }
+        : { x: px, y: 200, r: 4.5, kind: 'lamp' });
+    }
+    // Trees in the park are poles too.
+    const park = stopLots.find((l) => l.type === 'park')!;
+    poles.push({ x: park.x + 170, y: 168, r: 8, kind: 'tree' }, { x: park.x + 250, y: 150, r: 8, kind: 'tree' });
+
+    // ---- State -----------------------------------------------------------
+    const dog = { x: 60, y: 168, vx: 0, vy: 0, heading: 0, moving: false };
+    const human = { x: 30, y: 150, heading: 0, walking: false };
+    const rope: { x: number; y: number; px: number; py: number }[] = [];
+    for (let i = 0; i <= ROPE_N; i++) {
+      const t = i / ROPE_N;
+      const rx = human.x + (dog.x - human.x) * t, ry = human.y + (dog.y - human.y) * t;
+      rope.push({ x: rx, y: ry, px: rx, py: ry });
+    }
+    const held = new Set<string>();
+    let target: Vec | null = null;
+    let playing = false;
+    let near: Extract<Lot, { stop: Stop }> | null = null;
+    let wander = { lot: 0, wait: 1.2 };
+    const bikes: { x: number; dir: 1 | -1; speed: number; hue: string }[] = [];
+    let bikeTimer = 2;
+    let camX = 0;
+
+    // ---- Sizing ------------------------------------------------------------
+    let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0;
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      cssW = r.width;
+      cssH = r.height;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      scale = cssH / WH;
+      viewW = cssW / scale;
+    }
+
+    // ---- Physics helpers -----------------------------------------------------
+    function collide(p: { x: number; y: number }, r: number, top = WALK_TOP) {
+      for (const pole of poles) {
+        const dx = p.x - pole.x, dy = p.y - pole.y, d = Math.hypot(dx, dy), min = pole.r + r;
+        if (d < min && d > 0.0001) { p.x = pole.x + (dx / d) * min; p.y = pole.y + (dy / d) * min; }
+      }
+      const parkTop = p.x > park.x + 20 ? 30 : top; // the park is open ground
+      p.x = Math.max(r, Math.min(WORLD_W - r, p.x));
+      p.y = Math.max(parkTop + r, Math.min(WALK_BOT - r + 6, p.y));
+    }
+
+    function input(): Vec | null {
+      let ix = 0, iy = 0;
+      for (const k of held) { ix += KEYS[k].x; iy += KEYS[k].y; }
+      if (ix || iy) { target = null; const l = Math.hypot(ix, iy); return { x: ix / l, y: iy / l }; }
+      if (target) {
+        const dx = target.x - dog.x, dy = target.y - dog.y, l = Math.hypot(dx, dy);
+        if (l < 4) { target = null; return null; }
+        return { x: dx / l, y: dy / l };
+      }
+      return null;
+    }
+
+    // Before anyone takes the leash, Millie visits the shops by herself.
+    function autopilot(dt: number): Vec | null {
+      if (reduced) return null;
+      if (wander.wait > 0) { wander.wait -= dt; return null; }
+      const l = stopLots[wander.lot];
+      const tx = doorX(l), ty = l.type === 'park' ? 160 : WALK_TOP + 10;
+      const dx = tx - dog.x, dy = ty - dog.y, d = Math.hypot(dx, dy);
+      if (d < 5) {
+        wander = { lot: (wander.lot + 1) % (stopLots.length - 1), wait: 1.6 };
+        return null;
+      }
+      return { x: dx / d, y: dy / d };
+    }
+
+    function solveRope(dt: number) {
+      // Verlet for the inner points: a leash lying on the ground, damped.
+      for (let i = 1; i < ROPE_N; i++) {
+        const p = rope[i];
+        const vx = (p.x - p.px) * 0.82, vy = (p.y - p.py) * 0.82;
+        p.px = p.x; p.py = p.y;
+        p.x += vx; p.y += vy;
+      }
+      const seg = ROPE_LEN / ROPE_N;
+      // Inverse masses: the rope is light, Millie heavier, and her human
+      // four times her weight.
+      const inv = (i: number) => (i === 0 ? 0.08 : i === ROPE_N ? 0.32 : 1);
+      rope[0].x = human.x; rope[0].y = human.y;
+      rope[ROPE_N].x = dog.x; rope[ROPE_N].y = dog.y;
+      for (let it = 0; it < 24; it++) {
+        for (let i = 0; i < ROPE_N; i++) {
+          const a = rope[i], b = rope[i + 1];
+          const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+          if (d <= seg) continue; // a rope only resists stretching
+          const wa = inv(i), wb = inv(i + 1), k = (d - seg) / d / (wa + wb);
+          a.x += dx * k * wa; a.y += dy * k * wa;
+          b.x -= dx * k * wb; b.y -= dy * k * wb;
+        }
+        for (let i = 1; i < ROPE_N; i++) {
+          const p = rope[i];
+          for (const pole of poles) {
+            const dx = p.x - pole.x, dy = p.y - pole.y, d = Math.hypot(dx, dy), min = pole.r + 1.5;
+            if (d < min && d > 0.0001) { p.x = pole.x + (dx / d) * min; p.y = pole.y + (dy / d) * min; }
+          }
+        }
+      }
+      human.x = rope[0].x; human.y = rope[0].y;
+      dog.x = rope[ROPE_N].x; dog.y = rope[ROPE_N].y;
+      collide(human, HUMAN_R, WALK_TOP - 2);
+      collide(dog, DOG_R);
+      // Never longer than the leash, whatever the solver left over.
+      const dx = dog.x - human.x, dy = dog.y - human.y, d = Math.hypot(dx, dy);
+      if (d > ROPE_LEN) { dog.x = human.x + (dx / d) * ROPE_LEN; dog.y = human.y + (dy / d) * ROPE_LEN; }
+      rope[0].x = human.x; rope[0].y = human.y;
+      rope[ROPE_N].x = dog.x; rope[ROPE_N].y = dog.y;
+      void dt;
+    }
+
+    function update(dt: number) {
+      const dir = playing ? input() : autopilot(dt);
+      const speed = playing ? 150 : 70;
+      dog.moving = !!dir;
+      if (dir) {
+        dog.x += dir.x * speed * dt;
+        dog.y += dir.y * speed * dt;
+        dog.heading = Math.atan2(dir.y, dir.x);
+      }
+      collide(dog, DOG_R);
+
+      // The human walks on autopilot along the leash, eyes on the phone.
+      // Following the rope's path (not the dog) takes them round poles.
+      const straight = Math.hypot(dog.x - human.x, dog.y - human.y);
+      let ropeLen = 0;
+      for (let i = 0; i < ROPE_N; i++) ropeLen += Math.hypot(rope[i + 1].x - rope[i].x, rope[i + 1].y - rope[i].y);
+      human.walking = ropeLen > ROPE_LEN * 0.8 || straight > ROPE_LEN * 0.6;
+      if (human.walking) {
+        const guide = rope[Math.min(4, ROPE_N)];
+        const dx = guide.x - human.x, dy = guide.y - human.y, d = Math.hypot(dx, dy) || 1;
+        const hs = (playing ? 110 : 55) * dt;
+        human.x += (dx / d) * Math.min(hs, d);
+        human.y += (dy / d) * Math.min(hs, d);
+        human.heading = Math.atan2(dy, dx);
+      }
+      collide(human, HUMAN_R, WALK_TOP - 2);
+      solveRope(dt);
+
+      // Bikes in the bike lane: just traffic, for now.
+      bikeTimer -= dt;
+      if (bikeTimer <= 0 && !reduced) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        bikes.push({ x: dir === 1 ? camX - 40 : camX + viewW + 40, dir, speed: 110 + Math.random() * 60, hue: ['#ffb020', '#1fc9b7', '#e5487a', '#f4f1ea'][Math.floor(Math.random() * 4)] });
+        bikeTimer = 3 + Math.random() * 5;
+      }
+      for (const b of bikes) b.x += b.dir * b.speed * dt;
+      for (let i = bikes.length - 1; i >= 0; i--) if (bikes[i].x < camX - 120 || bikes[i].x > camX + viewW + 120) bikes.splice(i, 1);
+
+      // Camera follows Millie.
+      const want = Math.max(0, Math.min(WORLD_W - viewW, dog.x - viewW * 0.45));
+      camX = viewW >= WORLD_W ? (WORLD_W - viewW) / 2 : camX + (want - camX) * Math.min(1, dt * 4);
+
+      // Which shop is Millie sniffing at?
+      let best: typeof near = null;
+      for (const l of stopLots) {
+        const ok = l.type === 'park'
+          ? dog.x > l.x + 10
+          : Math.abs(dog.x - doorX(l)) < 40 && dog.y < WALK_TOP + 30;
+        if (ok) best = l;
+      }
+      if (best !== near) {
+        if (near) links.get(near.stop.id)?.classList.remove('near');
+        if (best) links.get(best.stop.id)?.classList.add('near');
+        near = best;
+        say();
+      }
+    }
+
+    function say() {
+      let text: string;
+      if (near && playing) text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
+      else if (playing) text = 'Walk Millie up to a shop door. Wind the leash round a lamppost to hold your human.';
+      else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street, then walk Millie with the arrow keys or WASD.';
+      if (caption.textContent !== text) caption.textContent = text;
+      const h = near && playing ? (coarse ? 'Tap to go in' : 'Enter to go in') : '';
+      if (hint.textContent !== h) hint.textContent = h;
+      hint.classList.toggle('show', !!h);
+    }
+
+    // ---- Drawing -------------------------------------------------------------
+    const FONT = "'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif";
+    const BODY = "'Inter Variable', 'Inter', system-ui, sans-serif";
+
+    function rr(x0: number, y0: number, w: number, h: number, r: number) {
+      ctx!.beginPath();
+      ctx!.roundRect(x0, y0, w, h, r);
+    }
+
+    function drawHouse(l: Extract<Lot, { type: 'house' }>) {
+      const c = ctx!;
+      c.fillStyle = HOUSE_TONES[l.tone];
+      c.fillRect(l.x, 0, l.w, FACADE);
+      c.fillStyle = 'rgba(0,0,0,0.08)';
+      c.fillRect(l.x, 0, 3, FACADE);
+      // Eixample windows with little balconies, two floors.
+      const cols = Math.max(2, Math.round(l.w / 50));
+      const gap = l.w / cols;
+      for (let f = 0; f < 2; f++) {
+        for (let i = 0; i < cols; i++) {
+          const wx = l.x + gap * i + gap / 2 - 9, wy = 16 + f * 46;
+          c.fillStyle = '#3b4560';
+          c.fillRect(wx, wy, 18, 26);
+          c.fillStyle = '#2a2f3d';
+          c.fillRect(wx - 4, wy + 24, 26, 3);
+          for (let k = 0; k < 5; k++) c.fillRect(wx - 3 + k * 6, wy + 18, 1.5, 7);
+        }
+      }
+      c.fillStyle = '#6b5a48';
+      c.fillRect(l.x + l.w / 2 - 12, FACADE - 26, 24, 26);
+    }
+
+    function drawShop(l: Extract<Lot, { type: 'shop' }>, isNear: boolean, night: boolean) {
+      const c = ctx!, s = l.stop;
+      c.fillStyle = '#efe6d3';
+      c.fillRect(l.x, 0, l.w, FACADE);
+      c.fillStyle = 'rgba(0,0,0,0.08)';
+      c.fillRect(l.x, 0, 3, FACADE);
+      // Upper floor windows
+      for (let i = 0; i < 3; i++) {
+        c.fillStyle = night ? '#ffd27a' : '#3b4560';
+        c.fillRect(l.x + 28 + i * 52, 14, 18, 24);
+      }
+      // Shop front
+      c.fillStyle = s.color;
+      c.fillRect(l.x + 8, 48, l.w - 16, FACADE - 48);
+      // Sign board
+      c.fillStyle = '#f4f1ea';
+      rr(l.x + 16, 53, l.w - 32, 30, 5);
+      c.fill();
+      c.fillStyle = '#0b1430';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      const size = s.label.length > 14 ? 11 : 14;
+      c.font = `800 ${size}px ${FONT}`;
+      c.fillText(s.label, l.x + l.w / 2, 63, l.w - 40);
+      c.fillStyle = '#3a4a75';
+      c.font = `600 8px ${BODY}`;
+      c.fillText(s.kind.toUpperCase(), l.x + l.w / 2, 76, l.w - 40);
+      // Window and door
+      c.fillStyle = night ? 'rgba(255, 220, 140, 0.9)' : 'rgba(255,255,255,0.55)';
+      c.fillRect(l.x + 18, 90, l.w / 2 - 34, 24);
+      c.fillRect(l.x + l.w / 2 + 16, 90, l.w / 2 - 34, 24);
+      c.fillStyle = isNear ? '#ffb020' : '#2a2f3d';
+      c.fillRect(l.x + l.w / 2 - 11, 88, 22, FACADE - 88);
+      // Awning stripes
+      const aw = l.w - 8;
+      for (let i = 0; i < 8; i++) {
+        c.fillStyle = i % 2 ? '#f4f1ea' : s.color === '#0b0b0b' ? '#5eea8c' : s.color;
+        c.fillRect(l.x + 4 + (aw / 8) * i, 40, aw / 8, 9);
+      }
+      // A welcome mat when Millie is at the door.
+      if (isNear) {
+        c.fillStyle = 'rgba(255, 176, 32, 0.45)';
+        rr(l.x + l.w / 2 - 22, FACADE + 2, 44, 12, 3);
+        c.fill();
+      }
+    }
+
+    function drawPark(l: Extract<Lot, { type: 'park' }>, isNear: boolean) {
+      const c = ctx!;
+      c.fillStyle = '#7fb55e';
+      c.fillRect(l.x, 0, l.w, WALK_BOT + 4);
+      c.fillStyle = 'rgba(255,255,255,0.12)';
+      for (let i = 0; i < 40; i++) {
+        const gx = l.x + ((i * 53) % l.w), gy = (i * 37) % (WALK_BOT - 10);
+        c.fillRect(gx, gy, 3, 3);
+      }
+      // Gravel path in
+      c.fillStyle = '#d8c9a8';
+      c.fillRect(l.x, 140, l.w, 40);
+      // Gate and sign
+      c.fillStyle = '#2a2f3d';
+      c.fillRect(l.x, 0, 4, 140);
+      c.fillStyle = isNear ? '#ffb020' : '#f4f1ea';
+      rr(l.x + 18, 92, 118, 34, 6);
+      c.fill();
+      c.fillStyle = '#0b1430';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = `800 13px ${FONT}`;
+      c.fillText('The park', l.x + 77, 104);
+      c.font = `600 9px ${BODY}`;
+      c.fillText('OFF-LEASH SOON', l.x + 77, 117);
+    }
+
+    function drawGround() {
+      const c = ctx!;
+      const x0 = Math.floor(camX / 22) * 22, x1 = camX + viewW + 22;
+      // Sidewalk: panot tiles
+      c.fillStyle = '#e2d9c8';
+      c.fillRect(camX, FACADE, viewW, CURB - FACADE);
+      c.strokeStyle = '#d0c5ae';
+      c.lineWidth = 1;
+      c.beginPath();
+      for (let tx = x0; tx < x1; tx += 22) { c.moveTo(tx, FACADE); c.lineTo(tx, CURB); }
+      for (let ty = FACADE; ty < CURB; ty += 22) { c.moveTo(camX, ty); c.lineTo(camX + viewW, ty); }
+      c.stroke();
+      c.fillStyle = '#d4c8b0';
+      for (let tx = x0; tx < x1; tx += 22) {
+        for (let ty = FACADE; ty < CURB - 11; ty += 22) {
+          c.beginPath();
+          c.arc(tx + 11, ty + 11, 3, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+      // Curb, bike lane and road
+      c.fillStyle = '#bdb3a0';
+      c.fillRect(camX, CURB - 4, viewW, 6);
+      c.fillStyle = '#3d6b58';
+      c.fillRect(camX, CURB + 2, viewW, 46);
+      c.fillStyle = '#4a4f5c';
+      c.fillRect(camX, CURB + 48, viewW, WH - CURB);
+      c.fillStyle = '#e8e4da';
+      for (let tx = Math.floor(camX / 60) * 60; tx < x1; tx += 60) c.fillRect(tx, CURB + 47, 30, 2);
+      for (let tx = Math.floor(camX / 240) * 240 + 80; tx < x1; tx += 240) drawBikeIcon(tx, LANE);
+      // A zebra crossing every so often.
+      for (let zx = 560; zx < WORLD_W; zx += 900) {
+        if (zx + 60 < camX || zx > x1) continue;
+        c.fillStyle = 'rgba(244, 241, 234, 0.9)';
+        for (let k = 0; k < 6; k++) c.fillRect(zx, CURB + 6 + k * 14, 56, 7);
+      }
+    }
+
+    function drawBikeIcon(bx: number, by: number) {
+      const c = ctx!;
+      c.strokeStyle = 'rgba(255,255,255,0.55)';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.arc(bx - 7, by, 5, 0, Math.PI * 2);
+      c.arc(bx + 7, by, 5, 0, Math.PI * 2);
+      c.moveTo(bx - 7, by);
+      c.lineTo(bx, by - 6);
+      c.lineTo(bx + 7, by);
+      c.stroke();
+    }
+
+    function drawBike(b: { x: number; dir: number; hue: string }) {
+      const c = ctx!, by = LANE + (b.dir === 1 ? 8 : -8);
+      c.save();
+      c.translate(b.x, by);
+      c.scale(b.dir, 1);
+      c.fillStyle = '#1b1b1f';
+      c.fillRect(-14, -1.5, 28, 3);
+      c.fillStyle = b.hue;
+      c.beginPath();
+      c.ellipse(-2, 0, 7, 6, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#5b3a29';
+      c.beginPath();
+      c.arc(1, 0, 3.5, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    }
+
+    function drawPoleBase(p: Pole) {
+      const c = ctx!;
+      c.fillStyle = 'rgba(0,0,0,0.18)';
+      c.beginPath();
+      c.ellipse(p.x + 3, p.y + 3, p.r + 2, p.r + 1, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = p.kind === 'tree' ? '#6b4a32' : '#2a2f3d';
+      c.beginPath();
+      c.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      c.fill();
+    }
+
+    function drawPoleTop(p: Pole, night: boolean) {
+      const c = ctx!;
+      if (p.kind === 'tree') {
+        c.fillStyle = 'rgba(70, 130, 60, 0.82)';
+        c.beginPath();
+        c.arc(p.x - 4, p.y - 6, 22, 0, Math.PI * 2);
+        c.arc(p.x + 10, p.y - 2, 16, 0, Math.PI * 2);
+        c.fill();
+      } else {
+        // Seen from above: the arm reaches out over the sidewalk.
+        c.strokeStyle = '#2a2f3d';
+        c.lineWidth = 2.5;
+        c.beginPath();
+        c.moveTo(p.x, p.y);
+        c.lineTo(p.x, p.y - 16);
+        c.stroke();
+        c.fillStyle = night ? '#ffe3a0' : '#3b4560';
+        c.beginPath();
+        c.ellipse(p.x, p.y - 18, 7, 4.5, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+
+    function drawHuman(night: boolean) {
+      const c = ctx!, r = HUMAN_R;
+      c.save();
+      c.translate(human.x, human.y);
+      c.fillStyle = 'rgba(0,0,0,0.18)';
+      c.beginPath();
+      c.ellipse(2, 3, r, r * 0.8, 0, 0, Math.PI * 2);
+      c.fill();
+      c.rotate(human.heading);
+      c.fillStyle = '#1fc9b7';
+      c.beginPath();
+      c.ellipse(0, 0, r * 0.75, r, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#5b3a29';
+      c.beginPath();
+      c.arc(-r * 0.05, 0, r * 0.5, 0, Math.PI * 2);
+      c.fill();
+      // The phone, glowing, held in front of the face.
+      c.shadowColor = night ? '#bfe6ff' : 'rgba(255,255,255,0.8)';
+      c.shadowBlur = night ? 14 : 6;
+      c.fillStyle = '#e9f6ff';
+      c.fillRect(r * 0.6, -r * 0.24, r * 0.34, r * 0.48);
+      c.restore();
+    }
+
+    function drawDog() {
+      const c = ctx!, r = DOG_R;
+      const t = performance.now() / 1000;
+      const wag = dog.moving ? Math.sin(t * 18) * 0.6 : Math.sin(t * 5) * 0.3;
+      c.save();
+      c.translate(dog.x, dog.y);
+      c.fillStyle = 'rgba(0,0,0,0.18)';
+      c.beginPath();
+      c.ellipse(2, 3, r * 1.3, r * 0.7, dog.heading, 0, Math.PI * 2);
+      c.fill();
+      c.rotate(dog.heading);
+      c.strokeStyle = '#1b1b1f';
+      c.lineWidth = r * 0.38;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(-r * 1.1, 0);
+      c.lineTo(-r * 1.1 - Math.cos(wag) * r, Math.sin(wag) * r);
+      c.stroke();
+      c.fillStyle = '#1b1b1f';
+      c.beginPath();
+      c.ellipse(-r * 0.15, 0, r * 1.2, r * 0.66, 0, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.arc(r * 1.0, 0, r * 0.58, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.ellipse(r * 0.85, -r * 0.55, r * 0.34, r * 0.2, -0.6, 0, Math.PI * 2);
+      c.ellipse(r * 0.85, r * 0.55, r * 0.34, r * 0.2, 0.6, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#ffb020';
+      c.lineWidth = r * 0.3;
+      c.beginPath();
+      c.moveTo(r * 0.5, -r * 0.48);
+      c.lineTo(r * 0.5, r * 0.48);
+      c.stroke();
+      c.restore();
+    }
+
+    function drawRope() {
+      const c = ctx!;
+      c.strokeStyle = '#d9403a';
+      c.lineWidth = 2;
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      c.beginPath();
+      c.moveTo(rope[0].x, rope[0].y);
+      for (let i = 1; i < ROPE_N; i++) {
+        const mx = (rope[i].x + rope[i + 1].x) / 2, my = (rope[i].y + rope[i + 1].y) / 2;
+        c.quadraticCurveTo(rope[i].x, rope[i].y, mx, my);
+      }
+      c.lineTo(rope[ROPE_N].x, rope[ROPE_N].y);
+      c.stroke();
+    }
+
+    function draw() {
+      const c = ctx!;
+      const night = isNight();
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.clearRect(0, 0, cssW, cssH);
+      c.setTransform(dpr * scale, 0, 0, dpr * scale, -camX * dpr * scale, 0);
+
+      drawGround();
+      for (const l of lots) {
+        if (l.x + l.w < camX - 10 || l.x > camX + viewW + 10) continue;
+        if (l.type === 'house') drawHouse(l);
+        else if (l.type === 'shop') drawShop(l, near === l && playing, night);
+        else drawPark(l, near === l && playing);
+      }
+      for (const b of bikes) drawBike(b);
+      const visible = poles.filter((p) => p.x > camX - 40 && p.x < camX + viewW + 40);
+      for (const p of visible) drawPoleBase(p);
+      drawRope();
+      drawHuman(night);
+      drawDog();
+      for (const p of visible) drawPoleTop(p, night);
+
+      if (night) {
+        c.fillStyle = 'rgba(11, 20, 48, 0.5)';
+        c.fillRect(camX, 0, viewW, WH);
+        c.globalCompositeOperation = 'lighter';
+        for (const p of visible) {
+          if (p.kind !== 'lamp') continue;
+          const g = c.createRadialGradient(p.x, p.y - 18, 2, p.x, p.y - 18, 70);
+          g.addColorStop(0, 'rgba(255, 200, 110, 0.35)');
+          g.addColorStop(1, 'rgba(255, 200, 110, 0)');
+          c.fillStyle = g;
+          c.fillRect(p.x - 70, p.y - 80, 140, 140);
+        }
+        c.globalCompositeOperation = 'source-over';
+      }
+    }
+
+    // ---- Loop and input ---------------------------------------------------------
+    let last = 0, raf = 0, onScreen = true;
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000 || 0);
+      last = now;
+      update(dt);
+      draw();
+      raf = onScreen ? requestAnimationFrame(frame) : 0;
+    }
+    function start() {
+      if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+    }
+    function takeLeash() {
+      if (!playing) { playing = true; say(); }
+    }
+    function goIn() {
+      if (near) links.get(near.stop.id)?.click();
+    }
+
+    fig.addEventListener('keydown', (e) => {
+      if (e.target !== fig) return;
+      if (e.code in KEYS) {
+        e.preventDefault();
+        takeLeash();
+        held.add(e.code);
+      } else if ((e.key === 'Enter' || e.key === ' ') && near) {
+        e.preventDefault();
+        goIn();
+      } else if (e.key === 'Escape') {
+        fig.blur();
+      }
+    });
+    fig.addEventListener('keyup', (e) => held.delete(e.code));
+    fig.addEventListener('blur', () => held.clear());
+    canvas.addEventListener('pointerdown', (e) => {
+      const r = canvas.getBoundingClientRect();
+      const wx = camX + (e.clientX - r.left) / scale, wy = (e.clientY - r.top) / scale;
+      fig.focus({ preventScroll: true });
+      const wasPlaying = playing;
+      takeLeash();
+      // A tap on a storefront walks Millie to its door; a second tap goes in.
+      const lot = stopLots.find((l) => wx >= l.x && wx < l.x + l.w && (wy < FACADE || l.type === 'park'));
+      if (lot && wy < FACADE + 10) {
+        if (wasPlaying && near === lot) { goIn(); return; }
+        target = { x: doorX(lot), y: lot.type === 'park' ? 160 : WALK_TOP + 10 };
+        return;
+      }
+      target = { x: wx, y: Math.max(WALK_TOP, Math.min(WALK_BOT, wy)) };
+    });
+
+    new ResizeObserver(() => { resize(); draw(); }).observe(canvas);
+    new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      if (onScreen) start();
+    }).observe(fig);
+    darkMq.addEventListener('change', draw);
+
+    resize();
+    say();
+    document.fonts?.ready.then(draw);
+    start();
+  }
+
+  const fig = document.querySelector<HTMLElement>('[data-street]');
+  if (fig) {
+    const stops: Stop[] = JSON.parse(fig.dataset.stops ?? '[]');
+    init(fig, stops);
+  }
+</script>
+
+<style>
+  .street {
+    margin: 0;
+    border-radius: var(--radius-l);
+    background: var(--bg-sunk);
+    overflow: hidden;
+  }
+  .street:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 4px;
+  }
+  .stage {
+    position: relative;
+    display: none;
+  }
+  .street:global(.live) .stage {
+    display: block;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: clamp(240px, 32vw, 380px);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .hint {
+    position: absolute;
+    left: 50%;
+    top: 12px;
+    margin: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--navy-deep);
+    color: var(--stone);
+    font-size: 14px;
+    font-weight: 600;
+    transform: translate(-50%, -6px);
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+  }
+  .hint:global(.show) {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px clamp(16px, 3vw, 24px) 20px;
+  }
+  .caption {
+    min-height: 1.6em;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  .stops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .stops a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+  .stops a:hover,
+  .stops a:global(.near) {
+    background: var(--c);
+    border-color: var(--c);
+    color: var(--i);
+  }
+  .stops a:global(.near) {
+    transform: translateY(-2px);
+  }
+</style>

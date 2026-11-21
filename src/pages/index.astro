@@ -1,7 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
-import EixampleMap from '../components/EixampleMap.astro';
+import StreetMap from '../components/StreetMap.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import PostList from '../components/PostList.astro';
 
@@ -30,7 +30,10 @@ const posts = (await getCollection('blog', ({ data }) => import.meta.env.DEV || 
         <a class="btn btn-ghost" href="/how-i-build">How I build</a>
       </div>
     </div>
-    <EixampleMap />
+  </section>
+
+  <section class="wrap" aria-label="Take Millie for a walk">
+    <StreetMap />
   </section>
 
   <section class="section wrap" aria-labelledby="work-title">
@@ -76,22 +79,13 @@ const posts = (await getCollection('blog', ({ data }) => import.meta.env.DEV || 
 
 <style>
   .hero {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: clamp(32px, 5vw, 56px);
-    padding-block: clamp(32px, 6vw, 72px) clamp(40px, 7vw, 80px);
+    padding-block: clamp(32px, 6vw, 72px) clamp(32px, 5vw, 56px);
   }
   .intro {
-    flex: 1 1 460px;
-    min-width: 0;
+    max-width: 880px;
     display: flex;
     flex-direction: column;
     gap: 22px;
-  }
-  .hero > :global(.map) {
-    flex: 1 1 420px;
-    min-width: 0;
   }
   h1 {
     font-size: clamp(44px, 6.6vw, 92px);
