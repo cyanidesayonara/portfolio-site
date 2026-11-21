@@ -18,13 +18,15 @@ const STOPS = [
 ];
 ---
 
-<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street. Arrow keys walk Millie, Shift sprints, E pees, Space barks and Enter goes into a shop." aria-describedby="street-caption">
+<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street. Arrow keys walk Millie, Shift sprints, E pees, Space barks, G shows the goals and Enter goes into a shop." aria-describedby="street-caption">
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
-    <p class="hint" data-hint aria-hidden="true"></p>
   </div>
   <figcaption>
-    <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
+    <div class="bar">
+      <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
+      <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
+    </div>
     <ul class="stops" aria-label="Stops on the street">
       {
         STOPS.map((s) => (
@@ -71,25 +73,34 @@ const STOPS = [
     cursor: pointer;
     touch-action: manipulation;
   }
-  .hint {
-    position: absolute;
-    left: 50%;
-    top: 12px;
-    margin: 0;
-    padding: 6px 14px;
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+  .sound {
+    display: none;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 2px solid var(--line);
     border-radius: 999px;
-    background: var(--navy-deep);
-    color: var(--stone);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
     font-size: 14px;
     font-weight: 600;
-    transform: translate(-50%, -6px);
-    opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    pointer-events: none;
+    cursor: pointer;
   }
-  .hint:global(.show) {
-    opacity: 1;
-    transform: translate(-50%, 0);
+  .street:global(.live) .sound {
+    display: inline-flex;
+    align-items: center;
+  }
+  .sound[aria-pressed='true'] {
+    background: var(--saffron);
+    border-color: var(--saffron);
+    color: var(--navy-deep);
   }
   figcaption {
     display: flex;
