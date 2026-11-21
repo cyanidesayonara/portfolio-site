@@ -1,0 +1,145 @@
+---
+const nav = [
+  { href: '/projects', label: 'Projects' },
+  { href: '/how-i-build', label: 'How I build' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/about', label: 'About' },
+];
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isCurrent = (href: string) => path === href || path.startsWith(href + '/');
+---
+
+<header class="site-header wrap">
+  <a class="brand" href="/">
+    <img src="/img/avatar.png" alt="" width="40" height="40" />
+    <span>Santtu Nykänen</span>
+  </a>
+  <nav aria-label="Main">
+    <ul>
+      {
+        nav.map((item) => (
+          <li>
+            <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+  <div class="actions">
+    <button class="theme-toggle" type="button" aria-label="Switch color theme">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"></path>
+      </svg>
+    </button>
+    <a class="btn btn-primary walk" href="/walk">Walk the site</a>
+  </div>
+</header>
+
+<script>
+  const btn = document.querySelector<HTMLButtonElement>('.theme-toggle');
+  btn?.addEventListener('click', () => {
+    const root = document.documentElement;
+    const current =
+      root.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try {
+      localStorage.setItem('theme', next);
+    } catch {}
+  });
+</script>
+
+<style>
+  .site-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding-block: 20px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 19px;
+    min-height: 44px;
+  }
+  .brand img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-sunk);
+  }
+  nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px;
+    font-weight: 500;
+    font-size: 15px;
+    text-decoration: none;
+    border-radius: 10px;
+  }
+  nav a[aria-current='page'] {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .theme-toggle:hover {
+    background: var(--bg-sunk);
+  }
+  .walk {
+    min-height: 44px;
+    font-size: 15px;
+    padding: 0 18px;
+  }
+  @media (max-width: 520px) {
+    /* The map's Park block and the hero carry this link on phones. */
+    .walk {
+      display: none;
+    }
+  }
+  @media (max-width: 720px) {
+    nav {
+      order: 3;
+      width: 100%;
+    }
+    nav ul {
+      justify-content: space-between;
+    }
+    nav a {
+      padding: 0 8px;
+    }
+  }
+</style>

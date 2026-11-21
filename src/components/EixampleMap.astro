@@ -1,0 +1,133 @@
+---
+/*
+  A 4×3 patch of Eixample: chamfered blocks with streets between them.
+  Some blocks are doors into the site; Millie trots round the streets.
+  All sizes are in container units, so the street centers are exact at
+  any width: blocks are 21.25cqw with 5cqw streets.
+*/
+type Block = { label?: string; href?: string; bg?: string; ink?: string };
+
+const blocks: Block[] = [
+  {},
+  { label: 'Leash', href: '/projects/path-of-leash-resistance', bg: 'var(--navy)', ink: 'var(--stone)' },
+  {},
+  { label: 'stemma', href: '/projects/stemma', bg: 'var(--turquoise)', ink: 'var(--navy-deep)' },
+  { label: 'Blog', href: '/blog', bg: 'var(--saffron)', ink: 'var(--navy-deep)' },
+  { label: 'Park', href: '/walk', bg: 'var(--leaf)', ink: 'var(--navy-deep)' },
+  {},
+  { label: 'Coriolis', href: '/projects/coriolis', bg: 'var(--navy-deep)', ink: 'var(--led)' },
+  {},
+  { label: 'About', href: '/about', bg: 'var(--magenta)', ink: 'var(--navy-deep)' },
+  {},
+  { label: 'How I build', href: '/how-i-build', bg: 'var(--surface)', ink: 'var(--ink)' },
+];
+---
+
+<figure class="map">
+  <div class="city">
+    <ul class="grid" aria-label="Map of the site">
+      {
+        blocks.map((b) =>
+          b.href ? (
+            <li>
+              <a class="block door" href={b.href} style={`--b:${b.bg};--i:${b.ink}`}>
+                {b.label}
+              </a>
+            </li>
+          ) : (
+            <li class="block" aria-hidden="true" />
+          ),
+        )
+      }
+    </ul>
+    <span class="millie" aria-hidden="true"></span>
+  </div>
+  <figcaption>Millie is out for a walk. Pick a block to visit.</figcaption>
+</figure>
+
+<style>
+  .map {
+    margin: 0;
+    padding: clamp(16px, 3vw, 28px);
+    background: var(--bg-sunk);
+    border-radius: var(--radius-l);
+  }
+  .city {
+    position: relative;
+    container-type: inline-size;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5cqw;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .block {
+    display: flex;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    background: var(--b, var(--block));
+    color: var(--i, var(--ink));
+    clip-path: polygon(22% 0, 78% 0, 100% 22%, 100% 78%, 78% 100%, 22% 100%, 0 78%, 0 22%);
+  }
+  li:has(> .door) {
+    display: flex;
+  }
+  .door {
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    text-align: center;
+    font-weight: 700;
+    font-size: clamp(11px, 3.2cqw, 16px);
+    line-height: 1.15;
+    text-decoration: none;
+    transition: transform 0.2s ease;
+  }
+  .door:hover {
+    color: var(--i);
+    transform: scale(1.06);
+  }
+  .door:focus-visible {
+    outline: none;
+    transform: scale(1.06);
+    box-shadow: inset 0 0 0 4px var(--focus);
+  }
+  .millie {
+    position: absolute;
+    left: 23.75cqw;
+    top: 23.75cqw;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border-radius: 50%;
+    background: var(--navy);
+    border: 4px solid var(--saffron);
+    box-shadow: var(--shadow);
+    animation: walk 14s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes walk {
+    0% { left: 23.75cqw; top: 23.75cqw; }
+    30% { left: 76.25cqw; top: 23.75cqw; }
+    42% { left: 76.25cqw; top: 50cqw; }
+    58% { left: 50cqw; top: 50cqw; }
+    70% { left: 50cqw; top: 23.75cqw; }
+    82% { left: 23.75cqw; top: 23.75cqw; }
+    90% { left: 23.75cqw; top: 50cqw; }
+    100% { left: 23.75cqw; top: 23.75cqw; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .millie {
+      animation: none;
+    }
+  }
+  figcaption {
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--ink-2);
+    text-align: center;
+  }
+</style>

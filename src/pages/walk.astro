@@ -1,0 +1,43 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Walk the site" description="A walkable version of this site, starring Millie. Coming soon.">
+  <section class="wrap walk">
+    <span class="eyebrow">Coming soon</span>
+    <h1>Take Millie for a walk.</h1>
+    <p class="lede">
+      This site is getting a playable twin: a few blocks of Barcelona where you are the dog, your
+      human is on their phone, and every building is a page. Drag them to a project and they'll
+      look it up.
+    </p>
+    <p class="lede">Until then, the original game runs right in your browser.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://cyanidesayonara.github.io/path-of-leash-resistance/">Play Path of Leash Resistance</a>
+      <a class="btn btn-ghost" href="/">Back to the map</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .walk {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-block: clamp(48px, 10vw, 120px);
+    max-width: 860px;
+  }
+  h1 {
+    font-size: clamp(48px, 7vw, 88px);
+  }
+  .lede {
+    font-size: 20px;
+    color: var(--ink-2);
+  }
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+  }
+</style>
