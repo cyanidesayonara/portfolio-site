@@ -196,6 +196,11 @@ export class StreetSound {
     if (t < 0) return;
     this.tone(240, t, 0.18, 'square', 0.1, this.sfx!, 1400, 170);
   }
+  slurp() {
+    const t = this.now();
+    if (t < 0) return;
+    for (let i = 0; i < 3; i++) this.tone(420 + i * 60, t + i * 0.09, 0.07, 'sine', 0.1, this.sfx!, 0, 700 + i * 80);
+  }
   flutter() {
     const t = this.now();
     if (t < 0) return;

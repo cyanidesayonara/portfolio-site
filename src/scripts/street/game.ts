@@ -3,9 +3,11 @@
   Resistance: you are Millie, your human is glued to their phone on the
   other end of a rope leash, and every shop is a page of the site.
 
-  Controls: arrows/WASD walk, Shift sprints (zoomies), E pees, Space
-  barks, G shows the goals, Enter goes into the shop at the door. On touch
-  screens a tap walks there and on-screen buttons sprint, pee and bark.
+  Controls match the real game's defaults: WASD or arrows move, Shift (or ])
+  runs, Space digs in, Q marks a spot, F squats when nature calls, G picks
+  up, E (or Ctrl) barks, Tab shows the goals, R starts again and Esc leaves.
+  Enter digs in too, except at a shop door, where it goes in. On touch
+  screens a tap walks there and on-screen buttons run, dig, pee and bark.
 */
 import {
   WH, FACADE, WALK_TOP, LANE, CAR_LANES,
@@ -67,7 +69,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const W = world.width;
 
   // ---- State ----------------------------------------------------------------------
-  const dog = { x: 70, y: 168, heading: 0, moving: false, sprint: false, peeing: 0, step: 0 };
+  const dog = { x: 70, y: 168, heading: 0, moving: false, sprint: false, peeing: 0, step: 0, dig: false, squat: 0 };
   const human = { x: 34, y: 150, heading: 0, walking: false, patience: 1, stop: 0, step: 0, stuck: 0, ghost: 0 };
   const rope = Array.from({ length: ROPE_N + 1 }, (_, i) => {
     const t = i / ROPE_N;
@@ -77,7 +79,14 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   let leash = ROPE_BASE;
   let heyT = 0;
   let pee = 0.6, zoom = 1, barkCd = 0, marked = 0;
-  const goals = { mark: false, pigeons: false, dog: false, bones: false };
+  const goals = { mark: false, pigeons: false, dog: false, bones: false, free: false };
+  let offLeash = false, offT = 0, clippedInPark = false;
+  let nature = 35, natureCalls = false;
+  const poops: { x: number; y: number; t: number }[] = [];
+  const ball = { x: world.park.x + 210, y: 110, vx: 0, vy: 0 };
+  let nearBone: { x: number; y: number; got: boolean } | null = null;
+  let nearDrink = false;
+  let touchDig: number | null = null, touchSquat: number | null = null;
   const bones = world.bones.map((b) => ({ ...b, got: false }));
   let bonesGot = 0;
   let toast: { text: string; t: number } | null = null;
@@ -107,7 +116,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   let camX = 0;
 
   // ---- Sizing and the static layer ---------------------------------------------------
-  let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0;
+  let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0, offY = 0;
   const bg = document.createElement('canvas');
   const bgc = bg.getContext('2d')!;
   let bgScale = 1;
@@ -127,6 +136,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     canvas!.width = Math.round(cssW * dpr);
     canvas!.height = Math.round(cssH * dpr);
     scale = cssH / WH;
+    // Fullscreen on a tall screen would zoom right in; keep a decent stretch
+    // of street in view and letterbox the rest.
+    if (fig.classList.contains('immersive') || document.fullscreenElement === fig) scale = Math.min(scale, cssW / 640);
+    offY = Math.max(0, (cssH - WH * scale) / 2);
     viewW = cssW / scale;
     buildBg();
   }
@@ -191,7 +204,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   function doPee() {
     if (dog.peeing > 0) return;
-    if (pee < 0.25) { say(dog, '...', 18); return; }
+    if (pee < 0.25) { say(dog, '...', 18); toast = { text: 'Out of pee! Find a water bowl', t: 2 }; return; }
     let best: Circle | null = null, bd = Infinity;
     for (const s of world.peeSpots) {
       const d = Math.hypot(s.x - dog.x, s.y - dog.y) - s.r - DOG_R;
@@ -209,6 +222,39 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       marked++;
       if (marked >= 5 && !goals.mark) { complete('mark', 'mark 5 spots'); say(human, 'Good girl!', 24); }
     }
+  }
+
+  function doPickup() {
+    if (!nearBone) return;
+    nearBone.got = true;
+    nearBone = null;
+    bonesGot++;
+    sound.pickup();
+    if (bonesGot >= 5) complete('bones', 'find 5 bones');
+  }
+
+  function resetRope() {
+    rope.forEach((p, i) => {
+      const t = i / ROPE_N;
+      p.x = p.px = human.x + (dog.x - human.x) * t;
+      p.y = p.py = human.y + (dog.y - human.y) * t;
+    });
+  }
+
+  // R starts the walk again, like the real game.
+  function restart() {
+    Object.assign(dog, { x: 70, y: 168, heading: 0, peeing: 0, squat: 0 });
+    Object.assign(human, { x: 34, y: 150, heading: 0, patience: 1, stop: 0, stuck: 0, ghost: 0 });
+    resetRope();
+    leash = ROPE_BASE; heyT = 0; pee = 0.6; zoom = 1; marked = 0; bonesGot = 0;
+    offLeash = false; clippedInPark = false; nature = 35; natureCalls = false;
+    for (const k of Object.keys(goals) as (keyof typeof goals)[]) goals[k] = false;
+    for (const sp of world.peeSpots) sp.marked = false;
+    for (const b of bones) b.got = false;
+    stains.length = 0; poops.length = 0; bubbles.length = 0; target = null;
+    Object.assign(ball, { x: world.park.x + 210, y: 110, vx: 0, vy: 0 });
+    camX = 0;
+    toast = { text: 'New walk', t: 1.5 };
   }
 
   function doBark() {
@@ -248,7 +294,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     const seg = leash / ROPE_N;
     // Inverse masses: the rope is light, Millie heavier, her human four times her weight.
-    const inv = (i: number) => (i === 0 ? 0.08 : i === ROPE_N ? 0.32 : 1);
+    const inv = (i: number) => (i === 0 ? 0.08 : i === ROPE_N ? (dog.dig ? 0.01 : 0.32) : 1);
     rope[0].x = human.x; rope[0].y = human.y;
     rope[ROPE_N].x = dog.x; rope[ROPE_N].y = dog.y;
     for (let it = 0; it < 22; it++) {
@@ -276,14 +322,30 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     barkCd -= dt;
     heyT -= dt;
     human.stop -= dt;
-    pee = Math.min(1, pee + dt * 0.07);
 
     let dir = playing ? input() : autopilot(dt);
     if (dog.peeing > 0) { dog.peeing -= dt; dir = null; }
-    const wantSprint = playing && (held.has('ShiftLeft') || held.has('ShiftRight') || touchSprint !== null);
+    // Dig in: Millie plants her feet and the leash holds her human instead.
+    dog.dig = playing && (held.has('Space') || held.has('Enter') || held.has('NumpadEnter') || touchDig !== null);
+    if (dog.dig) { dir = null; target = null; }
+    // Nature calls every so often: hold F (or POOP) to squat.
+    if (playing && !natureCalls && (nature -= dt) <= 0) natureCalls = true;
+    const squatting = natureCalls && (held.has('KeyF') || held.has('End') || touchSquat !== null);
+    if (squatting) {
+      dir = null;
+      dog.squat += dt;
+      if (dog.squat >= 1.1) {
+        poops.push({ x: dog.x - Math.cos(dog.heading) * DOG_R * 1.2, y: dog.y - Math.sin(dog.heading) * DOG_R * 1.2, t: 0 });
+        natureCalls = false;
+        nature = 40 + Math.random() * 30;
+        dog.squat = 0;
+        if (!offLeash) { human.stop = 2.2; say(human, pick(['Ugh. Bag time.', 'Really? Here?', 'Fine...']), 26); }
+      }
+    } else dog.squat = Math.max(0, dog.squat - dt * 2);
+    const wantSprint = playing && (held.has('ShiftLeft') || held.has('ShiftRight') || held.has('BracketRight') || touchSprint !== null);
     dog.sprint = !!dir && wantSprint && zoom > 0.04;
     zoom = dog.sprint ? Math.max(0, zoom - dt * 0.42) : Math.min(1, zoom + dt * 0.16);
-    const speed = !playing ? 70 : dog.sprint ? 235 : 140;
+    const speed = (!playing ? 70 : dog.sprint ? 235 : 140) * (offLeash ? 1.15 : 1);
     dog.moving = !!dir;
     if (dir) {
       dog.x += dir.x * speed * dt;
@@ -292,15 +354,53 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       dog.step += dt * (dog.sprint ? 24 : 15);
     }
     pushOut(dog, DOG_R);
-    for (const b of bones) {
-      if (b.got || Math.hypot(b.x - dog.x, b.y - dog.y) > DOG_R + 8) continue;
-      b.got = true;
-      bonesGot++;
-      sound.pickup();
-      if (bonesGot >= 5) complete('bones', 'find 5 bones');
+    nearBone = null;
+    for (const b of bones) if (!b.got && Math.hypot(b.x - dog.x, b.y - dog.y) < DOG_R + 16) nearBone = b;
+    if (offLeash) dog.x = Math.max(dog.x, world.park.x + 14);
+    // Drinking refills the pee meter; nothing else does.
+    const drink = world.drinks.find((d) => Math.hypot(d.x - dog.x, d.y - dog.y) < DOG_R + (d.kind === 'fountain' ? 16 : 10));
+    if (drink && playing && pee < 1) {
+      if (pee < 0.97 && !bubbles.some((b) => b.who === dog)) { say(dog, 'slurp', 16, false, 0.7); sound.slurp(); }
+      pee = Math.min(1, pee + dt * 0.45);
     }
+    nearDrink = !!drink;
+    updateBall(dt);
     if (dog.sprint) scatter(70, true);
     else scatter(36, playing);
+
+    // The park is an off-leash area: the human unclips her at the gate and
+    // waits there, and clips her back on when she comes back to them.
+    // Once clipped back on, she has to leave through the gate before the park unclips her again.
+    if (clippedInPark && dog.x < world.park.x + 8) clippedInPark = false;
+    if (!offLeash && !clippedInPark && playing && dog.x > world.park.x + 26 && dog.y < 212) {
+      offLeash = true;
+      offT = 0;
+      say(human, 'Off you go!', 28);
+      toast = { text: 'Off the leash!', t: 2 };
+      sound.pickup();
+      complete('free', 'run free in the park');
+    }
+    if (offLeash) {
+      offT += dt;
+      dog.y = Math.min(dog.y, 212 - DOG_R);
+      const gx = world.park.x + 26 - human.x, gy = 168 - human.y, gd = Math.hypot(gx, gy);
+      human.walking = gd > 2;
+      if (human.walking) {
+        const hs = Math.min(70 * dt, gd);
+        human.x += (gx / gd) * hs;
+        human.y += (gy / gd) * hs;
+        human.step += dt * 9;
+      }
+      human.heading = Math.atan2(dog.y - human.y, dog.x - human.x);
+      pushOut(human, HUMAN_R);
+      if (offT > 1.5 && Math.hypot(dog.x - human.x, dog.y - human.y) < DOG_R + HUMAN_R + 8) {
+        offLeash = false;
+        clippedInPark = true;
+        resetRope();
+        say(human, 'Come on, Millie.', 28);
+      }
+      return;
+    }
 
     // Patience: haul on them constantly and they snap and shorten the leash.
     const dx = dog.x - human.x, dy = dog.y - human.y, straight = Math.hypot(dx, dy) || 1;
@@ -345,6 +445,30 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     solveRope();
   }
 
+  function updateBall(dt: number) {
+    const d = Math.hypot(ball.x - dog.x, ball.y - dog.y);
+    if (d < DOG_R + 5 && d > 1e-4) {
+      const kick = dog.sprint ? 260 : 190;
+      ball.vx = ((ball.x - dog.x) / d) * kick;
+      ball.vy = ((ball.y - dog.y) / d) * kick;
+      ball.x = dog.x + ((ball.x - dog.x) / d) * (DOG_R + 5);
+      ball.y = dog.y + ((ball.y - dog.y) / d) * (DOG_R + 5);
+    }
+    const f = Math.max(0, 1 - dt * 1.4);
+    ball.vx *= f;
+    ball.vy *= f;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    const minX = world.park.x + 10, maxX = W - 6, minY = 34, maxY = 208;
+    if (ball.x < minX) { ball.x = minX; ball.vx = Math.abs(ball.vx) * 0.6; }
+    if (ball.x > maxX) { ball.x = maxX; ball.vx = -Math.abs(ball.vx) * 0.6; }
+    if (ball.y < minY) { ball.y = minY; ball.vy = Math.abs(ball.vy) * 0.6; }
+    if (ball.y > maxY) { ball.y = maxY; ball.vy = -Math.abs(ball.vy) * 0.6; }
+    const bx = ball.x, by = ball.y;
+    pushOut(ball, 4);
+    if (bx !== ball.x || by !== ball.y) { ball.vx *= -0.5; ball.vy *= -0.5; }
+  }
+
   function updatePeds(dt: number) {
     pedTimer -= dt;
     if (pedTimer <= 0 && peds.length < 3) {
@@ -354,7 +478,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       const prop = pick<Ped['prop']>(['phone', 'coffee', 'bag', 'dog', 'phone']);
       const ly = dir === 1 ? 153 : 148;
       const p: Ped = { x, y: ly, ly, dir, speed: 26 + Math.random() * 14, pause: 0, said: false, coat: pick(COATS), hair: pick(HAIRS), prop };
-      if (prop === 'dog') p.pet = { x: x - dir * 24, y: p.y + 10, heading: 0, color: pick(['#c98b4a', '#f4f1ea', '#8a6a4a', '#d9c3a0']), greeted: false };
+      if (prop === 'dog') p.pet = { x: x - dir * 22, y: p.y + 12, heading: dir === 1 ? 0 : Math.PI, color: pick(['#c98b4a', '#f4f1ea', '#8a6a4a', '#d9c3a0']), greeted: false };
       peds.push(p);
     }
     for (let i = peds.length - 1; i >= 0; i--) {
@@ -375,14 +499,24 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
           say(pet, 'Woof!', 16, true, 1);
           complete('dog', 'say hi to another dog');
         }
-        const tx = p.x - p.dir * 22, ty = p.y + 12 + Math.sin(performance.now() / 600 + p.x) * 3;
+        const tx = p.x - p.dir * 22, ty = p.y + 12;
         const wantX = pet.greeted && p.pause > 0 ? dog.x - Math.cos(dog.heading) * 14 : tx;
         const wantY = pet.greeted && p.pause > 0 ? dog.y : ty;
         const ddx = wantX - pet.x, ddy = wantY - pet.y, dd = Math.hypot(ddx, ddy);
-        if (dd > 1) {
-          pet.x += (ddx / dd) * Math.min(dd, 60 * dt);
-          pet.y += (ddy / dd) * Math.min(dd, 60 * dt);
-          pet.heading = Math.atan2(ddy, ddx);
+        if (dd > 3) {
+          const step = Math.min(dd - 2, 60 * dt);
+          pet.x += (ddx / dd) * step;
+          pet.y += (ddy / dd) * step;
+          // Ease the turn instead of snapping to every small correction.
+          const want = Math.atan2(ddy, ddx);
+          let turn = want - pet.heading;
+          turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+          pet.heading += turn * Math.min(1, dt * 6);
+        } else if (p.pause <= 0) {
+          const want = p.dir === 1 ? 0 : Math.PI;
+          let turn = want - pet.heading;
+          turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+          pet.heading += turn * Math.min(1, dt * 4);
         }
         const lx = pet.x - p.x, ly = pet.y - p.y, ld = Math.hypot(lx, ly);
         if (ld > 34) { pet.x = p.x + (lx / ld) * 34; pet.y = p.y + (ly / ld) * 34; }
@@ -471,13 +605,14 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     updateTraffic(dt);
     for (let i = bubbles.length - 1; i >= 0; i--) if ((bubbles[i].ttl -= dt) <= 0) bubbles.splice(i, 1);
     if (toast && (toast.t -= dt) <= 0) toast = null;
+    for (let i = poops.length - 1; i >= 0; i--) if ((poops[i].t += dt) > 3) poops.splice(i, 1);
 
     const want = clamp(dog.x - viewW * 0.45, 0, Math.max(0, W - viewW));
     camX = viewW >= W ? (W - viewW) / 2 : camX + (want - camX) * Math.min(1, dt * 4);
 
     let best: StopLot | null = null;
     for (const l of world.stops) {
-      const ok = l.type === 'park' ? dog.x > l.x + 12 : Math.abs(dog.x - doorX(l)) < 40 && dog.y < WALK_TOP + 32;
+      const ok = l.type === 'park' ? dog.x > l.x + 8 && dog.x < l.x + 160 && dog.y < 148 : Math.abs(dog.x - doorX(l)) < 40 && dog.y < WALK_TOP + 32;
       if (ok) best = l;
     }
     if (best !== near) {
@@ -491,7 +626,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   function sayCaption() {
     let text: string;
     if (near && playing) text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
-    else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. Hold RUN for zoomies, PEE marks a spot, BARK scatters the pigeons.' : 'Arrows walk · Shift zoomies · E pee · Space bark · G goals · Enter goes into a shop';
+    else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'WASD/arrows move · Shift run · Space dig in · Q mark · F squat · G pick up · E bark · Tab goals · R restart · Esc leave · Enter at a door goes in';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
     if (caption!.textContent !== text) caption!.textContent = text;
   }
@@ -629,6 +764,15 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.beginPath();
       c.arc(1, 0, 4, 0, Math.PI * 2);
       c.fill();
+      // Lights: white at the front, red at the back.
+      c.fillStyle = night ? '#fffbe6' : '#f4f1ea';
+      c.beginPath();
+      c.arc(15, 0, 1.8, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#ff3b30';
+      c.beginPath();
+      c.arc(-15, 0, 1.6, 0, Math.PI * 2);
+      c.fill();
     } else {
       shadowAt(0, 0, 26, 13);
       c.fillStyle = v.color;
@@ -647,9 +791,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.fillStyle = night ? '#fff3c4' : '#f4f1ea';
       c.fillRect(23, -10, 2.5, 5);
       c.fillRect(23, 5, 2.5, 5);
-      c.fillStyle = '#d9403a';
-      c.fillRect(-25.5, -10, 2, 5);
-      c.fillRect(-25.5, 5, 2, 5);
+      c.fillStyle = night ? '#ff4a3d' : '#d9403a';
+      c.beginPath();
+      c.roundRect(-26, -11, 3, 6, 1);
+      c.roundRect(-26, 5, 3, 6, 1);
+      c.fill();
     }
     c.restore();
   }
@@ -793,12 +939,17 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       ['Scatter the pigeons', goals.pigeons],
       ['Say hi to another dog', goals.dog],
       [`Find 5 bones${goals.bones ? '' : ` (${Math.min(bonesGot, 5)}/5)`}`, goals.bones],
+      ['Run free in the park', goals.free],
     ];
   }
 
   function bannerText(): string | null {
     if (toast) return toast.text;
-    if (near) return coarse ? `Tap the shop to go into ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
+    if (near) return coarse ? `Tap the sign to go into ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
+    if (nearBone) return coarse ? 'GRAB: pick up the bone' : 'G: pick up the bone';
+    if (natureCalls) return coarse ? 'Nature calls! Hold POOP' : 'Nature calls! Hold F';
+    if (pee < 0.25 && !nearDrink) return 'Thirsty! Find a water bowl';
+    if (offLeash) return 'Off the leash! Go back to your human to clip on';
     if (pee > 0.97 && !goals.mark) return 'Bursting! Go mark a spot';
     return null;
   }
@@ -863,7 +1014,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.font = `800 11px ${FONT}`;
     c.textAlign = 'left';
     c.fillText(`GOALS ${done}/${items.length}`, 10, 13.5);
-    keyBadge(gw - 8, 13, coarse ? (goalsOpen ? '–' : '+') : 'G');
+    keyBadge(gw - 8, 13, coarse ? (goalsOpen ? '–' : '+') : 'TAB');
     if (goalsOpen) {
       c.font = `600 10px ${BODY}`;
       items.forEach(([text, d], i) => {
@@ -905,28 +1056,58 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
     // Touch buttons
     if (coarse) for (const b of buttons()) {
-      const on = b.id === 'run' && touchSprint !== null;
-      c.fillStyle = on ? '#8bcb3c' : HUD_BG;
+      const on = (b.id === 'run' && touchSprint !== null) || (b.id === 'dig' && touchDig !== null) || (b.id === 'pee' && touchSquat !== null);
+      c.fillStyle = on ? '#8bcb3c' : b.id === 'grab' ? 'rgba(255, 176, 32, 0.92)' : HUD_BG;
       c.beginPath();
       c.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       c.fill();
-      if (b.id === 'pee') iconDrop(b.x, b.y - 5, '#ffb020', 1.1);
+      if (b.id === 'pee') iconDrop(b.x, b.y - 5, natureCalls ? '#b0674a' : '#ffb020', 1.1);
       else if (b.id === 'run') iconBolt(b.x, b.y - 5, on ? '#0b1430' : '#8bcb3c');
-      c.fillStyle = on ? '#0b1430' : '#f4f1ea';
+      else if (b.id === 'grab') iconBone(b.x, b.y - 5, '#0b1430', 0.9);
+      c.fillStyle = on || b.id === 'grab' ? '#0b1430' : '#f4f1ea';
       c.font = `800 9px ${FONT}`;
       c.textAlign = 'center';
-      c.fillText(b.label, b.x, b.y + (b.id === 'bark' ? 0.5 : 8));
+      const plain = b.id === 'bark' || b.id === 'dig';
+      c.fillText(b.label, b.x, b.y + (plain ? 0.5 : 8));
     }
     c.textAlign = 'left';
   }
 
   function buttons() {
-    const r = cssW < 520 ? 21 : 24, y = cssH - r - 10;
-    return [
-      { id: 'bark', label: 'BARK', x: cssW - r - 12, y, r },
-      { id: 'pee', label: 'PEE', x: cssW - r * 3 - 20, y, r },
-      { id: 'run', label: 'RUN', x: cssW - r * 5 - 28, y, r },
+    const r = cssW < 520 ? 21 : 24, y = cssH - r - 10, step = r * 2 + 8;
+    const x = (i: number) => cssW - r - 12 - step * i;
+    const list = [
+      { id: 'bark', label: 'BARK', x: x(0), y, r },
+      { id: 'pee', label: natureCalls ? 'POOP' : 'PEE', x: x(1), y, r },
+      { id: 'dig', label: 'DIG', x: x(2), y, r },
+      { id: 'run', label: 'RUN', x: x(3), y, r },
     ];
+    if (nearBone) list.push({ id: 'grab', label: 'GRAB', x: x(0), y: y - step, r });
+    return list;
+  }
+
+  function drawParkThings(x0: number, x1: number) {
+    for (const p of poops) {
+      if (p.x < x0 - 10 || p.x > x1 + 10) continue;
+      c.fillStyle = '#6b4a32';
+      c.beginPath();
+      c.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      c.arc(p.x + 2.5, p.y - 1.5, 2.4, 0, Math.PI * 2);
+      c.arc(p.x + 1, p.y - 3.5, 1.8, 0, Math.PI * 2);
+      c.fill();
+    }
+    if (ball.x > x0 - 10 && ball.x < x1 + 10) {
+      shadowAt(ball.x, ball.y, 4.5, 3);
+      c.fillStyle = '#d4e157';
+      c.beginPath();
+      c.arc(ball.x, ball.y, 4.5, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = 'rgba(255,255,255,0.8)';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.arc(ball.x - 3, ball.y, 3.5, -0.9, 0.9);
+      c.stroke();
+    }
   }
 
   function drawBones(x0: number, x1: number) {
@@ -951,8 +1132,15 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     const night = isNight();
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, canvas!.width, canvas!.height);
-    c.drawImage(bg, camX * bgScale, 0, viewW * bgScale, WH * bgScale, 0, 0, canvas!.width, canvas!.height);
-    c.setTransform(dpr * scale, 0, 0, dpr * scale, -camX * dpr * scale, 0);
+    if (offY > 0) {
+      // Letterbox: rooftops above the street, more road below it.
+      c.fillStyle = '#b8a888';
+      c.fillRect(0, 0, canvas!.width, Math.ceil(offY * dpr));
+      c.fillStyle = '#4a4f5c';
+      c.fillRect(0, Math.floor((offY + WH * scale) * dpr), canvas!.width, Math.ceil(offY * dpr) + 2);
+    }
+    c.drawImage(bg, camX * bgScale, 0, viewW * bgScale, WH * bgScale, 0, Math.round(offY * dpr), canvas!.width, Math.round(WH * scale * dpr));
+    c.setTransform(dpr * scale, 0, 0, dpr * scale, -camX * dpr * scale, offY * dpr);
     const x0 = camX, x1 = camX + viewW;
 
     c.fillStyle = 'rgba(214, 178, 60, 0.35)';
@@ -970,6 +1158,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
 
     drawBones(x0, x1);
+    drawParkThings(x0, x1);
     for (const v of vehicles) if (v.x > x0 - 60 && v.x < x1 + 60) drawVehicle(v, night);
     for (const g of pigeons) if (!g.flying) drawPigeon(g);
     for (const p of peds) {
@@ -981,13 +1170,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         c.moveTo(p.x, p.y);
         c.lineTo(p.pet.x, p.pet.y);
         c.stroke();
-        drawDogBody(p.pet.x, p.pet.y, p.pet.heading, 7, p.pet.color, performance.now() / 70, true, false, '#1fc9b7');
+        drawDogBody(p.pet.x, p.pet.y, p.pet.heading, 7, p.pet.color, performance.now() / 70, p.pause <= 0, false, '#1fc9b7');
       }
       drawPerson(p.x, p.y, p.dir === 1 ? 0 : Math.PI, PED_R, p.coat, p.hair, performance.now() / 110 + p.x, p.pause <= 0, p.prop, night);
     }
-    drawRope();
+    if (!offLeash) drawRope();
     drawPerson(human.x, human.y, human.heading, HUMAN_R, '#1fc9b7', '#5b3a29', human.step, human.walking, 'phone', night);
     drawDogBody(dog.x, dog.y, dog.heading, DOG_R, '#1b1b1f', dog.step, dog.moving, dog.peeing > 0, '#ffb020');
+    if (dog.dig || dog.squat > 0) {
+      // Scuff marks behind her paws while she digs in or squats.
+      c.strokeStyle = 'rgba(90, 70, 50, 0.45)';
+      c.lineWidth = 1.2;
+      const bx = dog.x - Math.cos(dog.heading) * DOG_R * 1.4, by = dog.y - Math.sin(dog.heading) * DOG_R * 1.4;
+      for (const o of [-4, 0, 4]) {
+        c.beginPath();
+        c.moveTo(bx + Math.sin(dog.heading) * o, by - Math.cos(dog.heading) * o);
+        c.lineTo(bx + Math.sin(dog.heading) * o - Math.cos(dog.heading) * 5, by - Math.cos(dog.heading) * o - Math.sin(dog.heading) * 5);
+        c.stroke();
+      }
+    }
     if (dog.peeing > 0) {
       c.fillStyle = 'rgba(240, 200, 60, 0.8)';
       c.beginPath();
@@ -999,16 +1200,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
     if (night) {
       c.fillStyle = 'rgba(11, 20, 48, 0.5)';
-      c.fillRect(x0, 0, viewW, WH);
+      c.fillRect(x0, -offY / scale - 1, viewW, WH + (2 * offY) / scale + 2);
       drawNightLights(c, world, x0, x1);
       c.globalCompositeOperation = 'lighter';
       for (const v of vehicles) {
-        if (v.kind !== 'car') continue;
-        const g = c.createRadialGradient(v.x + v.dir * 40, v.y, 2, v.x + v.dir * 40, v.y, 40);
+        const reach = v.kind === 'car' ? 40 : 22, size = v.kind === 'car' ? 40 : 20;
+        const g = c.createRadialGradient(v.x + v.dir * reach, v.y, 2, v.x + v.dir * reach, v.y, size);
         g.addColorStop(0, 'rgba(255, 240, 190, 0.35)');
         g.addColorStop(1, 'rgba(255, 240, 190, 0)');
         c.fillStyle = g;
-        c.fillRect(v.x + v.dir * 40 - 40, v.y - 40, 80, 80);
+        c.fillRect(v.x + v.dir * reach - size, v.y - size, size * 2, size * 2);
+        // Tail lights: one on a bike, a pair on a car.
+        const tx = v.x - v.dir * (v.kind === 'car' ? 26 : 15);
+        for (const ty of v.kind === 'car' ? [v.y - 7.5, v.y + 7.5] : [v.y]) {
+          const r = c.createRadialGradient(tx, ty, 1, tx, ty, v.kind === 'car' ? 8 : 9);
+          r.addColorStop(0, 'rgba(255, 60, 50, 0.55)');
+          r.addColorStop(1, 'rgba(255, 60, 50, 0)');
+          c.fillStyle = r;
+          c.fillRect(tx - 9, ty - 9, 18, 18);
+        }
       }
       c.globalCompositeOperation = 'source-over';
     }
@@ -1043,6 +1253,36 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       soundBtn.textContent = on ? 'Sound on' : 'Sound off';
     }
   }
+  // Fullscreen: the Fullscreen API where it exists, a window-filling mode where it doesn't.
+  const fsBtn = fig.querySelector<HTMLButtonElement>('[data-fullscreen]');
+  const isFull = () => document.fullscreenElement === fig || fig.classList.contains('immersive');
+  const syncFs = () => {
+    if (!fsBtn) return;
+    fsBtn.textContent = isFull() ? 'Exit fullscreen' : 'Fullscreen';
+    fsBtn.setAttribute('aria-pressed', String(isFull()));
+  };
+  function immersive(on: boolean) {
+    fig.classList.toggle('immersive', on);
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+    syncFs();
+  }
+  function toggleFullscreen() {
+    if (isFull()) {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      immersive(false);
+      return;
+    }
+    takeLeash();
+    fig.focus({ preventScroll: true });
+    // Some browsers and embedded views refuse or ignore the request without
+    // saying so: if the street isn't fullscreen shortly after, fill the window.
+    const req = fig.requestFullscreen?.();
+    if (req) req.catch(() => immersive(true));
+    window.setTimeout(() => { if (document.fullscreenElement !== fig) immersive(true); else syncFs(); }, 400);
+  }
+  fsBtn?.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', syncFs);
+
   if (soundBtn) {
     soundBtn.setAttribute('aria-pressed', String(wantSound));
     soundBtn.textContent = wantSound ? 'Sound on' : 'Sound off';
@@ -1052,28 +1292,38 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (near) links.get(near.stop.id)?.click();
   }
 
+  // The real game's default bindings (autoload/game.gd, the default layout).
+  const HOLD = new Set(['ShiftLeft', 'ShiftRight', 'BracketRight', 'Space', 'Enter', 'NumpadEnter', 'KeyF', 'End']);
   fig.addEventListener('keydown', (e) => {
     if (e.target !== fig) return;
-    if (e.code in MOVE || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-      if (e.code in MOVE) e.preventDefault();
-      takeLeash();
-      held.add(e.code);
-    } else if (e.code === 'Space') {
+    const code = e.code;
+    if (code === 'Escape') {
+      if (fig.classList.contains('immersive')) { toggleFullscreen(); return; }
+      fig.blur();
+      return;
+    }
+    if (code === 'Tab') {
+      if (e.shiftKey || !playing) return; // let Shift+Tab (and Tab before playing) move focus as usual
       e.preventDefault();
-      takeLeash();
-      if (!e.repeat) doBark();
-    } else if (e.code === 'KeyE' || e.code === 'KeyP') {
-      takeLeash();
-      if (!e.repeat) doPee();
-    } else if (e.key === 'Enter' && near) {
+      goalsOpen = !goalsOpen;
+      return;
+    }
+    if ((code === 'Enter' || code === 'NumpadEnter') && near) {
       e.preventDefault();
       goIn();
-    } else if (e.code === 'KeyG') {
-      takeLeash();
-      goalsOpen = !goalsOpen;
-    } else if (e.key === 'Escape') {
-      fig.blur();
+      return;
     }
+    if (code in MOVE || HOLD.has(code)) {
+      e.preventDefault();
+      takeLeash();
+      held.add(code);
+      return;
+    }
+    if (e.repeat) return;
+    if (code === 'KeyE' || code === 'ControlLeft' || code === 'ControlRight') { takeLeash(); doBark(); }
+    else if (code === 'KeyQ' || code === 'Delete') { takeLeash(); doPee(); }
+    else if (code === 'KeyG' || code === 'PageDown') { takeLeash(); doPickup(); }
+    else if (code === 'KeyR' && playing) restart();
   });
   fig.addEventListener('keyup', (e) => held.delete(e.code));
   fig.addEventListener('blur', () => held.clear());
@@ -1091,12 +1341,15 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       const b = buttons().find((b) => Math.hypot(b.x - sx, b.y - sy) < b.r + 6);
       if (b) {
         if (b.id === 'run') { touchSprint = e.pointerId; canvas.setPointerCapture(e.pointerId); }
+        else if (b.id === 'dig') { touchDig = e.pointerId; canvas.setPointerCapture(e.pointerId); }
+        else if (b.id === 'pee' && natureCalls) { touchSquat = e.pointerId; canvas.setPointerCapture(e.pointerId); }
         else if (b.id === 'pee') doPee();
+        else if (b.id === 'grab') doPickup();
         else doBark();
         return;
       }
     }
-    const wx = camX + sx / scale, wy = sy / scale;
+    const wx = camX + sx / scale, wy = (sy - offY) / scale;
     const lot = world.stops.find((l) => wx >= l.x && wx < l.x + l.w && (wy < FACADE || l.type === 'park'));
     if (lot && wy < FACADE + 10) {
       if (wasPlaying && near === lot) { goIn(); return; }
@@ -1105,7 +1358,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
   });
-  const endTouch = (e: PointerEvent) => { if (e.pointerId === touchSprint) touchSprint = null; };
+  const endTouch = (e: PointerEvent) => {
+    if (e.pointerId === touchSprint) touchSprint = null;
+    if (e.pointerId === touchDig) touchDig = null;
+    if (e.pointerId === touchSquat) touchSquat = null;
+  };
   canvas.addEventListener('pointerup', endTouch);
   canvas.addEventListener('pointercancel', endTouch);
 
@@ -1136,6 +1393,12 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       get bonesGot() { return bonesGot; },
       get goalsOpen() { return goalsOpen; },
       get banner() { return bannerText(); },
+      get offLeash() { return offLeash; },
+      get pee() { return pee; },
+      get natureCalls() { return natureCalls; },
+      set nature(v: number) { nature = v; },
+      get poops() { return poops.length; },
+      ball, world,
       bones,
       get near() { return near?.stop.id ?? null; },
       key(code: string, down: boolean) { fig.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code === 'Space' ? ' ' : code, bubbles: true })); },

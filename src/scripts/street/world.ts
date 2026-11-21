@@ -21,7 +21,7 @@ export type Circle = {
   x: number;
   y: number;
   r: number;
-  what: 'lamp' | 'tree' | 'hydrant' | 'bin' | 'bollard' | 'table';
+  what: 'lamp' | 'tree' | 'hydrant' | 'bin' | 'bollard' | 'table' | 'fountain';
   marked?: boolean;
 };
 export type Box = { shape: 'box'; x: number; y: number; w: number; h: number; what: 'bench' | 'planter' };
@@ -36,6 +36,7 @@ export type World = {
   crossings: number[];
   windows: { x: number; y: number; w: number; h: number }[];
   bones: { x: number; y: number }[];
+  drinks: { x: number; y: number; kind: 'bowl' | 'fountain' }[];
   park: StopLot;
   width: number;
 };
@@ -55,7 +56,7 @@ const FONT = "'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, 
 const BODY = "'Inter Variable', 'Inter', system-ui, sans-serif";
 
 export const doorX = (l: StopLot) => (l.type === 'park' ? l.x + 70 : l.x + l.w / 2);
-export const doorY = (l: StopLot) => (l.type === 'park' ? 165 : WALK_TOP + 10);
+export const doorY = (l: StopLot) => (l.type === 'park' ? 138 : WALK_TOP + 10);
 
 // A tiny deterministic random, so the street looks the same every visit.
 function rng(seed: number) {
@@ -137,7 +138,17 @@ export function buildWorld(stops: Stop[]): World {
   for (let bx = 250; bx < park.x - 60; bx += 340) bones.push({ x: bx, y: 141 });
   bones.push({ x: crossings[0] + 160, y: 300 }, { x: park.x + 120, y: 70 });
 
-  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], bones, park, width };
+  // Somewhere to drink: water bowls outside the café and the kiosk, and a
+  // cast-iron drinking fountain in the park.
+  const drinks: { x: number; y: number; kind: 'bowl' | 'fountain' }[] = [];
+  for (const id of ['about', 'blog']) {
+    const l = shops.find((x) => x.stop.id === id);
+    if (l) drinks.push({ x: l.x + l.w / 2 + 30, y: 133, kind: 'bowl' });
+  }
+  drinks.push({ x: park.x + 70, y: 196, kind: 'fountain' });
+  solids.push({ shape: 'circle', x: park.x + 70, y: 196, r: 6, what: 'fountain' });
+
+  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], bones, drinks, park, width };
 }
 
 // ---- Static layer --------------------------------------------------------------
@@ -151,6 +162,21 @@ export function drawStatic(c: CanvasRenderingContext2D, w: World) {
     else drawPark(c, l);
   }
   for (const s of w.solids) drawSolidBase(c, s);
+  for (const d of w.drinks) {
+    if (d.kind !== 'bowl') continue;
+    c.fillStyle = 'rgba(30, 20, 10, 0.2)';
+    c.beginPath();
+    c.ellipse(d.x + 2, d.y + 2, 7, 5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#e5487a';
+    c.beginPath();
+    c.ellipse(d.x, d.y, 7, 5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#6ec6e8';
+    c.beginPath();
+    c.ellipse(d.x, d.y, 4.6, 3, 0, 0, Math.PI * 2);
+    c.fill();
+  }
 }
 
 function drawGround(c: CanvasRenderingContext2D, w: World) {
@@ -305,11 +331,13 @@ function drawShop(c: CanvasRenderingContext2D, w: World, l: Extract<Lot, { type:
   c.fillStyle = '#0b1430';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.font = `800 ${s.label.length > 14 ? 11 : 14}px ${FONT}`;
-  c.fillText(s.label, l.x + l.w / 2, 64, l.w - 40);
-  c.fillStyle = '#3a4a75';
-  c.font = `600 8px ${BODY}`;
-  c.fillText(s.kind.toUpperCase(), l.x + l.w / 2, 77, l.w - 40);
+  c.font = `800 ${s.label.length > 14 ? 11 : s.kind ? 14 : 16}px ${FONT}`;
+  c.fillText(s.label, l.x + l.w / 2, s.kind ? 64 : 69, l.w - 40);
+  if (s.kind) {
+    c.fillStyle = '#3a4a75';
+    c.font = `600 8px ${BODY}`;
+    c.fillText(s.kind.toUpperCase(), l.x + l.w / 2, 77, l.w - 40);
+  }
   const aw = l.w - 8;
   for (let i = 0; i < 8; i++) {
     c.fillStyle = i % 2 ? '#f4f1ea' : accent;
@@ -363,7 +391,7 @@ function drawPark(c: CanvasRenderingContext2D, l: Extract<Lot, { type: 'park' }>
   c.font = `800 13px ${FONT}`;
   c.fillText('The park', l.x + 80, 104);
   c.font = `600 8px ${BODY}`;
-  c.fillText('OFF-LEASH AREA SOON', l.x + 80, 117);
+  c.fillText('OFF-LEASH AREA', l.x + 80, 117);
 }
 
 function shadow(c: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number) {
@@ -440,6 +468,21 @@ function drawSolidBase(c: CanvasRenderingContext2D, s: Solid) {
       c.fillStyle = '#3b4560';
       c.beginPath();
       c.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      c.fill();
+      break;
+    case 'fountain':
+      // A Barcelona cast-iron drinking fountain, with its puddle.
+      c.fillStyle = 'rgba(110, 198, 232, 0.55)';
+      c.beginPath();
+      c.ellipse(s.x + 4, s.y + 10, 11, 5, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#2f4a3c';
+      c.beginPath();
+      c.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#c9a74a';
+      c.beginPath();
+      c.arc(s.x, s.y, 2, 0, Math.PI * 2);
       c.fill();
       break;
     case 'table':
