@@ -9,7 +9,7 @@ const projects = (await getCollection('projects'))
   .filter((p) => p.data.featured)
   .sort((a, b) => a.data.order - b.data.order);
 
-const posts = (await getCollection('blog', ({ data }) => !data.draft))
+const posts = (await getCollection('blog', ({ data }) => import.meta.env.DEV || !data.draft))
   .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
   .slice(0, 3);
 ---
