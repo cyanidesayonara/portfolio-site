@@ -11,21 +11,24 @@ const STOPS = [
   { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Game', href: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
   { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'Music app', href: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
   { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'LED wall', href: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
-  { id: 'blog', label: 'Blog', short: 'Blog', kind: 'Kiosk', href: '/blog', color: '#e5487a', ink: '#0b1430' },
-  { id: 'how', label: 'How I build', short: 'How I build', kind: 'Workshop', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
-  { id: 'about', label: 'About', short: 'About', kind: 'Café', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
+  { id: 'blog', label: 'Blog', short: 'Blog', kind: '', href: '/blog', color: '#e5487a', ink: '#0b1430' },
+  { id: 'how', label: 'How I build', short: 'How I build', kind: '', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
+  { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
   { id: 'park', label: 'The park', short: 'Park', kind: 'Coming soon', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
 ];
 ---
 
-<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street. Arrow keys walk Millie, Shift sprints, E pees, Space barks, G shows the goals and Enter goes into a shop." aria-describedby="street-caption">
+<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street, with the same controls as Path of Leash Resistance: WASD or arrows move, Shift runs, Space digs in, Q marks a spot, F squats, G picks up, E barks, Tab shows the goals and Enter goes into a shop." aria-describedby="street-caption">
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
   </div>
   <figcaption>
     <div class="bar">
       <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
-      <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
+      <div class="tools">
+        <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
+        <button class="sound" type="button" data-fullscreen aria-pressed="false">Fullscreen</button>
+      </div>
     </div>
     <ul class="stops" aria-label="Stops on the street">
       {
@@ -72,6 +75,48 @@ const STOPS = [
     height: clamp(300px, 34vw, 420px);
     cursor: pointer;
     touch-action: manipulation;
+  }
+  /* Fullscreen: the real thing where the browser allows it, otherwise
+     the street fills the window (iPhone Safari). */
+  .street:fullscreen,
+  .street:global(.immersive) {
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+    background: var(--bg);
+  }
+  .street:global(.immersive) {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+  }
+  .street:fullscreen .stage,
+  .street:global(.immersive) .stage {
+    flex: 1;
+    min-height: 0;
+  }
+  .street:fullscreen canvas,
+  .street:global(.immersive) canvas {
+    height: 100%;
+  }
+  .street:fullscreen figcaption,
+  .street:global(.immersive) figcaption {
+    padding-block: 10px 12px;
+  }
+  /* Once the game runs, the stops are for discovering on the street (or in
+     the site's own nav). The links stay in the page for screen readers and
+     for the game, which follows them; without JavaScript they show. */
+  .street:global(.live) .stops {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .tools {
+    display: flex;
+    gap: 8px;
   }
   .bar {
     display: flex;
