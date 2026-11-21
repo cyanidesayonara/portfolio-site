@@ -626,7 +626,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   function sayCaption() {
     let text: string;
     if (near && playing) text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
-    else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'WASD/arrows move · Shift run · Space dig in · Q mark · F squat · G pick up · E bark · Tab goals · R restart · Esc leave · Enter at a door goes in';
+    else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'Walk Millie up to a shop door to go in. Arrow keys work too.';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
     if (caption!.textContent !== text) caption!.textContent = text;
   }
