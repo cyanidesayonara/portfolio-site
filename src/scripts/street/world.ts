@@ -35,6 +35,7 @@ export type World = {
   benches: Box[];
   crossings: number[];
   windows: { x: number; y: number; w: number; h: number }[];
+  bones: { x: number; y: number }[];
   park: StopLot;
   width: number;
 };
@@ -131,7 +132,12 @@ export function buildWorld(stops: Stop[]): World {
     (s): s is Circle => s.shape === 'circle' && ['lamp', 'tree', 'hydrant', 'bin', 'bollard'].includes(s.what),
   );
 
-  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], park, width };
+  // Bones to find: along the shopfronts, one out in the road, one in the park.
+  const bones: { x: number; y: number }[] = [];
+  for (let bx = 250; bx < park.x - 60; bx += 340) bones.push({ x: bx, y: 141 });
+  bones.push({ x: crossings[0] + 160, y: 300 }, { x: park.x + 120, y: 70 });
+
+  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], bones, park, width };
 }
 
 // ---- Static layer --------------------------------------------------------------

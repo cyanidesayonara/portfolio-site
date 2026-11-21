@@ -4,19 +4,20 @@
   other end of a rope leash, and every shop is a page of the site.
 
   Controls: arrows/WASD walk, Shift sprints (zoomies), E pees, Space
-  barks, Enter goes into the shop at the door. On touch screens a tap
-  walks there and on-screen buttons sprint, pee and bark.
+  barks, G shows the goals, Enter goes into the shop at the door. On touch
+  screens a tap walks there and on-screen buttons sprint, pee and bark.
 */
 import {
   WH, FACADE, WALK_TOP, LANE, CAR_LANES,
   buildWorld, drawStatic, drawTops, drawNightLights, doorX, doorY,
   type Stop, type StopLot, type Circle,
 } from './world';
+import { StreetSound } from './audio';
 
 type P = { x: number; y: number };
 type Bubble = { text: string; ttl: number; who: P; lift: number; loud: boolean };
 type Ped = {
-  x: number; y: number; dir: 1 | -1; speed: number; pause: number; said: boolean;
+  x: number; y: number; ly: number; dir: 1 | -1; speed: number; pause: number; said: boolean;
   coat: string; hair: string; prop: 'phone' | 'coffee' | 'bag' | 'dog';
   pet?: { x: number; y: number; heading: number; color: string; greeted: boolean };
 };
@@ -48,8 +49,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const canvas = fig.querySelector('canvas');
   const ctx = canvas?.getContext('2d');
   const caption = fig.querySelector<HTMLElement>('[data-caption]');
-  const hint = fig.querySelector<HTMLElement>('[data-hint]');
-  if (!canvas || !ctx || !caption || !hint) return;
+  const soundBtn = fig.querySelector<HTMLButtonElement>('[data-sound]');
+  if (!canvas || !ctx || !caption) return;
   const c = ctx;
   const links = new Map([...fig.querySelectorAll<HTMLAnchorElement>('[data-stop]')].map((a) => [a.dataset.stop ?? '', a]));
   fig.classList.add('live');
@@ -67,7 +68,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   // ---- State ----------------------------------------------------------------------
   const dog = { x: 70, y: 168, heading: 0, moving: false, sprint: false, peeing: 0, step: 0 };
-  const human = { x: 34, y: 150, heading: 0, walking: false, patience: 1, stop: 0, step: 0 };
+  const human = { x: 34, y: 150, heading: 0, walking: false, patience: 1, stop: 0, step: 0, stuck: 0, ghost: 0 };
   const rope = Array.from({ length: ROPE_N + 1 }, (_, i) => {
     const t = i / ROPE_N;
     const x = human.x + (dog.x - human.x) * t, y = human.y + (dog.y - human.y) * t;
@@ -75,8 +76,16 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   });
   let leash = ROPE_BASE;
   let heyT = 0;
-  let pee = 1, zoom = 1, barkCd = 0, marked = 0;
-  const goals = { mark: false, pigeons: false, dog: false };
+  let pee = 0.6, zoom = 1, barkCd = 0, marked = 0;
+  const goals = { mark: false, pigeons: false, dog: false, bones: false };
+  const bones = world.bones.map((b) => ({ ...b, got: false }));
+  let bonesGot = 0;
+  let toast: { text: string; t: number } | null = null;
+  let goalsOpen: boolean | null = null;
+  let goalsRect = { x: 0, y: 0, w: 0, h: 0 };
+  const sound = new StreetSound();
+  let wantSound = false;
+  try { wantSound = localStorage.getItem('street-sound') === 'on'; } catch { /* storage blocked */ }
   const stains: Stain[] = [];
   const bubbles: Bubble[] = [];
   const peds: Ped[] = [];
@@ -123,8 +132,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
 
   // ---- Collision ---------------------------------------------------------------------
-  function pushOut(p: P, r: number, withBodies: boolean) {
-    for (const s of world.solids) {
+  function pushOut(p: P, r: number, ghost = false) {
+    if (!ghost) for (const s of world.solids) {
       if (s.shape === 'circle') {
         const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy), min = s.r + r;
         if (d < min && d > 1e-4) { p.x = s.x + (dx / d) * min; p.y = s.y + (dy / d) * min; }
@@ -137,15 +146,16 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         }
       }
     }
-    if (withBodies) {
-      for (const o of peds) {
-        const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = PED_R + r;
-        if (d < min && d > 1e-4) { p.x = o.x + (dx / d) * min; p.y = o.y + (dy / d) * min; }
-      }
-    }
     const inPark = p.x > world.park.x + 12;
     p.x = clamp(p.x, r, W - r);
     p.y = clamp(p.y, (inPark ? 30 : WALK_TOP) + r * 0.6, WH - r - 2);
+  }
+
+  function complete(key: keyof typeof goals, label: string) {
+    if (goals[key] || !playing) return;
+    goals[key] = true;
+    toast = { text: `Goal done: ${label}`, t: 2.6 };
+    sound.goal();
   }
 
   // ---- Talking -----------------------------------------------------------------------
@@ -189,6 +199,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     dog.peeing = 0.9;
     pee -= 0.25;
+    sound.pee();
     const sx = best ? best.x + (dog.x - best.x) * 0.5 : dog.x - Math.cos(dog.heading) * DOG_R;
     const sy = best ? best.y + (dog.y - best.y) * 0.5 + 4 : dog.y - Math.sin(dog.heading) * DOG_R;
     stains.push({ x: sx, y: sy, r: 6 + Math.random() * 3 });
@@ -196,7 +207,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (best && !best.marked) {
       best.marked = true;
       marked++;
-      if (marked >= 5 && !goals.mark) { goals.mark = true; say(human, 'Good girl!', 24); }
+      if (marked >= 5 && !goals.mark) { complete('mark', 'mark 5 spots'); say(human, 'Good girl!', 24); }
     }
   }
 
@@ -204,6 +215,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (barkCd > 0) return;
     barkCd = 0.5;
     say(dog, 'WOOF!', 20, true, 0.9);
+    sound.bark();
     scatter(150, true);
     if (Math.random() < 0.6) { say(human, pick(['Shh!', 'Millie!', 'What?']), 26); human.stop = 0.5; }
     for (const p of peds) {
@@ -223,7 +235,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       g.vy = -120 - Math.random() * 80;
       any = true;
     }
-    if (any && byPlayer && playing) goals.pigeons = true;
+    if (any && byPlayer && playing) { sound.flutter(); complete('pigeons', 'scatter the pigeons'); }
   }
 
   // ---- Simulation ----------------------------------------------------------------------
@@ -248,12 +260,12 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         a.x += dx * k * wa; a.y += dy * k * wa;
         b.x -= dx * k * wb; b.y -= dy * k * wb;
       }
-      for (let i = 1; i < ROPE_N; i++) pushOut(rope[i], 1.5, false);
+      for (let i = 1; i < ROPE_N; i++) pushOut(rope[i], 1.5);
     }
     human.x = rope[0].x; human.y = rope[0].y;
     dog.x = rope[ROPE_N].x; dog.y = rope[ROPE_N].y;
-    pushOut(human, HUMAN_R, true);
-    pushOut(dog, DOG_R, true);
+    pushOut(human, HUMAN_R, human.ghost > 0);
+    pushOut(dog, DOG_R);
     const dx = dog.x - human.x, dy = dog.y - human.y, d = Math.hypot(dx, dy);
     if (d > leash) { dog.x = human.x + (dx / d) * leash; dog.y = human.y + (dy / d) * leash; }
     rope[0].x = human.x; rope[0].y = human.y;
@@ -279,7 +291,14 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       dog.heading = Math.atan2(dir.y, dir.x);
       dog.step += dt * (dog.sprint ? 24 : 15);
     }
-    pushOut(dog, DOG_R, true);
+    pushOut(dog, DOG_R);
+    for (const b of bones) {
+      if (b.got || Math.hypot(b.x - dog.x, b.y - dog.y) > DOG_R + 8) continue;
+      b.got = true;
+      bonesGot++;
+      sound.pickup();
+      if (bonesGot >= 5) complete('bones', 'find 5 bones');
+    }
     if (dog.sprint) scatter(70, true);
     else scatter(36, playing);
 
@@ -291,6 +310,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     else human.patience = Math.min(1, human.patience + dt * 0.12);
     if (human.patience <= 0) {
       say(human, 'HEY!', 28, true, 1.6);
+      sound.hey();
+      toast = { text: 'Leash shortened!', t: 2 };
       heyT = 3.5;
       human.patience = 1;
       human.stop = 0.7;
@@ -302,16 +323,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     let ropeLen = 0;
     for (let i = 0; i < ROPE_N; i++) ropeLen += Math.hypot(rope[i + 1].x - rope[i].x, rope[i + 1].y - rope[i].y);
     human.walking = human.stop <= 0 && (ropeLen > leash * 0.8 || straight > leash * 0.6);
+    const hx0 = human.x, hy0 = human.y;
+    let hs = 0;
     if (human.walking) {
       const guide = rope[4];
       const gx = guide.x - human.x, gy = guide.y - human.y, gd = Math.hypot(gx, gy) || 1;
-      const hs = (playing ? 112 : 55) * dt;
-      human.x += (gx / gd) * Math.min(hs, gd);
-      human.y += (gy / gd) * Math.min(hs, gd);
+      hs = Math.min((playing ? 112 : 55) * dt, gd);
+      human.x += (gx / gd) * hs;
+      human.y += (gy / gd) * hs;
       human.heading = Math.atan2(gy, gx);
       human.step += dt * 9;
     }
-    pushOut(human, HUMAN_R, true);
+    human.ghost -= dt;
+    pushOut(human, HUMAN_R, human.ghost > 0);
+    // A gap the leash fits through can be too narrow for a person. If they
+    // stop making progress, let them squeeze past instead of sticking.
+    const moved = Math.hypot(human.x - hx0, human.y - hy0);
+    if (human.walking && hs > 0.5 && moved < hs * 0.3) human.stuck += dt;
+    else human.stuck = Math.max(0, human.stuck - dt * 2);
+    if (human.stuck > 0.4) { human.ghost = 0.9; human.stuck = 0; }
     solveRope();
   }
 
@@ -322,7 +352,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
       const x = clamp(dir === 1 ? camX - 30 : camX + viewW + 30, 20, W - 20);
       const prop = pick<Ped['prop']>(['phone', 'coffee', 'bag', 'dog', 'phone']);
-      const p: Ped = { x, y: dir === 1 ? 153 : 148, dir, speed: 26 + Math.random() * 14, pause: 0, said: false, coat: pick(COATS), hair: pick(HAIRS), prop };
+      const ly = dir === 1 ? 153 : 148;
+      const p: Ped = { x, y: ly, ly, dir, speed: 26 + Math.random() * 14, pause: 0, said: false, coat: pick(COATS), hair: pick(HAIRS), prop };
       if (prop === 'dog') p.pet = { x: x - dir * 24, y: p.y + 10, heading: 0, color: pick(['#c98b4a', '#f4f1ea', '#8a6a4a', '#d9c3a0']), greeted: false };
       peds.push(p);
     }
@@ -342,7 +373,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
           pet.greeted = true;
           p.pause = 2.4;
           say(pet, 'Woof!', 16, true, 1);
-          if (playing) goals.dog = true;
+          complete('dog', 'say hi to another dog');
         }
         const tx = p.x - p.dir * 22, ty = p.y + 12 + Math.sin(performance.now() / 600 + p.x) * 3;
         const wantX = pet.greeted && p.pause > 0 ? dog.x - Math.cos(dog.heading) * 14 : tx;
@@ -355,10 +386,18 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         }
         const lx = pet.x - p.x, ly = pet.y - p.y, ld = Math.hypot(lx, ly);
         if (ld > 34) { pet.x = p.x + (lx / ld) * 34; pet.y = p.y + (ly / ld) * 34; }
-        pushOut(pet, 7, false);
+        pushOut(pet, 7);
       }
       if (p.pause > 0) p.pause -= dt;
       else p.x += p.dir * p.speed * dt;
+      // Pedestrians are never in the way for long: Millie and her human
+      // nudge them aside, and they drift back to their line afterwards.
+      for (const [o, r] of [[dog, DOG_R], [human, HUMAN_R]] as const) {
+        const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = r + PED_R;
+        if (d < min && d > 1e-4) { p.x = o.x + (dx / d) * min; p.y = o.y + (dy / d) * min; }
+      }
+      p.y += (p.ly - p.y) * Math.min(1, dt * 1.5);
+      p.y = clamp(p.y, WALK_TOP + PED_R, 210 - PED_R);
       if (p.x < -40 || p.x > W + 40 || p.x < camX - 200 || p.x > camX + viewW + 200) peds.splice(i, 1);
     }
   }
@@ -412,6 +451,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       v.alerted -= dt;
       if (blocked && v.alerted <= 0 && bodies.some((o) => Math.abs(o.y - v.y) < band && (o.x - v.x) * v.dir > 0 && (o.x - v.x) * v.dir < reach)) {
         say(v, v.kind === 'car' ? 'HONK!' : 'Ring ring!', 22, true, 1.1);
+        if (v.x > camX && v.x < camX + viewW) { if (v.kind === 'car') sound.honk(); else sound.bell(); }
         v.alerted = 3;
         v.wobble = 0.6;
       }
@@ -430,6 +470,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     updatePigeons(dt);
     updateTraffic(dt);
     for (let i = bubbles.length - 1; i >= 0; i--) if ((bubbles[i].ttl -= dt) <= 0) bubbles.splice(i, 1);
+    if (toast && (toast.t -= dt) <= 0) toast = null;
 
     const want = clamp(dog.x - viewW * 0.45, 0, Math.max(0, W - viewW));
     camX = viewW >= W ? (W - viewW) / 2 : camX + (want - camX) * Math.min(1, dt * 4);
@@ -450,12 +491,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   function sayCaption() {
     let text: string;
     if (near && playing) text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
-    else if (playing) text = coarse ? 'Walk up to a shop door. Hold RUN for zoomies, PEE marks a spot, BARK scatters the pigeons.' : 'Arrows walk · Shift zoomies · E pee · Space bark · Enter goes into a shop';
+    else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. Hold RUN for zoomies, PEE marks a spot, BARK scatters the pigeons.' : 'Arrows walk · Shift zoomies · E pee · Space bark · G goals · Enter goes into a shop';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
     if (caption!.textContent !== text) caption!.textContent = text;
-    const h = near && playing ? (coarse ? 'Tap to go in' : 'Enter to go in') : '';
-    if (hint!.textContent !== h) hint!.textContent = h;
-    hint!.classList.toggle('show', !!h);
   }
 
   // ---- Drawing ----------------------------------------------------------------------
@@ -682,88 +720,230 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.restore();
   }
 
+  // ---- HUD, in the style of Path of Leash Resistance's -----------------------------------
+  const HUD_BG = 'rgba(20, 27, 44, 0.86)';
+  function hudPanel(x: number, y: number, w: number, h: number) {
+    c.fillStyle = HUD_BG;
+    c.beginPath();
+    c.roundRect(x, y, w, h, 8);
+    c.fill();
+  }
+  function iconDrop(x: number, y: number, color: string, s = 1) {
+    c.fillStyle = color;
+    c.beginPath();
+    c.moveTo(x, y - 5 * s);
+    c.quadraticCurveTo(x + 4.5 * s, y + 0.5 * s, x + 3.6 * s, y + 2 * s);
+    c.arc(x, y + 1.5 * s, 3.6 * s, 0.1, Math.PI - 0.1);
+    c.quadraticCurveTo(x - 4.5 * s, y + 0.5 * s, x, y - 5 * s);
+    c.fill();
+  }
+  function iconBolt(x: number, y: number, color: string) {
+    c.fillStyle = color;
+    c.beginPath();
+    c.moveTo(x + 1.5, y - 6);
+    c.lineTo(x - 3.5, y + 1);
+    c.lineTo(x - 0.2, y + 1);
+    c.lineTo(x - 1.5, y + 6);
+    c.lineTo(x + 3.5, y - 1);
+    c.lineTo(x + 0.2, y - 1);
+    c.closePath();
+    c.fill();
+  }
+  function iconRing(x: number, y: number, color: string) {
+    c.strokeStyle = color;
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.arc(x, y, 4.2, 0, Math.PI * 2);
+    c.stroke();
+  }
+  function iconPhone(x: number, y: number, color: string) {
+    c.strokeStyle = color;
+    c.lineWidth = 1.4;
+    c.beginPath();
+    c.roundRect(x - 3.5, y - 6, 7, 12, 1.5);
+    c.stroke();
+  }
+  function iconBone(x: number, y: number, color: string, s = 1) {
+    c.fillStyle = color;
+    c.beginPath();
+    c.roundRect(x - 5 * s, y - 1.6 * s, 10 * s, 3.2 * s, 1.5 * s);
+    for (const [ox, oy] of [[-5, -1.8], [-5, 1.8], [5, -1.8], [5, 1.8]]) {
+      c.moveTo(x + ox * s + 2.2 * s, y + oy * s);
+      c.arc(x + ox * s, y + oy * s, 2.2 * s, 0, Math.PI * 2);
+    }
+    c.fill();
+  }
+  function keyBadge(x: number, y: number, label: string) {
+    c.font = `700 9px ${BODY}`;
+    const w = Math.max(16, c.measureText(label).width + 8);
+    c.strokeStyle = 'rgba(232, 228, 218, 0.7)';
+    c.lineWidth = 1;
+    c.beginPath();
+    c.roundRect(x - w, y - 7, w, 14, 3);
+    c.stroke();
+    c.fillStyle = 'rgba(232, 228, 218, 0.85)';
+    c.textAlign = 'center';
+    c.fillText(label, x - w / 2, y + 0.5);
+    c.textAlign = 'left';
+  }
+
+  function goalItems(): [string, boolean][] {
+    return [
+      [`Mark 5 spots${goals.mark ? '' : ` (${Math.min(marked, 5)}/5)`}`, goals.mark],
+      ['Scatter the pigeons', goals.pigeons],
+      ['Say hi to another dog', goals.dog],
+      [`Find 5 bones${goals.bones ? '' : ` (${Math.min(bonesGot, 5)}/5)`}`, goals.bones],
+    ];
+  }
+
+  function bannerText(): string | null {
+    if (toast) return toast.text;
+    if (near) return coarse ? `Tap the shop to go into ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
+    if (pee > 0.97 && !goals.mark) return 'Bursting! Go mark a spot';
+    return null;
+  }
+
   function drawHud() {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!playing) return;
-    const panel = (x: number, y: number, w: number, h: number) => {
-      c.fillStyle = 'rgba(11, 20, 48, 0.8)';
-      c.beginPath();
-      c.roundRect(x, y, w, h, 8);
-      c.fill();
-    };
-    // Compact on phones, so the HUD doesn't cover the shop signs.
-    const small = cssW < 480;
+    const small = cssW < 520;
     const k = small ? 0.72 : 1;
+    c.textBaseline = 'middle';
+    c.textAlign = 'left';
+
+    // Stats, top left
     c.save();
     c.translate(small ? 6 : 10, small ? 6 : 10);
     c.scale(k, k);
-    panel(0, 0, 148, 66);
-    c.font = `700 9px ${BODY}`;
-    c.textAlign = 'left';
-    c.textBaseline = 'middle';
-    const bar = (y: number, label: string, v: number, color: string) => {
-      c.fillStyle = '#c9cfdf';
-      c.fillText(label, 10, y);
-      c.fillStyle = 'rgba(255,255,255,0.15)';
-      c.fillRect(68, y - 3.5, 70, 7);
-      c.fillStyle = color;
-      c.fillRect(68, y - 3.5, 70 * v, 7);
+    hudPanel(0, 0, 176, 86);
+    const label = (y: number, text: string) => {
+      c.fillStyle = '#e8e4da';
+      c.font = `700 9px ${BODY}`;
+      c.fillText(text, 26, y);
     };
-    bar(14, 'PEE', pee, '#ffb020');
-    bar(32, 'ZOOMIES', zoom, '#8bcb3c');
-    c.fillStyle = '#c9cfdf';
-    c.fillText('MARKED', 10, 50);
-    for (let i = 0; i < 5; i++) {
-      c.fillStyle = i < marked ? '#ffb020' : 'rgba(255,255,255,0.2)';
-      c.beginPath();
-      c.arc(74 + i * 14, 50, 4.5, 0, Math.PI * 2);
-      c.fill();
+    const bar = (y: number, v: number, color: string) => {
+      c.fillStyle = 'rgba(255,255,255,0.14)';
+      c.fillRect(92, y - 3.5, 74, 7);
+      c.fillStyle = color;
+      c.fillRect(92, y - 3.5, 74 * clamp(v, 0, 1), 7);
+    };
+    iconPhone(14, 15, '#e8e4da');
+    label(15, 'PATIENCE');
+    for (let i = 0; i < 3; i++) {
+      c.fillStyle = human.patience > i / 3 + 0.02 ? '#1fc9b7' : 'rgba(255,255,255,0.14)';
+      c.fillRect(92 + i * 13, 11, 10, 8);
     }
+    iconBone(140, 15, '#f4ecd8', 0.9);
+    c.fillStyle = '#f4f1ea';
+    c.font = `800 11px ${FONT}`;
+    c.fillText(String(bonesGot), 151, 15.5);
+    iconDrop(14, 34, '#ffb020');
+    label(34, 'PEE');
+    bar(34, pee, '#ffb020');
+    iconRing(14, 52, '#ffb020');
+    label(52, 'MARKED');
+    for (let i = 0; i < 5; i++) iconDrop(98 + i * 14, 52, i < marked ? '#ffb020' : 'rgba(255,255,255,0.22)', 0.85);
+    iconBolt(14, 70, '#8bcb3c');
+    label(70, 'ZOOMIES');
+    bar(70, zoom, '#8bcb3c');
     c.restore();
-    if (cssW >= 560) {
-      const items: [string, boolean][] = [['Mark 5 spots', goals.mark], ['Scatter the pigeons', goals.pigeons], ['Say hi to another dog', goals.dog]];
-      const done = items.filter(([, d]) => d).length;
-      const x = cssW - 178;
-      panel(x, 10, 168, 82);
-      c.fillStyle = '#f4f1ea';
-      c.font = `800 10px ${FONT}`;
-      c.fillText(`GOALS ${done}/${items.length}`, x + 10, 24);
+
+    // Goals, top right; G or a tap opens and closes the list
+    if (goalsOpen === null) goalsOpen = !small;
+    const items = goalItems();
+    const done = items.filter(([, d]) => d).length;
+    const gw = 196, gh = goalsOpen ? 30 + items.length * 17 : 26;
+    c.save();
+    const gx = cssW - (gw + 10) * k - (small ? -4 : 0), gy = small ? 6 : 10;
+    c.translate(gx, gy);
+    c.scale(k, k);
+    goalsRect = { x: gx, y: gy, w: gw * k, h: gh * k };
+    hudPanel(0, 0, gw, gh);
+    c.fillStyle = '#f4f1ea';
+    c.font = `800 11px ${FONT}`;
+    c.textAlign = 'left';
+    c.fillText(`GOALS ${done}/${items.length}`, 10, 13.5);
+    keyBadge(gw - 8, 13, coarse ? (goalsOpen ? '–' : '+') : 'G');
+    if (goalsOpen) {
       c.font = `600 10px ${BODY}`;
-      items.forEach(([label, d], i) => {
-        const y = 44 + i * 16;
-        c.strokeStyle = d ? '#8bcb3c' : '#c9cfdf';
+      items.forEach(([text, d], i) => {
+        const y = 34 + i * 17;
+        c.strokeStyle = d ? '#8bcb3c' : 'rgba(232, 228, 218, 0.8)';
         c.lineWidth = 1.2;
-        c.strokeRect(x + 10, y - 5, 10, 10);
+        c.strokeRect(10, y - 5, 10, 10);
         if (d) {
           c.beginPath();
-          c.moveTo(x + 12, y);
-          c.lineTo(x + 14.5, y + 3);
-          c.lineTo(x + 18.5, y - 3);
+          c.moveTo(12, y);
+          c.lineTo(14.5, y + 3);
+          c.lineTo(18.5, y - 3);
           c.stroke();
         }
-        c.fillStyle = d ? 'rgba(201, 207, 223, 0.6)' : '#f4f1ea';
-        c.fillText(label, x + 28, y);
+        c.fillStyle = d ? 'rgba(232, 228, 218, 0.45)' : '#f4f1ea';
+        c.textAlign = 'left';
+        c.fillText(text, 28, y + 0.5);
       });
     }
+    c.restore();
+
+    // Banner: prompts and toasts, top center (below the panels on phones)
+    const text = bannerText();
+    if (text) {
+      c.font = `800 ${small ? 10 : 12}px ${FONT}`;
+      const t = text.toUpperCase();
+      const tw = c.measureText(t).width;
+      const bw = tw + 34, bh = small ? 22 : 26;
+      const bx = cssW / 2 - bw / 2, by = small ? 6 + 86 * k + 6 : 12;
+      hudPanel(bx, by, bw, bh);
+      c.fillStyle = toast ? '#8bcb3c' : '#ffb020';
+      c.beginPath();
+      c.arc(bx + 13, by + bh / 2, 3.5, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#f4f1ea';
+      c.textAlign = 'left';
+      c.fillText(t, bx + 23, by + bh / 2 + 0.5);
+    }
+
+    // Touch buttons
     if (coarse) for (const b of buttons()) {
-      c.fillStyle = b.id === 'run' && touchSprint !== null ? '#8bcb3c' : 'rgba(11, 20, 48, 0.8)';
+      const on = b.id === 'run' && touchSprint !== null;
+      c.fillStyle = on ? '#8bcb3c' : HUD_BG;
       c.beginPath();
       c.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       c.fill();
-      c.fillStyle = '#f4f1ea';
-      c.font = `800 10px ${FONT}`;
+      if (b.id === 'pee') iconDrop(b.x, b.y - 5, '#ffb020', 1.1);
+      else if (b.id === 'run') iconBolt(b.x, b.y - 5, on ? '#0b1430' : '#8bcb3c');
+      c.fillStyle = on ? '#0b1430' : '#f4f1ea';
+      c.font = `800 9px ${FONT}`;
       c.textAlign = 'center';
-      c.fillText(b.label, b.x, b.y + 1);
+      c.fillText(b.label, b.x, b.y + (b.id === 'bark' ? 0.5 : 8));
     }
+    c.textAlign = 'left';
   }
 
   function buttons() {
-    const r = cssW < 480 ? 21 : 24, y = cssH - r - 10;
+    const r = cssW < 520 ? 21 : 24, y = cssH - r - 10;
     return [
       { id: 'bark', label: 'BARK', x: cssW - r - 12, y, r },
       { id: 'pee', label: 'PEE', x: cssW - r * 3 - 20, y, r },
       { id: 'run', label: 'RUN', x: cssW - r * 5 - 28, y, r },
     ];
+  }
+
+  function drawBones(x0: number, x1: number) {
+    const t = performance.now() / 1000;
+    for (const b of bones) {
+      if (b.got || b.x < x0 - 20 || b.x > x1 + 20) continue;
+      const bob = Math.sin(t * 3 + b.x) * 1.2;
+      shadowAt(b.x, b.y + 2, 6, 2.5);
+      c.save();
+      c.translate(b.x, b.y + bob);
+      c.rotate(-0.4);
+      iconBone(0, 0, '#f4ecd8', 1.25);
+      c.strokeStyle = 'rgba(80, 60, 40, 0.5)';
+      c.lineWidth = 0.8;
+      c.stroke();
+      c.restore();
+    }
   }
 
   function draw() {
@@ -789,6 +969,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.fillRect(doorX(near) - 18, FACADE, 36, 9);
     }
 
+    drawBones(x0, x1);
     for (const v of vehicles) if (v.x > x0 - 60 && v.x < x1 + 60) drawVehicle(v, night);
     for (const g of pigeons) if (!g.flying) drawPigeon(g);
     for (const p of peds) {
@@ -850,6 +1031,22 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
   function takeLeash() {
     if (!playing) { playing = true; sayCaption(); start(); }
+    if (wantSound && !sound.on) sound.enable();
+  }
+  function setSound(on: boolean) {
+    wantSound = on;
+    try { localStorage.setItem('street-sound', on ? 'on' : 'off'); } catch { /* storage blocked */ }
+    if (on) sound.enable();
+    else sound.disable();
+    if (soundBtn) {
+      soundBtn.setAttribute('aria-pressed', String(on));
+      soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+    }
+  }
+  if (soundBtn) {
+    soundBtn.setAttribute('aria-pressed', String(wantSound));
+    soundBtn.textContent = wantSound ? 'Sound on' : 'Sound off';
+    soundBtn.addEventListener('click', () => setSound(!wantSound));
   }
   function goIn() {
     if (near) links.get(near.stop.id)?.click();
@@ -871,6 +1068,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     } else if (e.key === 'Enter' && near) {
       e.preventDefault();
       goIn();
+    } else if (e.code === 'KeyG') {
+      takeLeash();
+      goalsOpen = !goalsOpen;
     } else if (e.key === 'Escape') {
       fig.blur();
     }
@@ -883,6 +1083,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     fig.focus({ preventScroll: true });
     const wasPlaying = playing;
     takeLeash();
+    if (wasPlaying && sx >= goalsRect.x && sx <= goalsRect.x + goalsRect.w && sy >= goalsRect.y && sy <= goalsRect.y + goalsRect.h) {
+      goalsOpen = !goalsOpen;
+      return;
+    }
     if (coarse && wasPlaying) {
       const b = buttons().find((b) => Math.hypot(b.x - sx, b.y - sy) < b.r + 6);
       if (b) {
@@ -910,7 +1114,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     onScreen = entry.isIntersecting;
     if (onScreen) start();
   }).observe(fig);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') start(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { start(); sound.resume(); }
+    else sound.pause();
+  });
   const rebuild = () => { buildBg(); draw(); };
   darkMq.addEventListener('change', rebuild);
   new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -926,6 +1133,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       dog, human, peds, vehicles, pigeons, goals,
       get playing() { return playing; },
       get marked() { return marked; },
+      get bonesGot() { return bonesGot; },
+      get goalsOpen() { return goalsOpen; },
+      get banner() { return bannerText(); },
+      bones,
       get near() { return near?.stop.id ?? null; },
       key(code: string, down: boolean) { fig.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code === 'Space' ? ' ' : code, bubbles: true })); },
       tick(n: number) { for (let i = 0; i < n; i++) update(1 / 60); draw(); },
