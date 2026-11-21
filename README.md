@@ -2,7 +2,7 @@
 
 My personal site, built with [Astro](https://astro.build) and deployed to GitHub Pages at [santtu.fyi](https://santtu.fyi/).
 
-The look ("Eixample") borrows Path of Leash Resistance's Trencadís palette and its fonts, Bricolage Grotesque and Inter. All colours are tokens in `src/styles/global.css`, with a dark theme that follows the system or the header toggle.
+The look borrows Path of Leash Resistance's Trencadís palette and its fonts, Bricolage Grotesque and Inter. All colours are tokens in `src/styles/global.css`, with a dark theme that follows the system or the header toggle.
 
 ## Develop
 
@@ -19,7 +19,7 @@ npm run build    # type-checks, then builds to dist/
 - `src/content/projects/*.md`: one file per project. The frontmatter schema is in `src/content.config.ts`; `featured: true` puts a project on the home page, and `order` sorts them.
 - `src/content/blog/*.md`: blog posts. `draft: true` hides one.
 - `src/pages/`: home, projects, blog, about, how-i-build, walk (the teaser for the walkable version), 404 and the RSS feed.
-- `src/components/EixampleMap.astro`: the block map on the home page.
+- `src/components/StreetMap.astro`: the playable street on the home page (canvas, rope physics, the stops row of links).
 - `public/`: images, favicon, `CNAME` and the social share image (`img/og.png`).
 
 Old Jekyll URLs (`/posts/...`, `/about-me`) redirect to their new homes; the list is in `astro.config.mjs`.
