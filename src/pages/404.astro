@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Page not found">
+  <section class="wrap lost">
+    <span class="eyebrow">404</span>
+    <h1>Millie sniffed everywhere. Nothing here.</h1>
+    <p>The page you were after has moved or never existed.</p>
+    <a class="btn btn-primary" href="/">Back to the map</a>
+  </section>
+</Base>
+
+<style>
+  .lost {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding-block: clamp(64px, 12vw, 140px);
+    max-width: 860px;
+  }
+  h1 {
+    font-size: clamp(40px, 6vw, 72px);
+  }
+  p {
+    font-size: 20px;
+    color: var(--ink-2);
+  }
+</style>

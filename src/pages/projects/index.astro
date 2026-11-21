@@ -1,0 +1,62 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+
+const all = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const featured = all.filter((p) => p.data.featured);
+const earlier = all.filter((p) => !p.data.featured);
+---
+
+<Base title="Projects" description="Games, desktop apps, LED hardware and web apps by Santtu Nykänen.">
+  <section class="wrap head">
+    <h1>Projects</h1>
+    <p>
+      The things I'm proudest of: a game, a music tool and an LED wall. Further down
+      are earlier projects from when I was learning the trade.
+    </p>
+  </section>
+
+  <section class="wrap" aria-label="Current projects">
+    <div class="grid">
+      {featured.map((p) => <ProjectCard project={p} headingLevel="h2" />)}
+    </div>
+  </section>
+
+  <section class="section wrap" aria-labelledby="earlier">
+    <h2 id="earlier" class="section-title">Earlier work</h2>
+    <div class="grid small">
+      {earlier.map((p) => <ProjectCard project={p} variant="compact" />)}
+    </div>
+  </section>
+</Base>
+
+<style>
+  .head {
+    padding-block: clamp(32px, 6vw, 64px) 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  h1 {
+    font-size: clamp(48px, 7vw, 88px);
+  }
+  .head p {
+    max-width: 620px;
+    font-size: 19px;
+    color: var(--ink-2);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 24px;
+  }
+  .grid > :global(.feature) {
+    grid-column: 1 / -1;
+  }
+  .grid.small {
+    margin-top: 32px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+    gap: 20px;
+  }
+</style>

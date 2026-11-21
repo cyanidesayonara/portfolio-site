@@ -1,0 +1,66 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  prev: CollectionEntry<'projects'>;
+  next: CollectionEntry<'projects'>;
+}
+const { prev, next } = Astro.props;
+---
+
+<nav class="pager" aria-label="More projects">
+  <a class="prev" href={`/projects/${prev.id}`} rel="prev">
+    <span class="dir">Previous project</span>
+    <span class="name">{prev.data.title}</span>
+  </a>
+  <a class="next" href={`/projects/${next.id}`} rel="next">
+    <span class="dir">Next project</span>
+    <span class="name">{next.data.title}</span>
+  </a>
+</nav>
+
+<style>
+  .pager {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 16px;
+    padding-top: 32px;
+    border-top: 2px solid var(--ink);
+  }
+  a {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 24px 28px;
+    background: var(--surface);
+    border-radius: var(--radius-m);
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  a:hover {
+    color: var(--ink);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+  .next {
+    text-align: right;
+  }
+  .dir {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .prev .dir::before {
+    content: '← ';
+  }
+  .next .dir::after {
+    content: ' →';
+  }
+  .name {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(22px, 3vw, 30px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+</style>

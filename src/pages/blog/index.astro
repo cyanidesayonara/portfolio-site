@@ -1,0 +1,41 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import PostList from '../../components/PostList.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+---
+
+<Base title="Blog" description="Notes on building games, tools and hardware, and on working with AI coding agents.">
+  <section class="wrap head">
+    <h1>Blog</h1>
+    <p>Notes on building games, tools and hardware, and on working with AI coding agents.</p>
+    <a href="/rss.xml">Subscribe with RSS</a>
+  </section>
+  <section class="wrap list" aria-label="Posts">
+    <PostList posts={posts} />
+  </section>
+</Base>
+
+<style>
+  .head {
+    padding-block: clamp(32px, 6vw, 64px) 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  h1 {
+    font-size: clamp(48px, 7vw, 88px);
+  }
+  .head p {
+    max-width: 620px;
+    font-size: 19px;
+    color: var(--ink-2);
+  }
+  .list {
+    padding-bottom: 96px;
+  }
+</style>

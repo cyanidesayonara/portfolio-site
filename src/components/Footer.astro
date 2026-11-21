@@ -1,0 +1,57 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer wrap">
+  <div class="top">
+    <p class="sign">Santtu Nykänen</p>
+    <nav aria-label="Contact">
+      <ul>
+        <li><a href="mailto:santtu.nykanen@gmail.com">Email</a></li>
+        <li><a href="https://github.com/cyanidesayonara">GitHub</a></li>
+        <li><a href="https://www.linkedin.com/in/santtu-nykanen">LinkedIn</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="small">© {year} Santtu Nykänen</p>
+</footer>
+
+<style>
+  .site-footer {
+    padding-block: 32px 48px;
+  }
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px 24px;
+    padding-top: 32px;
+    border-top: 2px solid var(--ink);
+  }
+  .sign {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 22px;
+  }
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  ul a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 500;
+  }
+  .small {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+</style>
