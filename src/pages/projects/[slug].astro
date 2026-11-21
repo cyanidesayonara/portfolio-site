@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import ProjectPager from '../../components/ProjectPager.astro';
+import CoriolisSim from '../../components/CoriolisSim.astro';
 
 export async function getStaticPaths() {
   const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
@@ -44,6 +45,14 @@ const { Content } = await render(project);
         <img src={p.cover} alt={p.coverAlt} fetchpriority="high" />
       </div>
     </div>
+
+    {
+      project.id === 'coriolis' && (
+        <div class="wrap">
+          <CoriolisSim />
+        </div>
+      )
+    }
 
     <div class="wrap body">
       <aside class="facts" aria-label="Project facts">
