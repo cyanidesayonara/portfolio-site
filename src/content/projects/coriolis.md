@@ -1,7 +1,7 @@
 ---
 title: Coriolis
 tagline: An LED wall display, ten years in the making. A clock first, then ambient art, workouts and games.
-summary: A 128×128 HUB75 LED panel driven by a Teensy 4.1, developed against a desktop simulator. The third generation of an LED wall that started as Borealis in 2016.
+summary: A 128×128 LED wall display designed for a Teensy 4.1, developed first against a desktop simulator. The third generation of an LED wall that started as Borealis in 2016.
 kind: Hardware
 stack: [C++, Teensy 4.1, HUB75 LED matrix, CMake, Desktop simulator, Arduino]
 years: 2016 to now
@@ -18,11 +18,11 @@ order: 3
 color: led
 ---
 
-Aurora, then Borealis, then Coriolis. This is the third generation of my LED wall: a 128×128 HUB75 panel driven by a Teensy 4.1. It's a wall clock first, with ambient art, a guided-fitness suite and games on top.
+Aurora, then Borealis, then Coriolis. This is the third generation of my LED wall: a 128×128 display built from four 64×64 HUB75 panels and a Teensy 4.1. It's a wall clock first, with ambient art, a guided-fitness suite and games on top. The software is ahead of the hardware: it runs today in a desktop simulator, and the physical build comes next.
 
 ## Coriolis: 128×128
 
-The whole thing was developed against a desktop simulator, so every scene can be built and tested on a PC before it goes near the hardware. All the images here were captured from that simulator.
+The simulator is the main development environment. The scene switching, launcher, settings and overlays are shared line for line between the simulator and the firmware, and scenes draw into an abstract frame buffer instead of touching hardware, so what runs on the desktop is what will run on the wall. All the images here were captured from the simulator.
 
 <div class="gallery">
 
