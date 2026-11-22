@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import type { Obstacle } from './leash';
 import { bakeStatic, bakeSteps, drain } from './bake';
 import { DirectBuilder } from './meshbuilder';
+import { makeCitySkyline, makeInlandHills } from './horizon';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
@@ -1051,13 +1052,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   xem.scale.setScalar(0.9);
   xem.userData.always = true;
   root.add(xem);
-  const hills = new THREE.Mesh(
-    new THREE.CylinderGeometry(900, 1000, 120, 48, 1, true, Math.PI * 0.15, Math.PI * 0.7),
-    new THREE.MeshBasicMaterial({ color: 0x6f8f6a, side: THREE.BackSide, fog: false }),
-  );
-  hills.position.set(0, 20, 300);
-  hills.userData.always = true;
-  root.add(hills);
+  // Hills inland (+Z), the city's skyline far down the coast behind the chimneys (-X).
+  root.add(makeInlandHills(WATER_Y - 12));
+  root.add(makeCitySkyline(WATER_Y - 2));
 
   const poles: Obstacle[] = circles.filter((c) => c.obstacle).map((c) => c.obstacle!);
 

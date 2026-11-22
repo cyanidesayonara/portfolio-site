@@ -24,6 +24,7 @@ import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
 import { createTransitOverlay, playDepartureDoors } from './transit';
+import { trackVisibleViewport } from '../viewport';
 
 type CamMode = 'street' | 'follow' | 'overhead';
 
@@ -85,7 +86,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   root.classList.add('live');
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.15, 900);
+  // Far enough for the hills and the skyline (horizon.ts, up to ~1.5 km out).
+  const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.15, 1800);
 
   // Sky dome with a vertical gradient, plus stars and a moon for the night.
   const skyUniforms = { top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() } };
@@ -97,6 +99,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       fragmentShader: 'uniform vec3 top; uniform vec3 horizon; varying vec3 vP; void main(){ float h = clamp(vP.y*1.6, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.7)), 1.0); }',
     }),
   );
+  sky.renderOrder = -1; // always first: it writes no depth, so everything draws over it
   scene.add(sky);
   const starGeo = new THREE.BufferGeometry();
   const starPos: number[] = [];
@@ -931,12 +934,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // Fullscreen: fill the window with a reveal, and ask the browser for real fullscreen too.
   const fullBtn = q<HTMLButtonElement>('[data-fullscreen]');
   let full = false;
+  let untrackViewport: (() => void) | null = null;
   const setFull = (on: boolean) => {
     if (on === full) return;
     const from = root.getBoundingClientRect();
     full = on;
     if (on) {
       root.classList.add('immersive');
+      untrackViewport = trackVisibleViewport(root);
       document.documentElement.style.overflow = 'hidden';
       const vw = window.innerWidth, vh = window.innerHeight;
       const inset = `inset(${from.top}px ${vw - from.right}px ${vh - from.bottom}px ${from.left}px round 28px)`;
@@ -947,6 +952,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     } else {
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
       root.classList.remove('immersive');
+      untrackViewport?.();
+      untrackViewport = null;
       document.documentElement.style.overflow = '';
     }
     if (fullBtn) {
@@ -977,6 +984,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hud.banner('Back where we started', 'news');
   };
   let departing = false;
+  // Back from the 2D street can restore this page from the bfcache with the doors shut.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    departing = false;
+    host.querySelectorAll('.loading.depart').forEach((el) => el.remove());
+  });
   const goToStop = (stop: Level['stops'][number]) => {
     if (departing) return;
     if (stop.id === 'station') {
@@ -1271,12 +1284,20 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const startWhirl = (pole: Obstacle, coil: number) => {
     const r = Math.max(0.56, Math.hypot(human.x - pole.x, human.z - pole.z));
     const sp = Math.hypot(human.vx, human.vz);
+    // Spin the way the rope pulls the hand around the pole (its torque about the
+    // pole), not the way the whole leash happens to be coiled. If the rope runs
+    // straight at the pole, fall back to the human's own motion, then the coil.
+    const hd = leash.ends().human;
+    const rx = human.x - pole.x, rz = human.z - pole.z;
+    const pull = rx * hd.z - rz * hd.x;
+    const carry = rx * human.vz - rz * human.vx;
+    const dir = Math.abs(pull) > 0.05 ? Math.sign(pull) : Math.abs(carry) > 0.05 ? Math.sign(carry) : coil >= 0 ? 1 : -1;
     whirl = {
       pole, r, t: 0, swept: 0, extra: 0,
       theta: Math.atan2(human.z - pole.z, human.x - pole.x),
       omega: clamp(sp / r, 5, 9),
       budget: clamp(Math.abs(coil) / (Math.PI * 2), 0.6, 4) * Math.PI * 2,
-      dir: coil >= 0 ? 1 : -1,
+      dir,
     };
     human.state = 'whirl';
     leash.whirl = true;
@@ -2353,6 +2374,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         camSnap = true;
       },
       render: () => renderer.render(scene, camera),
+      camera,
     };
   }
 }

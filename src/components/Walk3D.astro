@@ -139,9 +139,13 @@ const KEYS = [
     border: 1px solid var(--line);
   }
   .walk3d:global(.immersive) {
+    /* Sized to the visible viewport (--vv-*, set by trackVisibleViewport) so the
+       touch controls at the bottom are never pushed off-screen. */
     position: fixed;
-    inset: 0;
-    height: 100dvh;
+    top: var(--vv-top, 0px);
+    left: 0;
+    right: 0;
+    height: var(--vv-h, 100dvh);
     padding-bottom: env(safe-area-inset-bottom);
     z-index: 1000;
     border-radius: 0;
@@ -992,5 +996,15 @@ const KEYS = [
     .stick { width: 88px; height: 88px; }
     .acts { grid-template-columns: repeat(2, 48px); gap: 6px; }
     .acts button { height: 42px; font-size: 10px; }
+  }
+  /* Phones held sideways (and other short screens): there's no room for the map
+     between the goals and the touch buttons, so shrink it and tuck it up top. */
+  @media (max-height: 520px) and (pointer: coarse), (max-height: 520px) and (hover: none) {
+    .stage :global(.minimap:not(.big)) { width: 92px; height: 92px; top: 48px; bottom: auto; }
+    .stage :global(.minimap:not(.big) .mm-key kbd) { display: none; }
+  }
+  @media (max-height: 520px) {
+    .walk3d:global(.has-touch) .stage :global(.minimap:not(.big)) { width: 92px; height: 92px; top: 48px; bottom: auto; }
+    .walk3d:global(.has-touch) .stage :global(.minimap:not(.big) .mm-key kbd) { display: none; }
   }
 </style>

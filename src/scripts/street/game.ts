@@ -15,6 +15,7 @@ import {
   type Stop, type StopLot, type Circle,
 } from './world';
 import { StreetSound } from './audio';
+import { trackVisibleViewport } from '../viewport';
 
 type P = { x: number; y: number };
 type Bubble = { text: string; ttl: number; who: P; lift: number; loud: boolean };
@@ -92,6 +93,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const bones = world.bones.map((b) => ({ ...b, got: false }));
   let bonesGot = 0;
   let toast: { text: string; t: number } | null = null;
+  let allDone = false;
   let goalsOpen: boolean | null = null;
   let goalsRect = { x: 0, y: 0, w: 0, h: 0 };
   const sound = new StreetSound();
@@ -122,6 +124,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   let wander = { lot: 0, wait: 1.2 };
   let camX = 0;
   let boarding: { href: string; t: number; sent: boolean } | null = null;
+  // Coming back with the browser's Back button can restore this page mid-boarding.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) boarding = null; });
   let arriving = 0;
 
   // ---- Sizing and the static layer ---------------------------------------------------
@@ -178,6 +182,22 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     goals[key] = true;
     toast = { text: `Goal done: ${label}`, t: 2.6 };
     sound.goal();
+    if (Object.values(goals).every(Boolean)) finale();
+  }
+
+  // Every goal done: a little celebration, then point her at the train to the 3D walk.
+  function finale() {
+    allDone = true;
+    say(human, 'Best walk ever!', 24, true, 2.4);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      spawnFx('heart', dog.x + Math.cos(a) * 10, dog.y - 12 + Math.sin(a) * 6, Math.cos(a) * 34, -26 + Math.sin(a) * 14, 1.3);
+    }
+    window.setTimeout(() => {
+      if (!playing) return;
+      sound.stationChime();
+      toast = { text: 'Best walk ever! Every goal done', t: 4 };
+    }, 1600);
   }
 
   // ---- Talking -----------------------------------------------------------------------
@@ -258,6 +278,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     leash = ROPE_BASE; heyT = 0; pee = 0.6; zoom = 1; marked = 0; bonesGot = 0;
     offLeash = false; clippedInPark = false; nature = 35; natureCalls = false;
     for (const k of Object.keys(goals) as (keyof typeof goals)[]) goals[k] = false;
+    allDone = false;
     for (const sp of world.peeSpots) sp.marked = false;
     for (const b of bones) b.got = false;
     stains.length = 0; poops.length = 0; bubbles.length = 0; fx.length = 0; target = null;
@@ -987,6 +1008,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (pee < 0.25 && !nearDrink) return 'Thirsty! Find a water bowl';
     if (offLeash) return 'Off the leash! Go back to your human to clip on';
     if (pee > 0.97 && !goals.mark) return 'Bursting! Go mark a spot';
+    if (allDone) return 'All done! Next: train to 3D at Estació';
     return null;
   }
 
@@ -1376,8 +1398,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     fsBtn.textContent = isFull() ? 'Exit fullscreen' : 'Fullscreen';
     fsBtn.setAttribute('aria-pressed', String(isFull()));
   };
+  let untrackViewport: (() => void) | null = null;
   function immersive(on: boolean) {
     fig.classList.toggle('immersive', on);
+    if (on && !untrackViewport) untrackViewport = trackVisibleViewport(fig);
+    else if (!on && untrackViewport) { untrackViewport(); untrackViewport = null; }
     document.documentElement.style.overflow = on ? 'hidden' : '';
     syncFs();
   }
@@ -1457,6 +1482,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   fig.addEventListener('keyup', (e) => held.delete(e.code));
   fig.addEventListener('blur', () => held.clear());
   let steerId: number | null = null;
+  // How far up a tap can send her: the shopfronts stop her at the pavement, but the park is open lawn.
+  const topAt = (wx: number) => (wx > world.park.x + 12 ? 36 : WALK_TOP);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('touchstart', (e) => {
     coarse = true;
@@ -1498,14 +1525,17 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       }
     }
     const wx = camX + sx / scale, wy = (sy - offY) / scale;
-    const lot = world.stops.find((l) => wx >= l.x && wx < l.x + l.w && (wy < FACADE || l.type === 'park'));
-    if (lot && wy < FACADE + 10) {
+    // Shops: tap the facade. The park is open ground (the bone and the ball are in
+    // it), so only its sign counts as "going in"; anywhere else there just walks.
+    const onParkSign = (l: (typeof world.stops)[number]) => wx >= l.x + 14 && wx < l.x + 146 && wy >= 86 && wy < 134;
+    const lot = world.stops.find((l) => (l.type === 'park' ? onParkSign(l) : wx >= l.x && wx < l.x + l.w && wy < FACADE));
+    if (lot) {
       if (wasPlaying && near === lot) { goIn(); return; }
       target = { x: doorX(lot), y: doorY(lot) };
       return;
     }
     steerId = e.pointerId;
-    target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
+    target = { x: wx, y: clamp(wy, topAt(wx), WH - 8) };
     spawnFx('ring', target.x, target.y, 0, 0, 0.45);
   });
   canvas.addEventListener('pointermove', (e) => {
@@ -1513,7 +1543,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     const r = canvas.getBoundingClientRect();
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const wx = camX + sx / scale, wy = (sy - offY) / scale;
-    target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
+    target = { x: wx, y: clamp(wy, topAt(wx), WH - 8) };
   });
   const endTouch = (e: PointerEvent) => {
     if (e.pointerId === steerId) steerId = null;
@@ -1581,6 +1611,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       ball, world,
       bones,
       get near() { return near?.stop.id ?? null; },
+      get view() { return { camX, scale, offY }; },
+      get target() { return target; },
       buttons: () => buttons(),
       restart: () => restart(),
       key(code: string, down: boolean) { fig.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code === 'Space' ? ' ' : code, bubbles: true })); },
