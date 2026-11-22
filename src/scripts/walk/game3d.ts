@@ -806,6 +806,20 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     creditEl.innerHTML = `“${s.title}” by ${who}. <a href="${s.source}" rel="noopener" target="_blank">Source</a> · <a href="${s.licence_url}" rel="noopener" target="_blank">${s.licence}</a>. Stems separated by stemma.`;
   };
   audio.onSongChange = (s) => { renderSongs(); renderCredit(s); };
+  // N (or the toolbar button): skip to the next song, turning sound on if it was off.
+  const nextSong = async () => {
+    const list = await audio.loadIndex();
+    if (!list.length) return;
+    const i = list.findIndex((x) => x.id === audio.songId);
+    const nx = list[(i + 1) % list.length];
+    // Exactly one request for the new song: the jukebox lets the latest one win.
+    audio.songId = nx.id;
+    if (!audio.on) { audio.musicOn = true; setSound(true); } // enabling plays songId
+    else if (!audio.musicOn) audio.setMusicOn(true);
+    else void audio.playSong(nx.id);
+    hud.toast('Now playing', `${nx.title} by ${nx.credit_as ?? nx.artist}`);
+  };
+  q('[data-next-song]')?.addEventListener('click', () => { void nextSong(); host.focus({ preventScroll: true }); });
   const drawLanes = () => {
     if (!lanesCanvas || !stemmaOpen) return;
     const s = audio.song();
@@ -1039,6 +1053,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       case 'KeyC': cycleCam(); break;
       case 'Tab': hud.toggleGoals(); break;
       case 'KeyM': minimap.toggle(); break;
+      case 'KeyN': void nextSong(); break;
       case 'Minus': case 'NumpadSubtract': zoomBy(1.15); break;
       case 'Equal': case 'NumpadAdd': zoomBy(1 / 1.15); break;
       case 'BracketLeft': case 'BracketRight': orbitBy(0); break;

@@ -30,6 +30,7 @@ const KEYS = [
   { keys: ['Wheel', '-', '='], label: 'Zoom' },
   { keys: ['Tab'], label: 'Goals' },
   { keys: ['M'], label: 'Map' },
+  { keys: ['N'], label: 'Next song' },
   { keys: ['R'], label: 'Restart' },
 ];
 ---
@@ -41,12 +42,13 @@ const KEYS = [
     tabindex="0"
     role="application"
     aria-roledescription="game"
-    aria-label="Path of Leash Resistance in 3D, in a Catalan seafront town. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, Tab shows the goals. Shift+Tab or Escape leaves the game."
+    aria-label="Path of Leash Resistance in 3D, in a Catalan seafront town. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, N skips to the next song, Tab shows the goals. Shift+Tab or Escape leaves the game."
   >
     <div class="focus-hint" aria-hidden="true"><span>Click to play</span></div>
 
     <div class="toolbar" role="group" aria-label="Game settings">
       <button type="button" class="tb" data-sound aria-pressed="false">Sound off</button>
+      <button type="button" class="tb" data-next-song>Next song</button>
       <span class="seg" role="group" aria-label="Time and weather">
         <button type="button" class="tb" data-sky="day" aria-pressed="false">Day</button>
         <button type="button" class="tb" data-sky="rain" aria-pressed="false">Rain</button>
