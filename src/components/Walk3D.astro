@@ -1,0 +1,754 @@
+---
+/*
+  The 3D walk: Path of Leash Resistance on the Badalona seafront.
+  Markup and styles here; the game lives in src/scripts/walk/ (game3d.ts
+  wires it up, level.ts lays out the place, leash.ts is the rope, hud.ts
+  the HUD, audio.ts the stemma stems and effects).
+
+  `lazy` (the home page) loads the game only when the stage nears the
+  viewport, so three.js never weighs down the first paint.
+*/
+interface Props {
+  lazy?: boolean;
+  id?: string;
+}
+const { lazy = false, id = 'walk' } = Astro.props;
+
+// The same keys as Path of Leash Resistance's default layout, plus the 3D extras.
+const KEYS = [
+  { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
+  { keys: ['Shift'], label: 'Run' },
+  { keys: ['V'], label: 'Jump' },
+  { keys: ['Space'], label: 'Dig / dig in' },
+  { keys: ['Q'], label: 'Mark' },
+  { keys: ['E'], label: 'Bark' },
+  { keys: ['G'], label: 'Pick up' },
+  { keys: ['X'], label: 'Use' },
+  { keys: ['Enter'], label: 'Go in' },
+  { keys: ['C'], label: 'Camera' },
+  { keys: ['Tab'], label: 'Goals' },
+  { keys: ['R'], label: 'Restart' },
+];
+---
+
+<figure class="walk3d" data-walk-3d data-lazy={lazy ? '' : undefined} id={id}>
+  <div
+    class="stage"
+    data-stage
+    tabindex="0"
+    role="application"
+    aria-roledescription="game"
+    aria-label="Path of Leash Resistance in 3D, on the Badalona seafront. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, Tab shows the goals. Shift+Tab or Escape leaves the game."
+  >
+    <div class="focus-hint" aria-hidden="true"><span>Click to play</span></div>
+
+    <div class="toolbar" role="group" aria-label="Game settings">
+      <button type="button" class="tb" data-sound aria-pressed="false">Sound off</button>
+      <span class="seg" role="group" aria-label="Time and weather">
+        <button type="button" class="tb" data-sky="day" aria-pressed="false">Day</button>
+        <button type="button" class="tb" data-sky="rain" aria-pressed="false">Rain</button>
+        <button type="button" class="tb" data-sky="night" aria-pressed="false">Night</button>
+      </span>
+      <button type="button" class="tb" data-camera>Camera: Street</button>
+      <button type="button" class="tb" data-fullscreen aria-pressed="false">Fullscreen</button>
+    </div>
+
+    <aside class="panel stemma-panel" data-stemma-panel aria-label="stemma jukebox">
+      <header>
+        <div><b>stemma</b><span>Real songs, split into stems by stemma. Pick the street's music.</span></div>
+        <button type="button" class="x" data-stemma-close aria-label="Close the jukebox">×</button>
+      </header>
+      <ul class="songs" data-song-list></ul>
+      <div class="stems" role="group" aria-label="Stems">
+        <button type="button" data-stem="vocals" aria-pressed="true"><i style="--c:#e5487a"></i>Vocals</button>
+        <button type="button" data-stem="drums" aria-pressed="true"><i style="--c:#ffb020"></i>Drums</button>
+        <button type="button" data-stem="bass" aria-pressed="true"><i style="--c:#1fc9b7"></i>Bass</button>
+        <button type="button" data-stem="other" aria-pressed="true"><i style="--c:#8bcb3c"></i>Other</button>
+      </div>
+      <canvas class="lanes" data-stem-lanes width="560" height="132" aria-hidden="true"></canvas>
+      <p class="credit" data-song-credit></p>
+    </aside>
+
+    <aside class="panel coriolis-panel" data-coriolis-panel aria-label="Coriolis LED wall controls">
+      <header><div><b>Coriolis</b><span>Arrows steer, Enter selects, M opens the launcher.</span></div><button type="button" class="x" data-c-exit aria-label="Step back from the wall">×</button></header>
+      <div class="remote">
+        <button type="button" data-c-key="Up" aria-label="Up">▲</button>
+        <button type="button" data-c-key="Left" aria-label="Left">◀</button>
+        <button type="button" data-c-key="Select">OK</button>
+        <button type="button" data-c-key="Right" aria-label="Right">▶</button>
+        <button type="button" data-c-key="Down" aria-label="Down">▼</button>
+      </div>
+      <div class="cmds">
+        <button type="button" data-c-cmd="Menu">Launcher</button>
+        <button type="button" data-c-cmd="Settings">Settings</button>
+        <button type="button" data-c-cmd="Next">Next</button>
+        <button type="button" data-c-key="Back">Back</button>
+      </div>
+    </aside>
+
+    <div class="touch" aria-hidden="true">
+      <div class="stick" data-stick><i data-knob></i></div>
+      <div class="acts">
+        <button type="button" data-touch="KeyE">Bark</button>
+        <button type="button" data-touch="Space">Dig</button>
+        <button type="button" data-touch="KeyV">Jump</button>
+        <button type="button" data-touch="KeyQ">Mark</button>
+        <button type="button" data-touch="KeyG">Grab</button>
+        <button type="button" data-touch="KeyX">Use</button>
+        <button type="button" data-touch="Enter">Go in</button>
+        <button type="button" data-touch="Tab">Goals</button>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <ul class="keys" aria-label="Controls">
+      {
+        KEYS.map((k) => (
+          <li>
+            <span class="caps">
+              {k.keys.map((key) => (
+                <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+              ))}
+            </span>
+            <span>{k.label}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </figcaption>
+</figure>
+
+<script>
+  const roots = document.querySelectorAll<HTMLElement>('[data-walk-3d]');
+  roots.forEach((root) => {
+    const start = () => import('../scripts/walk/game3d').then((m) => m.startWalk3D(root));
+    if (!('lazy' in root.dataset)) { void start(); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); void start(); }
+    }, { rootMargin: '300px' });
+    io.observe(root);
+  });
+</script>
+
+<style>
+  .walk3d {
+    margin: 0;
+    border-radius: var(--radius-l);
+    background: var(--feature-bg);
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .walk3d:global(.immersive) {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+  }
+  .stage {
+    position: relative;
+    height: clamp(440px, 64vh, 720px);
+    background: linear-gradient(#5fa8e0, #cfe6f2);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    font-family: var(--font-body);
+  }
+  .walk3d:global(.immersive) .stage {
+    flex: 1 1 auto;
+    height: auto;
+  }
+  .stage:focus-visible {
+    outline: 3px solid var(--saffron);
+    outline-offset: -3px;
+  }
+  .stage :global(canvas.gl) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .stage :global(.webgl-fallback) {
+    margin: 0;
+    padding: 32px;
+    color: var(--stone);
+    max-width: 52ch;
+  }
+
+  .focus-hint {
+    position: absolute;
+    inset: 46% 0 auto;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .focus-hint span {
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(11, 20, 48, 0.82);
+    color: var(--stone);
+    font: 800 15px var(--font-display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .stage:focus-within .focus-hint,
+  .walk3d:global(.immersive) .focus-hint {
+    opacity: 0;
+  }
+
+  /* ---- Toolbar ---- */
+  .toolbar {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    z-index: 4;
+  }
+  .seg {
+    display: inline-flex;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .seg .tb {
+    border-radius: 0;
+  }
+  .seg .tb:first-child { border-radius: 999px 0 0 999px; }
+  .seg .tb:last-child { border-radius: 0 999px 999px 0; }
+  .tb {
+    min-height: 32px;
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(11, 20, 48, 0.78);
+    color: #f4f1ea;
+    font: 700 12px var(--font-body);
+    cursor: pointer;
+  }
+  .tb:hover { background: rgba(29, 44, 82, 0.92); }
+  .tb[aria-pressed='true'] {
+    background: var(--saffron);
+    color: var(--navy-deep);
+  }
+  .tb:focus-visible { outline: 2px solid var(--saffron); outline-offset: 2px; }
+
+  /* ---- HUD (hud.ts) ---- */
+  .stage :global(.hud) {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    color: #f4f1ea;
+  }
+  .stage :global(.hud-card) {
+    position: absolute;
+    background: rgba(20, 32, 61, 0.72);
+    border-radius: 10px;
+    backdrop-filter: blur(2px);
+  }
+  .stage :global(.vitals) {
+    left: 14px;
+    top: 12px;
+    width: 214px;
+    padding: 8px 10px 9px;
+    display: grid;
+    gap: 5px;
+    background: rgba(20, 32, 61, 0.6);
+  }
+  .stage :global(.vitals .row) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 16px;
+  }
+  .stage :global(.vitals .row.top) {
+    height: 22px;
+    justify-content: space-between;
+  }
+  .stage :global(.vitals svg) { display: block; fill: currentColor; }
+  .stage :global(.phones) { display: flex; gap: 5px; color: #1fc9b7; }
+  .stage :global(.phones svg) { width: 11px; height: 18px; }
+  .stage :global(.phones svg .scr) { fill: #d6fff9; }
+  .stage :global(.phones svg.lost) { opacity: 0.22; }
+  .stage :global(.phones.low svg:not(.lost)) { color: #ff6b5a; }
+  .stage :global(.bones) {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font: 800 18px var(--font-display);
+  }
+  .stage :global(.bones svg) { width: 20px; height: 10px; fill: #f4efe2; }
+  .stage :global(.ic) { width: 14px; display: grid; place-items: center; }
+  .stage :global(.ic svg) { width: 10px; height: 14px; }
+  .stage :global(.ic.pee) { color: #ffc93c; }
+  .stage :global(.ic.mk) { color: #1fc9b7; }
+  .stage :global(.ic.zm) { color: #8bcb3c; }
+  .stage :global(.lbl) {
+    width: 58px;
+    font: 700 10px var(--font-body);
+    letter-spacing: 0.06em;
+    color: #c9cfdf;
+  }
+  .stage :global(.bar) {
+    position: relative;
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(11, 20, 48, 0.7);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+  }
+  .stage :global(.bar i) {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: #ffc93c;
+    border-radius: 4px;
+    transition: width 0.15s;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.22);
+  }
+  .stage :global(.bar i.full) { background: #ffe08a; }
+  .stage :global(.bar i.zoom) { background: #8bcb3c; }
+  .stage :global(.bar i.zoom[data-mode='free']) { background: #1fc9b7; }
+  .stage :global(.drops) { display: flex; gap: 3px; color: rgba(255, 255, 255, 0.18); }
+  .stage :global(.drops svg) { width: 10px; height: 13px; }
+  .stage :global(.drops svg.on) { color: #1fc9b7; }
+  .stage :global(.chip) {
+    margin-left: auto;
+    padding: 0 5px;
+    border-radius: 6px;
+    background: rgba(31, 201, 183, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(31, 201, 183, 0.85);
+    font: 800 11px var(--font-display);
+  }
+
+  .stage :global(.goals) {
+    right: 8px;
+    top: 8px;
+    width: 200px;
+    padding: 9px 12px;
+    border: 0;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .stage :global(.goals.open) { width: min(380px, calc(100% - 250px)); padding: 12px 14px; }
+  .stage :global(.goals .gh) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font: 800 13px var(--font-display);
+    letter-spacing: 0.04em;
+  }
+  .stage :global(.goals.all .gh) { color: #8bcb3c; }
+  .stage :global(.goals .gprog) {
+    display: block;
+    height: 4px;
+    margin-top: 7px;
+    border-radius: 2px;
+    background: rgba(11, 20, 48, 0.7);
+    overflow: hidden;
+  }
+  .stage :global(.goals .gprog i) { display: block; height: 100%; background: #ffb020; }
+  .stage :global(.goals ul) {
+    display: none;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .stage :global(.goals.open ul) { display: grid; gap: 4px; }
+  .stage :global(.goals.open .gprog) { display: none; }
+  .stage :global(.goals li) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 21px;
+    font: 500 13px var(--font-body);
+  }
+  .stage :global(.goals li .tick) {
+    flex: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1.5px rgba(244, 241, 234, 0.7);
+    display: grid;
+    place-items: center;
+    font-size: 10px;
+    color: #0b1430;
+  }
+  .stage :global(.goals li.done) { color: #a9d672; }
+  .stage :global(.goals li.done .tick) { background: #8bcb3c; box-shadow: none; }
+  .stage :global(.goals .gl) { flex: 1; }
+  .stage :global(.gm) {
+    width: 50px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(11, 20, 48, 0.7);
+    overflow: hidden;
+  }
+  .stage :global(.gm i) { display: block; height: 100%; background: #ffb020; }
+  .stage :global(.gn) { width: 30px; text-align: right; font: 700 11px var(--font-body); color: #c9cfdf; }
+
+  .stage :global(kbd.kc) {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    margin: 0 3px;
+    border-radius: 5px;
+    background: #f4f1ea;
+    color: #14203d;
+    font: 800 12px var(--font-display);
+    box-shadow: 0 3px 0 #0b1430, inset 0 2px 0 rgba(255, 255, 255, 0.6);
+    vertical-align: middle;
+  }
+  .stage :global(kbd.kc.pill) {
+    height: 18px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f4f1ea;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+    font-size: 10px;
+  }
+
+  .stage :global(.banner) {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    transform: translate(-50%, -8px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100% - 480px);
+    padding: 7px 18px 7px 14px;
+    border-radius: 999px;
+    background: rgba(20, 32, 61, 0.82);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+    font: 800 14px var(--font-display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .stage :global(.banner.show) { opacity: 1; transform: translate(-50%, 0); }
+  .stage :global(.banner .dot) { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #ffb020; }
+  .stage :global(.banner[data-tone='news'] .dot) { background: #8bcb3c; }
+
+  .stage :global(.shouts) {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 58%;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+  }
+  .stage :global(.shout) {
+    font: 800 clamp(22px, 4vw, 34px) var(--font-display);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #f4f1ea;
+    -webkit-text-stroke: 8px #0b1430;
+    paint-order: stroke fill;
+    white-space: nowrap;
+  }
+  .stage :global(.shout.good) { color: #b5e37a; }
+  .stage :global(.shout.bad) { color: #ff8a7c; }
+  .stage :global(.shout.loud) { color: #ffc24d; }
+
+  .stage :global(.toasts) {
+    position: absolute;
+    right: 8px;
+    top: 64px;
+    display: grid;
+    gap: 8px;
+    justify-items: end;
+  }
+  .stage :global(.goals.open ~ .toasts) { top: auto; bottom: 64px; }
+  .stage :global(.toast) {
+    min-width: 220px;
+    max-width: 320px;
+    padding: 8px 12px 9px 14px;
+    border-radius: 10px;
+    background: rgba(20, 32, 61, 0.92);
+    box-shadow: inset 4px 0 0 var(--ac);
+    display: grid;
+    gap: 2px;
+  }
+  .stage :global(.toast b) { font: 800 14px var(--font-display); color: var(--ac); }
+  .stage :global(.toast span) { font: 500 13px var(--font-body); }
+
+  .stage :global(.combo) {
+    position: absolute;
+    left: 50%;
+    bottom: 64px;
+    transform: translateX(-50%);
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+  }
+  .stage :global(.combo[hidden]) { display: none; }
+  .stage :global(.combo span:first-child) {
+    font: 800 20px var(--font-display);
+    -webkit-text-stroke: 6px #0b1430;
+    paint-order: stroke fill;
+    white-space: nowrap;
+  }
+  .stage :global(.cbar) { width: min(320px, 70vw); height: 8px; border-radius: 4px; background: rgba(20, 32, 61, 0.6); overflow: hidden; }
+  .stage :global(.cbar i) { display: block; height: 100%; background: #ffc752; }
+  .stage :global(.cbar i.low) { background: #ff734c; }
+
+  .stage :global(.bubbles) { position: absolute; inset: 0; }
+  .stage :global(.bubble) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    max-width: 220px;
+    padding: 5px 10px;
+    margin: -38px 0 0 -12px;
+    border-radius: 9px;
+    background: #faf7ed;
+    color: #211f24;
+    font: 500 14px var(--font-body);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(51, 46, 51, 0.3);
+    white-space: nowrap;
+  }
+  .stage :global(.bubble::after) {
+    content: '';
+    position: absolute;
+    left: 10px;
+    bottom: -8px;
+    border: 5.5px solid transparent;
+    border-top: 9px solid #faf7ed;
+    border-bottom: 0;
+  }
+  .stage :global(.bubble[data-tone='win']) { background: #e0fadb; }
+  .stage :global(.bubble[data-tone='win']::after) { border-top-color: #e0fadb; }
+  .stage :global(.bubble[data-tone='loud']) { background: #ffb020; color: #0b1430; font: 800 15px var(--font-display); }
+  .stage :global(.bubble[data-tone='loud']::after) { border-top-color: #ffb020; }
+  .stage :global(.bubble.pop) { animation: bubblePop 0.16s ease-out; }
+  @keyframes bubblePop {
+    0% { scale: 0.7; }
+    70% { scale: 1.06; }
+    100% { scale: 1; }
+  }
+
+  .stage :global(.prompts) {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 22px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(11, 20, 48, 0.62);
+    font: 700 13px var(--font-body);
+    opacity: 0;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .stage :global(.prompts.show) { opacity: 1; }
+  .stage :global(.prompts .pi) { display: inline-flex; align-items: center; gap: 4px; }
+  .stage :global(.flash) { position: absolute; inset: 0; opacity: 0; }
+  .stage :global(.flash.go) { animation: flash 0.4s ease-out; }
+  @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+
+  /* ---- Panels ---- */
+  .panel {
+    position: absolute;
+    right: 12px;
+    bottom: 56px;
+    width: min(400px, calc(100% - 24px));
+    padding: 12px 14px 14px;
+    border-radius: 14px;
+    background: rgba(20, 32, 61, 0.95);
+    color: #f4f1ea;
+    box-shadow: inset 0 4px 0 var(--turquoise), 0 4px 10px rgba(0, 0, 0, 0.35);
+    z-index: 5;
+    transform: translateY(12px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .panel:global(.open) { opacity: 1; transform: none; pointer-events: auto; }
+  .coriolis-panel { box-shadow: inset 0 4px 0 var(--led), 0 4px 10px rgba(0, 0, 0, 0.35); width: min(300px, calc(100% - 24px)); }
+  .panel header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .panel header b { display: block; font: 800 18px var(--font-display); }
+  .panel header span { font-size: 13px; color: #c9cfdf; }
+  .panel .x {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: inherit;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .songs {
+    display: grid;
+    gap: 4px;
+    max-height: 168px;
+    overflow: auto;
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+  }
+  .songs :global(button) {
+    width: 100%;
+    display: grid;
+    gap: 1px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .songs :global(button b) { font: 700 14px var(--font-body); }
+  .songs :global(button span) { font-size: 12px; color: #c9cfdf; }
+  .songs :global(button[aria-pressed='true']) { background: rgba(31, 201, 183, 0.25); box-shadow: inset 0 0 0 1px var(--turquoise); }
+  .stems { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .stems button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #8590ad;
+    font: 700 12px var(--font-body);
+    cursor: pointer;
+  }
+  .stems button i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); opacity: 0.35; }
+  .stems button[aria-pressed='true'] { color: #f4f1ea; background: rgba(255, 255, 255, 0.12); }
+  .stems button[aria-pressed='true'] i { opacity: 1; }
+  .lanes { display: block; width: 100%; height: 88px; margin-top: 8px; border-radius: 8px; background: rgba(11, 20, 48, 0.6); }
+  .credit { margin: 8px 0 0; font-size: 11px; line-height: 1.4; color: #c9cfdf; }
+  .credit :global(a) { color: #d6fff9; }
+  .remote { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 40px); gap: 4px; justify-content: center; }
+  .remote button:nth-child(1) { grid-column: 2; }
+  .remote button:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .remote button:nth-child(3) { grid-column: 2; grid-row: 2; }
+  .remote button:nth-child(4) { grid-column: 3; grid-row: 2; }
+  .remote button:nth-child(5) { grid-column: 2; grid-row: 3; }
+  .remote button, .cmds button {
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: inherit;
+    font: 700 12px var(--font-body);
+    cursor: pointer;
+  }
+  .cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+  .cmds button { min-height: 32px; }
+
+  /* ---- Touch ---- */
+  .touch {
+    display: none;
+    position: absolute;
+    inset: auto 12px 56px 12px;
+    justify-content: space-between;
+    align-items: flex-end;
+    pointer-events: none;
+    z-index: 4;
+  }
+  @media (pointer: coarse) {
+    .touch { display: flex; }
+    .stage :global(.prompts) { bottom: 170px; }
+  }
+  .stick {
+    position: relative;
+    width: 112px;
+    height: 112px;
+    border-radius: 50%;
+    background: rgba(11, 20, 48, 0.4);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+    pointer-events: auto;
+    touch-action: none;
+  }
+  .stick i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 48px;
+    height: 48px;
+    margin: -24px;
+    border-radius: 50%;
+    background: rgba(244, 241, 234, 0.85);
+  }
+  .acts {
+    display: grid;
+    grid-template-columns: repeat(4, 54px);
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .acts button {
+    height: 46px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(11, 20, 48, 0.78);
+    color: #f4f1ea;
+    font: 800 11px var(--font-display);
+    text-transform: uppercase;
+    touch-action: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* ---- Caption: keycaps ---- */
+  figcaption {
+    padding: 12px clamp(14px, 3vw, 22px) 14px;
+    background: var(--feature-bg);
+    color: var(--feature-ink);
+  }
+  .walk3d:global(.immersive) figcaption { display: none; }
+  .keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    color: var(--feature-ink-2);
+  }
+  .keys li { display: inline-flex; align-items: center; gap: 6px; }
+  .caps { display: inline-flex; gap: 3px; }
+  kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: #f4f1ea;
+    color: #14203d;
+    font: 800 11px var(--font-display);
+    box-shadow: 0 3px 0 #0b1430;
+  }
+  kbd.wide { padding: 0 8px; }
+  @media (max-width: 720px) {
+    .stage { height: clamp(420px, 72vh, 640px); }
+    .stage :global(.vitals) { transform: scale(0.8); transform-origin: top left; }
+    .stage :global(.goals) { transform: scale(0.85); transform-origin: top right; }
+    .stage :global(.banner) { top: auto; bottom: 200px; max-width: calc(100% - 32px); }
+    .toolbar { left: 8px; right: 8px; bottom: auto; top: 104px; }
+    .toolbar .tb { min-height: 28px; padding: 4px 9px; font-size: 11px; }
+    @media (pointer: fine) { .toolbar { top: auto; bottom: 8px; } }
+    .keys { display: none; }
+  }
+</style>
