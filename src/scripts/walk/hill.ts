@@ -48,7 +48,8 @@ export const HILL = {
   stairsE: STAIRS_E,
   stairsTop: STAIRS_TOP,
   pipica: PIP,
-  pipicaBench: { x: -10.8, z: (PIP.gateZ0 + PIP.gateZ1) / 2 },
+  // Beside the gate (not in front of it), so Millie can walk straight out.
+  pipicaBench: { x: -11.0, z: PIP.gateZ0 - 2.2 },
   bowl: { x: -23.8, z: 198.4 },
   drink: { x: -14.5, z: 220.5 },
   museu: { x0: 16, x1: 30, z0: 196, z1: 210 },
@@ -438,9 +439,10 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   place(makeWaterBowl(), HILL.bowl.x, MID_Y, HILL.bowl.z);
   builder.addBox(-22.2, MID_Y, 204.2, -19.2, MID_Y + 0.35, 204.8, 0x7a5a3c);
   addBox({ x0: -22.2, x1: -19.2, z0: 204.2, z1: 204.8, top: MID_Y + 0.35, kind: 'log' });
-  // Bench beside the pipicà gate for Millie's human.
+  // Bench beside the pipicà gate for Millie's human. The seat point (where the
+  // human stops, facing the park) stays just clear of the collider's front edge.
   place(makeBench(), HILL.pipicaBench.x + 0.35, MID_Y, HILL.pipicaBench.z, -Math.PI / 2);
-  addBox({ x0: HILL.pipicaBench.x - 0.15, x1: HILL.pipicaBench.x + 0.85, z0: HILL.pipicaBench.z - 0.9, z1: HILL.pipicaBench.z + 0.9, top: MID_Y + 0.5, kind: 'bench' });
+  addBox({ x0: HILL.pipicaBench.x + 0.15, x1: HILL.pipicaBench.x + 0.7, z0: HILL.pipicaBench.z - 0.9, z1: HILL.pipicaBench.z + 0.9, top: MID_Y + 0.5, kind: 'bench' });
   yield;
 
   // ---- Trees, cypresses, lamps, hilltop benches, drinking fountain & fingerpost ----
