@@ -3,7 +3,7 @@
   with live markers on top. Small in the corner (centered on Millie, sea up,
   like the street camera), or the whole town when enlarged with [M].
 */
-import type { Level } from './level';
+import { SWIM, type Level } from './level';
 
 export interface MapMarker {
   x: number;
@@ -76,6 +76,17 @@ export class Minimap {
     R(60, -34, 80, -22.5, C.green);
     // The underpass, cut through the railway.
     R(-3, -4, 3, 22, '#9a9384');
+    // The swim zone's buoy line.
+    g.fillStyle = '#ff7a2a';
+    for (const [x0, z0, x1, z1] of [[SWIM.x0, SWIM.z, SWIM.x1, SWIM.z], [SWIM.x0, -60, SWIM.x0, SWIM.z], [SWIM.x1, -60, SWIM.x1, SWIM.z]]) {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      for (let d = 0; d <= len; d += 2.5) {
+        const t = d / len;
+        g.beginPath();
+        g.arc((x0 + (x1 - x0) * t - X0) * PPM, (z0 + (z1 - z0) * t - Z0) * PPM, 0.5 * PPM, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
     // The pier.
     R(-50, Z0, -46, -10, C.pier);
     // Colliders: buildings, pavilions, walls and fences.

@@ -181,7 +181,7 @@ export function createLife(ctx: LifeCtx) {
     paddle.add(blade);
     paddle.position.set(0.2, 1.0, 0.35);
     p.group.add(paddle);
-    return { p, paddle, x: -20, z: -84, dir: 1 };
+    return { p, paddle, x: -20, z: -98, dir: 1 }; // out beyond the buoy line
   })();
 
   // ---- Neighbors sitting out in the side streets -----------------------------------------

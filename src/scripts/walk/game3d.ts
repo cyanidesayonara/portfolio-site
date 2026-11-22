@@ -49,6 +49,8 @@ const DOG_R = 0.3;
 const HUMAN_R = 0.3;
 const WALK = 3.0, RUN = 5.6, HUMAN_WALK = 1.35;
 const STEP_UP = 0.35;
+// Swimming: Millie floats with her back just under the surface once the water is deeper than this.
+const SWIM_DEPTH = 0.42, SWIM_SINK = 0.4, HUMAN_WADE = 0.95;
 
 export interface WalkOptions { home?: boolean }
 
@@ -201,7 +203,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     x: level.start.human.x, y: RAMBLA_Y, z: level.start.human.z, vx: 0, vz: 0, heading: -Math.PI / 2,
     state: 'walk' as 'walk' | 'phone' | 'selfie' | 'sit' | 'bench' | 'whirl' | 'stumble' | 'haul',
     stateT: 0, eventT: rand(3.5, 6.5), reelT: rand(4, 8), pendingReel: 0, patience: 1, giveIn: 0, grace: 0,
-    ughSaid: false, phones: 3, stuck: 0, seat: null as null | { x: number; z: number; heading: number }, seated: false, heyT: 0, stumbleT: 0, haulT: 0, restBase: 5,
+    ughSaid: false, phones: 3, stuck: 0, toldCold: false, seat: null as null | { x: number; z: number; heading: number }, seated: false, heyT: 0, stumbleT: 0, haulT: 0, restBase: 5,
   };
   let whirl: null | { pole: Obstacle; theta: number; omega: number; swept: number; budget: number; dir: number; r: number; t: number; extra: number } = null;
   const whirlDet = new WhirlDetector();
@@ -384,7 +386,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   styles.forEach((st, i) => {
     const rider = makePerson({ top: pickOne(NPC_TOPS), hair: pickOne(NPC_HAIRS), skin: pickOne(NPC_SKINS), hairStyle: 'short', prop: 'none' });
     const b = makeBike(st, rider);
-    rider.animate(0, { speed: 2, pose: st === 'scooter' ? 'stand' : 'ride' });
+    rider.animate(0, { speed: 2, pose: st === 'scooter' ? 'scoot' : 'ride' });
     scene.add(collapseRig(b.group));
     const dir = i % 2 ? 1 : -1;
     riders.push({ g: b.group, wheels: b.wheels, rider, x: rand(-70, 70), z: dir > 0 ? -5.2 : -6.2, dir, speed: 0, max: st === 'road' ? 7.5 : st === 'scooter' ? 5 : 5.5, rang: 0, light: b.light });
@@ -613,6 +615,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       }
     }
   };
+  // Millie's floor: the seabed, or the swimming height where it's deep.
+  let dogSwimming = false;
+  const dogFloor = (x: number, z: number, y: number) => {
+    const f = level.floor(x, z, y);
+    return f < WATER_Y - SWIM_DEPTH && level.surface(x, z, y) === 'water' ? WATER_Y - SWIM_SINK : f;
+  };
   const blockLedge = (p: { x: number; z: number }, x0: number, z0: number, feetY: number) => {
     if (level.floor(p.x, p.z, feetY) <= feetY + STEP_UP) return;
     if (level.floor(p.x, z0, feetY) <= feetY + STEP_UP) { p.z = z0; return; }
@@ -651,7 +659,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   // ---- Actions ------------------------------------------------------------------------
   const doJump = () => {
-    if (!dog.onGround || coriolisFocus) return;
+    if (!dog.onGround || coriolisFocus || dogSwimming) return;
     dog.vy = 6.5;
     dog.onGround = false;
     audio.jump();
@@ -1261,7 +1269,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     dog.digging = held.has('Space');
     const surf = level.surface(dog.x, dog.z, dog.y);
     const depth = Math.max(0, WATER_Y - level.floor(dog.x, dog.z, dog.y));
-    const surfMul = surf === 'sand' ? 0.82 : surf === 'water' ? clamp(0.75 - depth, 0.35, 0.75) : 1;
+    dogSwimming = surf === 'water' && depth > SWIM_DEPTH;
+    const surfMul = surf === 'sand' ? 0.82 : dogSwimming ? 0.42 : surf === 'water' ? clamp(0.75 - depth, 0.35, 0.75) : 1;
     const target = (dog.digging ? 1.0 : running ? RUN : WALK) * surfMul * inp.mag;
     const tvx = inp.x * target, tvz = inp.z * target;
     const acc = inp.mag > 0 ? 12 : 9;
@@ -1295,7 +1304,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     collide(dog, DOG_R, dog.y);
     level.clampBounds(dog);
     blockLedge(dog, dx0, dz0, dog.y);
-    const g = level.floor(dog.x, dog.z, dog.y);
+    const g = dogFloor(dog.x, dog.z, dog.y);
     if (!dog.onGround || dog.y > g + 0.02) {
       dog.vy -= 17.5 * dt;
       dog.y += dog.vy * dt;
@@ -1316,10 +1325,16 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       collide(human, HUMAN_R, human.y);
       level.clampBounds(human);
       blockLedge(human, hx0, hz0, human.y);
+      // Wading: they go in up to the waist, no further.
+      let waterBlocked = false;
+      if (WATER_Y - level.floor(human.x, human.z, human.y + 0.3) > HUMAN_WADE && level.surface(human.x, human.z, human.y) === 'water') {
+        human.x = hx0; human.z = hz0; waterBlocked = true;
+        if (!human.toldCold) { humanSay(pickOne(['Too cold for me!', "I'm not swimming!", 'This is as far as I go.']), 1.8); human.toldCold = true; }
+      } else if (WATER_Y - level.floor(human.x, human.z, human.y + 0.3) < 0.2) human.toldCold = false;
       human.y = level.floor(human.x, human.z, human.y + 0.3);
       const moved = Math.hypot(human.x - hx0, human.z - hz0);
       const wanted = Math.hypot(human.vx, human.vz) * dt;
-      human.stuck = wanted > 0.01 && moved < wanted * 0.2 ? human.stuck + dt : Math.max(0, human.stuck - dt);
+      human.stuck = wanted > 0.01 && moved < wanted * 0.2 && !waterBlocked ? human.stuck + dt : Math.max(0, human.stuck - dt);
       if (human.stuck > 2.5 && !offLeash) {
         // Safety valve: hop to just behind the dog.
         human.x = dog.x - Math.cos(dog.heading) * 1.6;
@@ -1610,7 +1625,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       r.g.visible = Math.hypot(r.x - dog.x, r.z - dog.z) < 60;
       if (r.g.visible) {
         r.wheels.forEach((wh) => { wh.rotation.z -= r.speed * dt * 3; });
-        r.rider.animate(time, { speed: r.speed, pose: r.max === 5 ? 'stand' : 'ride' });
+        r.rider.animate(time, { speed: r.speed, pose: r.max === 5 ? 'scoot' : 'ride' });
       }
       // A fast rider who hits the human knocks them down.
       if (r.speed > 2 && Math.hypot(r.x - human.x, r.z - human.z) < 0.7 && human.state !== 'stumble' && !whirl) {
@@ -1912,8 +1927,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     // ---- Visuals ----
     dogM.group.position.set(dog.x, dog.y, dog.z);
     dogM.group.rotation.y = -dog.heading;
-    dogM.animate(time, { speed: sp, dig: dog.digging, peeing: dog.peeing > 0, wag: offLeash ? 1 : clamp(1 - leash.taut, 0.2, 0.8), air: !dog.onGround });
-    const dg = level.floor(dog.x, dog.z, dog.y);
+    dogM.animate(time, { speed: sp, dig: dog.digging && !dogSwimming, peeing: dog.peeing > 0, wag: offLeash ? 1 : clamp(1 - leash.taut, 0.2, 0.8), air: !dog.onGround, swim: dogSwimming });
+    const dg = dogFloor(dog.x, dog.z, dog.y);
     dogShadow.position.set(dog.x, dg + 0.03, dog.z);
     dogShadow.scale.setScalar(0.9 * clamp(1 - (dog.y - dg) * 0.3, 0.5, 1));
     humanM.group.position.set(human.x, human.y, human.z);
@@ -2215,7 +2230,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         level.districts.unshift(d);
         return d;
       },
-      beachDevils, life,
+      beachDevils, life, riders,
       get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
       tick: (frames = 1) => { for (let i = 0; i < frames; i++) update(1 / 60); renderer.render(scene, camera); },
