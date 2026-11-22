@@ -4,7 +4,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Ground rules
 
-- **Branch:** PR #1 (`redesign-astro`) has been merged to `main`; put new work on a feature branch with a PR against `main`. Commit as you go and push.
+- **Branch:** PR #1 (`redesign-astro`) and PR #2 (`walk-phase2-polish`) have been merged to `main`; `feat/transit-cutscene-polish` (PR #3) adds the 2D↔3D Estació train connection, loading cutscene, and 2D/3D polish. Put new work on a feature branch (or continue on `feat/transit-cutscene-polish` until PR #3 merges) with a PR against `main`. Commit as you go and push.
 - **Never merge to `main` without Santtu's explicit go-ahead.** Merging deploys the site to GitHub Pages (`.github/workflows/pages-deploy.yml`).
 - **Commit messages & PRs:** authored only by Santtu Nykänen. Never add `Co-authored-by` trailers or any AI/agent attribution anywhere (see `AGENTS.md`).
 - **Copy:** American English, professional. Santtu is a generalist developer, not a "game maker". Never invent stats or facts.
@@ -39,6 +39,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 | `fade.ts` | See-through dither for anything between the camera and Millie. Millie and her human are exempt. |
 | `minimap.ts` | A top-down plan drawn once from level data, plus live markers. Turns with the follow camera; `M` enlarges it. |
 | `hud.ts`, `audio.ts`, `theme.ts`, `textures.ts` | HUD DOM, Web Audio (stemma jukebox stems plus synthesized SFX), day/rain/night presets, procedural canvas textures. |
+| `transit.ts` | Animated R1 commuter-train loading cutscene and sliding-door reveal connecting the 2D street `Estació` stop to 3D `Estació` and back (`?via=train`). |
 
 `src/components/Walk3D.astro` holds the markup, toolbar, panels and all HUD CSS, and lazy-loads `game3d`. `src/pages/walk.astro` is the page. The home page (`src/pages/index.astro`) still uses the 2D `StreetMap.astro`.
 
@@ -69,6 +70,11 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 
 ## Polish backlog (from Santtu's playtesting)
 
+- **Leash fling / pole slip (`src/scripts/walk/leash.ts`, `src/scripts/walk/game3d.ts`):**
+  - *Pole slip-through:* `leash.ts` (`step()`, lines 133–146) only projects discrete interior vertices `pts[i]` outside pole circles (`o.r + 0.035`), never testing segment-vs-circle intersection or swept tunneling (`seg ≈ 0.22 m` vs thin poles `r = 0.06–0.17 m`). Add segment-circle push-out that preserves the previous-frame side of the pole.
+  - *Wrong whirl spin direction:* `startWhirl()` (`game3d.ts`, line 1279) sets `dir: coil >= 0 ? 1 : -1` from dog-to-human coil angle instead of the actual rope pull tangent at the human's hand. Derive `dir` from the 2D cross product of `(human - pole)` and `leash.ends().human` (`(human.x - pole.x) * hd.z - (human.z - pole.z) * hd.x >= 0 ? 1 : -1`).
+- **Horizon green wall and distant Barcelona skyline (`src/scripts/walk/level.ts`, lines 1048–1060):**
+  - `hills` (`CylinderGeometry(..., Math.PI * 0.15, Math.PI * 0.7)`) currently spans across `+X` (`27°..153°`) and cuts into the sea as a flat untextured green band (`0x6f8f6a`, `fog: false`). Re-center the inland Serralada hills around `theta = 0` (`+Z`) with a ridgeline and atmospheric haze, and add a distant Barcelona skyline silhouette (Montjuïc/Tibidabo ridge, W hotel sail, twin towers, Torre Glòries, Sagrada Família spires) on the southwest horizon behind `makeXemeneies()`.
 - Articulated human knees, hip/shoulder counter-rotation, `selfie` pose, and multi-segment dog tail wag are in; other models and animations can still use refinement.
 - Touch pinch-to-zoom, 1-finger canvas orbit, a compact 2×2 core touch button pad, tappable contextual prompt pills, and a toolbar Restart button are implemented (also added Restart, drag-to-steer, touch hold-prevention, and contextual `GO IN` to the home page's 2D street); not yet verified on real phone hardware (along with true browser fullscreen and audio by ear).
 - Stand-ins now use layout facade, roof, pavilion accent, and landmark colors/silhouettes (visually verified from the pier in headless Chrome).

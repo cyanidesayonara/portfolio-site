@@ -577,7 +577,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   shadowed(station);
   place(station, STATION_X, GROUND_Y, 14.2 + stD / 2);
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
-  stops0.push({ id: 'station', label: 'Estació', kind: 'Rodalies R1', href: '', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 1, r: 0 });
+  stops0.push({ id: 'station', label: 'Estació', kind: 'Train to 2D street', href: '/?via=train', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 2.2, r: 5.5 });
 
   yield 'The underpass';
   // ---- The underpass ----------------------------------------------------------------------
@@ -1063,16 +1063,19 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
 
   yield 'Stops (doors of the pavilions)';
   // ---- Stops (doors of the pavilions) --------------------------------------------------
-  const stops: Stop[] = pavilions.map((p) => ({
-    id: p.id,
-    label: p.title,
-    kind: p.sub,
-    href: p.href,
-    color: p.color,
-    x: p.id === 'coriolis' ? p.x + p.w / 2 - 0.6 : p.id === 'blog' ? 40 : p.x + p.w * 0.34,
-    z: p.id === 'blog' ? -9.0 : PZ1 + 1.2,
-    r: p.id === 'blog' ? 2.6 : 2.4,
-  }));
+  const stops: Stop[] = [
+    ...pavilions.map((p) => ({
+      id: p.id,
+      label: p.title,
+      kind: p.sub,
+      href: p.href,
+      color: p.color,
+      x: p.id === 'coriolis' ? p.x + p.w / 2 - 0.6 : p.id === 'blog' ? 40 : p.x + p.w * 0.34,
+      z: p.id === 'blog' ? -9.0 : PZ1 + 1.2,
+      r: p.id === 'blog' ? 2.6 : 2.4,
+    })),
+    ...stops0,
+  ];
 
   yield 'Floor, surfaces, bounds';
   // ---- Floor, surfaces, bounds ---------------------------------------------------------

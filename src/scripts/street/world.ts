@@ -12,6 +12,7 @@ export type Stop = { id: string; label: string; kind: string; href: string; colo
 
 export type Lot =
   | { type: 'shop'; x: number; w: number; stop: Stop }
+  | { type: 'station'; x: number; w: number; stop: Stop }
   | { type: 'park'; x: number; w: number; stop: Stop }
   | { type: 'house'; x: number; w: number; tone: number };
 export type StopLot = Extract<Lot, { stop: Stop }>;
@@ -80,6 +81,11 @@ export function buildWorld(stops: Stop[]): World {
       house(130);
       lots.push({ type: 'park', x, w: 320, stop });
       x += 320;
+      return;
+    }
+    if (stop.id === 'station') {
+      lots.push({ type: 'station', x, w: 220, stop });
+      x += 220;
       return;
     }
     lots.push({ type: 'shop', x, w: 190, stop });
@@ -159,6 +165,7 @@ export function drawStatic(c: CanvasRenderingContext2D, w: World) {
   for (const l of w.lots) {
     if (l.type === 'house') drawHouse(c, w, l);
     else if (l.type === 'shop') drawShop(c, w, l);
+    else if (l.type === 'station') drawStation(c, w, l);
     else drawPark(c, l);
   }
   for (const s of w.solids) drawSolidBase(c, s);
@@ -361,6 +368,84 @@ function drawShop(c: CanvasRenderingContext2D, w: World, l: Extract<Lot, { type:
   // Doormat
   c.fillStyle = 'rgba(60, 40, 30, 0.35)';
   c.fillRect(l.x + l.w / 2 - 16, FACADE + 1, 32, 7);
+  shade(c, l.x, l.w);
+}
+
+function drawStation(c: CanvasRenderingContext2D, w: World, l: Extract<Lot, { type: 'station' }>) {
+  const cx = l.x + l.w / 2;
+  // Commuter train roof & carriage strip visible above the station parapet
+  c.fillStyle = '#d7dadf';
+  c.fillRect(l.x + 8, 2, l.w - 16, 13);
+  c.fillStyle = '#e5302a';
+  c.fillRect(l.x + 8, 10, l.w - 16, 4);
+  c.fillStyle = '#2a2f3d';
+  for (let wx = l.x + 18; wx < l.x + l.w - 26; wx += 22) c.fillRect(wx, 4, 14, 5);
+
+  // Oxblood coastal station body + cream pilasters and cornice
+  c.fillStyle = '#8e2f2c';
+  c.fillRect(l.x, 14, l.w, FACADE - 14);
+  c.fillStyle = '#e9ddc2';
+  c.fillRect(l.x, 14, l.w, 4);
+  c.beginPath();
+  c.moveTo(cx - 48, 14);
+  c.lineTo(cx, 1);
+  c.lineTo(cx + 48, 14);
+  c.closePath();
+  c.fill();
+  for (let i = 0; i <= 4; i++) {
+    const px = l.x + 4 + i * ((l.w - 14) / 4);
+    c.fillRect(px, 14, 6, FACADE - 14);
+  }
+  // Upper arched windows + lower flanking windows (glow in dark mode)
+  for (let i = 0; i < 4; i++) {
+    const wx = l.x + 18 + i * 50;
+    for (const [wy, wh] of [[24, 22], [86, 26]] as const) {
+      if (wy > 60 && (i === 1 || i === 2)) continue;
+      c.fillStyle = '#e9ddc2';
+      c.beginPath();
+      c.roundRect(wx - 2, wy - 3, 20, wh + 3, [8, 8, 0, 0]);
+      c.fill();
+      c.fillStyle = '#3b4560';
+      c.beginPath();
+      c.roundRect(wx, wy, 16, wh, [6, 6, 0, 0]);
+      c.fill();
+      w.windows.push({ x: wx, y: wy, w: 16, h: wh });
+    }
+  }
+  // Station nameplate and R1 roundel
+  c.fillStyle = '#e5302a';
+  c.beginPath();
+  c.roundRect(cx - 56, 52, 112, 26, 4);
+  c.fill();
+  c.fillStyle = '#f4f1ea';
+  c.beginPath();
+  c.arc(cx - 42, 65, 8.5, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#e5302a';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.font = `800 8px ${FONT}`;
+  c.fillText('R1', cx - 42, 65.5);
+  c.fillStyle = '#f4f1ea';
+  c.font = `800 13px ${FONT}`;
+  c.fillText('Estació', cx + 8, 61.5);
+  c.font = `700 7.5px ${BODY}`;
+  c.fillText('TRAIN TO 3D SEAFRONT', cx + 8, 71.5);
+  // Central arched entrance
+  c.fillStyle = '#e9ddc2';
+  c.beginPath();
+  c.roundRect(cx - 15, 83, 30, FACADE - 83, [12, 12, 0, 0]);
+  c.fill();
+  c.fillStyle = '#2a2f3d';
+  c.beginPath();
+  c.roundRect(cx - 11, 86, 22, FACADE - 86, [9, 9, 0, 0]);
+  c.fill();
+  c.fillStyle = '#d8c79c';
+  c.fillRect(cx - 3, 94, 6, 12);
+  w.windows.push({ x: cx - 3, y: 94, w: 6, h: 12 });
+  // Platform welcome mat
+  c.fillStyle = 'rgba(229, 48, 42, 0.32)';
+  c.fillRect(cx - 16, FACADE + 1, 32, 7);
   shade(c, l.x, l.w);
 }
 

@@ -206,4 +206,12 @@ export class StreetSound {
     if (t < 0) return;
     for (let i = 0; i < 6; i++) this.hiss(t + i * 0.045, 0.04, 0.05, 2500, 'bandpass', this.sfx!);
   }
+  stationChime() {
+    const t = this.now();
+    if (t < 0) return;
+    [659, 831, 988].forEach((f, i) => {
+      this.tone(f, t + i * 0.09, 0.24, 'triangle', 0.14, this.sfx!);
+      this.tone(f * 2, t + i * 0.09, 0.18, 'sine', 0.05, this.sfx!);
+    });
+  }
 }
