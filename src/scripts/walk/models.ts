@@ -809,10 +809,12 @@ export function makePalm(seed: number, height = 9) {
   return { group: g, crown, radius: 0.26 };
 }
 
+let planeBark: THREE.MeshStandardMaterial | null = null;
 export function makePlaneTree(seed: number) {
   const r = rng(seed);
   const g = new THREE.Group();
-  const bark = new THREE.MeshStandardMaterial({ map: barkTexture(), roughness: 0.9 });
+  // One bark material for every plane tree: painting the texture is the slow part.
+  const bark = planeBark ??= new THREE.MeshStandardMaterial({ map: barkTexture(), roughness: 0.9 });
   const trunk = cyl(0.17, 0.24, 3.4, bark, 10);
   trunk.position.y = 1.7;
   g.add(trunk);

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "units": "meters",
-  "mapBounds": { "x0": -96, "x1": 96, "z0": -134, "z1": 103 },
+  "mapBounds": { "x0": -96, "x1": 96, "z0": -134, "z1": 173 },
   "swim": { "x0": -40, "x1": 44, "z": -90, "shoreZ": -60 },
   "pipica": { "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "gateZ0": -29.2, "gateZ1": -26.8 },
   "pier": { "x0": -50, "x1": -46, "root": -10, "rise": -30, "end": -130, "high": 1.2 },
@@ -19,7 +19,13 @@
     { "id": "townStreet", "x0": -34, "x1": 34, "z0": 34, "z1": 103, "mapColor": "#bdb19e" },
     { "id": "pipica", "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "mapColor": "#9bc46a" },
     { "id": "underpass", "x0": -3, "x1": 3, "z0": -4, "z1": 22, "mapColor": "#9a9384" },
-    { "id": "pier", "x0": -50, "x1": -46, "z0": -134, "z1": -10, "mapColor": "#8d7356" }
+    { "id": "pier", "x0": -50, "x1": -46, "z0": -134, "z1": -10, "mapColor": "#8d7356" },
+    { "id": "plazaFill", "x0": -70, "x1": 70, "z0": 101, "z1": 173, "mapColor": "#62584c" },
+    { "id": "plaza", "x0": -20, "x1": 20, "z0": 101, "z1": 139, "mapColor": "#cfc3ad" },
+    { "id": "alleyW", "x0": -20, "x1": -14, "z0": 139, "z1": 155, "mapColor": "#bdb19e" },
+    { "id": "alleyE", "x0": 14, "x1": 20, "z0": 139, "z1": 155, "mapColor": "#bdb19e" },
+    { "id": "shopStreet", "x0": -62, "x1": 62, "z0": 155, "z1": 161, "mapColor": "#bdb19e" },
+    { "id": "pipica2", "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "mapColor": "#9bc46a" }
   ],
   "districts": [
     {
@@ -71,7 +77,7 @@
     {
       "id": "town",
       "label": "Carrer del Mar",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": 33.5, "z1": 100000 },
+      "bounds": { "x0": -100000, "x1": 100000, "z0": 33.5, "z1": 101 },
       "streets": [
         { "id": "carrer-del-mar", "name": "Carrer del Mar", "width": 7, "surface": "paving", "points": [[0, 34], [0, 100]] },
         { "id": "side-a", "name": "Side street A", "width": 6, "surface": "paving", "points": [[-34, 53], [34, 53]] },
@@ -83,22 +89,18 @@
         { "x0": -41, "x1": -20, "z0": 34, "z1": 50, "floors": 5, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z", "+z"], "groundFloor": true },
         { "x0": 3.5, "x1": 20, "z0": 34, "z1": 50, "floors": 4, "color": "#d9705a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
         { "x0": 20, "x1": 41, "z0": 34, "z1": 50, "floors": 3, "color": "#e8d4a8", "roofColor": "#c2997a", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z", "+z"], "groundFloor": true },
-
         { "x0": -20, "x1": -3.5, "z0": 56, "z1": 68, "floors": 5, "color": "#efe4cc", "roofColor": "#b88566", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["+x", "-z", "+z"], "groundFloor": true },
         { "x0": -41, "x1": -20, "z0": 56, "z1": 68, "floors": 3, "color": "#c8735a", "roofColor": "#a87561", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
         { "x0": 3.5, "x1": 20, "z0": 56, "z1": 68, "floors": 4, "color": "#d9b48a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
         { "x0": 20, "x1": 41, "z0": 56, "z1": 68, "floors": 5, "color": "#f2e9d8", "roofColor": "#c2997a", "shutterColor": "#8a5a3c", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
-
         { "x0": -20, "x1": -3.5, "z0": 74, "z1": 86, "floors": 4, "color": "#b9c3c9", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+x", "-z", "+z"], "groundFloor": true },
         { "x0": -41, "x1": -20, "z0": 74, "z1": 86, "floors": 4, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
         { "x0": 3.5, "x1": 20, "z0": 74, "z1": 86, "floors": 5, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
         { "x0": 20, "x1": 41, "z0": 74, "z1": 86, "floors": 3, "color": "#d9705a", "roofColor": "#c2997a", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
-
-        { "x0": -20, "x1": -3.5, "z0": 92, "z1": 101, "floors": 3, "color": "#e8d4a8", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": true },
+        { "x0": -20, "x1": -3.5, "z0": 92, "z1": 101, "floors": 3, "color": "#e8d4a8", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x", "-z", "+z"], "groundFloor": true },
         { "x0": -41, "x1": -20, "z0": 92, "z1": 101, "floors": 4, "color": "#efe4cc", "roofColor": "#9a8a78", "shutterColor": "#8a5a3c", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
-        { "x0": 3.5, "x1": 20, "z0": 92, "z1": 101, "floors": 4, "color": "#c8735a", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
+        { "x0": 3.5, "x1": 20, "z0": 92, "z1": 101, "floors": 4, "color": "#c8735a", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
         { "x0": 20, "x1": 41, "z0": 92, "z1": 101, "floors": 5, "color": "#d9b48a", "roofColor": "#c2997a", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
-
         { "x0": 41, "x1": 70, "z0": 34, "z1": 60, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z", "-x"], "groundFloor": true },
         { "x0": 70, "x1": 100, "z0": 34, "z1": 60, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
         { "x0": -140, "x1": -95, "z0": 34, "z1": 60, "floors": 4, "color": "#e8d4a8", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
@@ -114,6 +116,42 @@
       "pois": [
         { "id": "carrer-del-mar", "kind": "street", "label": "Carrer del Mar", "x": 0, "z": 62, "color": "#f4f1ea" }
       ]
+    },
+    {
+      "id": "plaza",
+      "label": "Plaça del Mercat",
+      "bounds": { "x0": -100000, "x1": 100000, "z0": 101, "z1": 100000 },
+      "streets": [
+        { "id": "plaza", "name": "Plaça del Mercat", "width": 40, "surface": "paving", "points": [[0, 101], [0, 139]] },
+        { "id": "carrer-major", "name": "Carrer Major", "width": 6, "surface": "paving", "points": [[-62, 158], [62, 158]] },
+        { "id": "alley-w", "name": "Market alley W", "width": 6, "surface": "paving", "points": [[-17, 139], [-17, 155]] },
+        { "id": "alley-e", "name": "Market alley E", "width": 6, "surface": "paving", "points": [[17, 139], [17, 155]] }
+      ],
+      "blocks": [
+        { "x0": -41, "x1": -20, "z0": 101, "z1": 119, "floors": 5, "color": "#e9cf9a", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
+        { "x0": -41, "x1": -20, "z0": 119, "z1": 155, "floors": 4, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+x", "+z"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 101, "z1": 119, "floors": 4, "color": "#dcd2bd", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-x"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 119, "z1": 155, "floors": 5, "color": "#f0c27a", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "+z"], "groundFloor": true },
+        { "x0": -62, "x1": -41, "z0": 139, "z1": 155, "floors": 4, "color": "#e6dcc6", "roofColor": "#b2563a", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
+        { "x0": 41, "x1": 62, "z0": 139, "z1": 155, "floors": 3, "color": "#d9705a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
+        { "x0": -62, "x1": -30, "z0": 161, "z1": 173, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -30, "x1": -3, "z0": 161, "z1": 173, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
+        { "x0": 3, "x1": 30, "z0": 161, "z1": 173, "floors": 4, "color": "#e8d4a8", "roofColor": "#c2997a", "shutterColor": "#2a5aa8", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
+        { "x0": 30, "x1": 62, "z0": 161, "z1": 173, "floors": 4, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -70, "x1": -62, "z0": 139, "z1": 173, "floors": 4, "color": "#d8cdb6", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
+        { "x0": 62, "x1": 70, "z0": 139, "z1": 173, "floors": 4, "color": "#d8cdb6", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true }
+      ],
+      "pavilions": [],
+      "landmarks": [
+        { "id": "market", "label": "Mercat", "x0": -14, "x1": 14, "z0": 139, "z1": 151, "height": 10, "color": "#c98f6a", "roofColor": "#6f7d84" }
+      ],
+      "pois": [
+        { "id": "plaza", "kind": "street", "label": "Plaça del Mercat", "x": 0, "z": 112, "color": "#f4f1ea" },
+        { "id": "carrer-major", "kind": "street", "label": "Carrer Major", "x": -36, "z": 158, "color": "#f4f1ea" },
+        { "id": "market", "kind": "landmark", "label": "Mercat", "x": 0, "z": 145, "color": "#e5487a" },
+        { "id": "pipica2", "kind": "pipica", "label": "Pipicà", "x": 13, "z": 132, "color": "#8bcb3c" }
+      ]
     }
-  ]
+  ],
+  "pipica2": { "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "gateZ0": 129.6, "gateZ1": 132.0 }
 }

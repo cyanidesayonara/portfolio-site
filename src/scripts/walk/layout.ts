@@ -103,6 +103,7 @@ export interface TownLayout {
   mapBounds: BoundsData;
   swim: { x0: number; x1: number; z: number; shoreZ: number };
   pipica: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
+  pipica2: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pier: { x0: number; x1: number; root: number; rise: number; end: number; high: number };
   ramps: number[];
   tracks: number[];
