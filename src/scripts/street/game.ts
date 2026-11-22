@@ -58,7 +58,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   fig.classList.add('live');
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const coarse = matchMedia('(pointer: coarse)').matches;
+  let coarse = matchMedia('(pointer: coarse)').matches || matchMedia('(any-pointer: coarse)').matches;
   const darkMq = matchMedia('(prefers-color-scheme: dark)');
   const isNight = () => {
     const t = document.documentElement.dataset.theme;
@@ -945,7 +945,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   function bannerText(): string | null {
     if (toast) return toast.text;
-    if (near) return coarse ? `Tap the sign to go into ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
+    if (near) return coarse ? `Tap GO IN or sign: ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
     if (nearBone) return coarse ? 'GRAB: pick up the bone' : 'G: pick up the bone';
     if (natureCalls) return coarse ? 'Nature calls! Hold POOP' : 'Nature calls! Hold F';
     if (pee < 0.25 && !nearDrink) return 'Thirsty! Find a water bowl';
@@ -958,7 +958,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!playing) return;
     const small = cssW < 520;
-    const k = small ? 0.72 : 1;
+    const k = small ? 0.78 : 1;
     c.textBaseline = 'middle';
     c.textAlign = 'left';
 
@@ -1057,24 +1057,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     // Touch buttons
     if (coarse) for (const b of buttons()) {
       const on = (b.id === 'run' && touchSprint !== null) || (b.id === 'dig' && touchDig !== null) || (b.id === 'pee' && touchSquat !== null);
-      c.fillStyle = on ? '#8bcb3c' : b.id === 'grab' ? 'rgba(255, 176, 32, 0.92)' : HUD_BG;
+      const accent = b.id === 'grab' || b.id === 'enter';
+      c.fillStyle = on ? '#8bcb3c' : accent ? 'rgba(255, 176, 32, 0.94)' : HUD_BG;
       c.beginPath();
       c.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       c.fill();
       if (b.id === 'pee') iconDrop(b.x, b.y - 5, natureCalls ? '#b0674a' : '#ffb020', 1.1);
       else if (b.id === 'run') iconBolt(b.x, b.y - 5, on ? '#0b1430' : '#8bcb3c');
       else if (b.id === 'grab') iconBone(b.x, b.y - 5, '#0b1430', 0.9);
-      c.fillStyle = on || b.id === 'grab' ? '#0b1430' : '#f4f1ea';
+      c.fillStyle = on || accent ? '#0b1430' : '#f4f1ea';
       c.font = `800 9px ${FONT}`;
       c.textAlign = 'center';
-      const plain = b.id === 'bark' || b.id === 'dig';
+      const plain = b.id === 'bark' || b.id === 'dig' || b.id === 'enter';
       c.fillText(b.label, b.x, b.y + (plain ? 0.5 : 8));
     }
     c.textAlign = 'left';
   }
 
   function buttons() {
-    const r = cssW < 520 ? 21 : 24, y = cssH - r - 10, step = r * 2 + 8;
+    const r = cssW < 520 ? 22 : 24, y = cssH - r - 10, step = r * 2 + 8;
     const x = (i: number) => cssW - r - 12 - step * i;
     const list = [
       { id: 'bark', label: 'BARK', x: x(0), y, r },
@@ -1083,6 +1084,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       { id: 'run', label: 'RUN', x: x(3), y, r },
     ];
     if (nearBone) list.push({ id: 'grab', label: 'GRAB', x: x(0), y: y - step, r });
+    if (near) list.push({ id: 'enter', label: 'GO IN', x: x(nearBone ? 1 : 0), y: y - step, r });
     return list;
   }
 
@@ -1288,6 +1290,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     soundBtn.textContent = wantSound ? 'Sound on' : 'Sound off';
     soundBtn.addEventListener('click', () => setSound(!wantSound));
   }
+  fig.querySelector<HTMLButtonElement>('[data-restart]')?.addEventListener('click', () => { takeLeash(); restart(); });
   function goIn() {
     if (near) links.get(near.stop.id)?.click();
   }
@@ -1327,24 +1330,43 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   });
   fig.addEventListener('keyup', (e) => held.delete(e.code));
   fig.addEventListener('blur', () => held.clear());
+  let steerId: number | null = null;
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('touchstart', (e) => {
+    coarse = true;
+    if (!playing) return;
+    const rect = canvas.getBoundingClientRect();
+    const btns = buttons();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      const sx = t.clientX - rect.left, sy = t.clientY - rect.top;
+      const onGoal = sx >= goalsRect.x - 10 && sx <= goalsRect.x + goalsRect.w + 10 && sy >= goalsRect.y - 10 && sy <= goalsRect.y + goalsRect.h + 10;
+      const onBtn = btns.some((b) => Math.hypot(b.x - sx, b.y - sy) < b.r + 8);
+      if (onGoal || onBtn || isFull()) { e.preventDefault(); break; }
+    }
+  }, { passive: false });
   canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') coarse = true;
     const r = canvas.getBoundingClientRect();
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     fig.focus({ preventScroll: true });
     const wasPlaying = playing;
     takeLeash();
-    if (wasPlaying && sx >= goalsRect.x && sx <= goalsRect.x + goalsRect.w && sy >= goalsRect.y && sy <= goalsRect.y + goalsRect.h) {
+    if (wasPlaying && sx >= goalsRect.x - 10 && sx <= goalsRect.x + goalsRect.w + 10 && sy >= goalsRect.y - 10 && sy <= goalsRect.y + goalsRect.h + 10) {
       goalsOpen = !goalsOpen;
       return;
     }
     if (coarse && wasPlaying) {
-      const b = buttons().find((b) => Math.hypot(b.x - sx, b.y - sy) < b.r + 6);
+      const b = buttons().find((b) => Math.hypot(b.x - sx, b.y - sy) < b.r + 8);
       if (b) {
-        if (b.id === 'run') { touchSprint = e.pointerId; canvas.setPointerCapture(e.pointerId); }
-        else if (b.id === 'dig') { touchDig = e.pointerId; canvas.setPointerCapture(e.pointerId); }
-        else if (b.id === 'pee' && natureCalls) { touchSquat = e.pointerId; canvas.setPointerCapture(e.pointerId); }
+        e.preventDefault();
+        const cap = () => { try { canvas.setPointerCapture(e.pointerId); } catch {} };
+        if (b.id === 'run') { touchSprint = e.pointerId; cap(); }
+        else if (b.id === 'dig') { touchDig = e.pointerId; cap(); }
+        else if (b.id === 'pee' && natureCalls) { touchSquat = e.pointerId; cap(); }
         else if (b.id === 'pee') doPee();
         else if (b.id === 'grab') doPickup();
+        else if (b.id === 'enter') goIn();
         else doBark();
         return;
       }
@@ -1356,9 +1378,18 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       target = { x: doorX(lot), y: doorY(lot) };
       return;
     }
+    steerId = e.pointerId;
+    target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== steerId) return;
+    const r = canvas.getBoundingClientRect();
+    const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    const wx = camX + sx / scale, wy = (sy - offY) / scale;
     target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
   });
   const endTouch = (e: PointerEvent) => {
+    if (e.pointerId === steerId) steerId = null;
     if (e.pointerId === touchSprint) touchSprint = null;
     if (e.pointerId === touchDig) touchDig = null;
     if (e.pointerId === touchSquat) touchSquat = null;
@@ -1401,6 +1432,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       ball, world,
       bones,
       get near() { return near?.stop.id ?? null; },
+      buttons: () => buttons(),
+      restart: () => restart(),
       key(code: string, down: boolean) { fig.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code === 'Space' ? ' ' : code, bubbles: true })); },
       tick(n: number) { for (let i = 0; i < n; i++) update(1 / 60); draw(); },
     };

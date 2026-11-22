@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "site",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "4321", "--directory", "dist"],
+      "runtimeExecutable": "npx.cmd",
+      "runtimeArgs": ["-y", "node@22.23.5", "node_modules/astro/bin/astro.mjs", "preview", "--port", "4321", "--host", "127.0.0.1"],
       "port": 4321
     }
   ]

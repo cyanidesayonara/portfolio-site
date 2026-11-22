@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 
 const vcCache = new Map<string, THREE.MeshStandardMaterial>();
-function vcMaterial(side: THREE.Side, flat: boolean) {
+export function vcMaterial(side: THREE.Side, flat: boolean) {
   const key = `${side}|${flat}`;
   let m = vcCache.get(key);
   if (!m) {
@@ -24,7 +24,7 @@ function vcMaterial(side: THREE.Side, flat: boolean) {
 
 const mergeable = (o: THREE.Object3D): o is THREE.Mesh => {
   const m = o as THREE.Mesh;
-  if (!m.isMesh || (m as unknown as THREE.InstancedMesh).isInstancedMesh || o.userData.dynamic) return false;
+  if (!m.isMesh || (m as unknown as THREE.InstancedMesh).isInstancedMesh || o.userData.dynamic || o.userData.baked) return false;
   if (Array.isArray(m.material)) return false;
   const mat = m.material as THREE.MeshStandardMaterial;
   if (!mat || mat.transparent || !(mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) return false;

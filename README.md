@@ -2,7 +2,7 @@
 
 My personal site, built with [Astro](https://astro.build) and deployed to GitHub Pages at [santtu.fyi](https://santtu.fyi/).
 
-The look borrows Path of Leash Resistance's Trencadís palette and its fonts, Bricolage Grotesque and Inter. All colours are tokens in `src/styles/global.css`, with a dark theme that follows the system or the header toggle.
+The look borrows Path of Leash Resistance's Trencadís palette and its fonts, Bricolage Grotesque and Inter. All colors are tokens in `src/styles/global.css`, with a dark theme that follows the system or the header toggle.
 
 ## Develop
 
@@ -18,7 +18,8 @@ npm run build    # type-checks, then builds to dist/
 
 - `src/content/projects/*.md`: one file per project. The frontmatter schema is in `src/content.config.ts`; `featured: true` puts a project on the home page, and `order` sorts them.
 - `src/content/blog/*.md`: blog posts. `draft: true` hides one.
-- `src/pages/`: home, projects, blog, about, how-i-build, walk (the teaser for the walkable version), 404 and the RSS feed.
+- `src/pages/`: home, projects, blog, about, how-i-build, walk (the 3D seafront walk), 404 and the RSS feed.
+- `src/components/Walk3D.astro`: the 3D "Path of Leash Resistance" seafront walk at `/walk`. Its modules live in `src/scripts/walk/` (`game3d.ts`, `level.ts`, `layout.ts`, `meshbuilder.ts`, `world.ts`, `bake.ts`, `leash.ts`, `life.ts`, `minimap.ts`, `hud.ts`, `audio.ts`). Add `?walktest` for perf readouts and `window.__walk` test hooks.
 - `src/components/StreetMap.astro`: the playable street on the home page and its row of stop links. The game itself is in `src/scripts/street/`: `world.ts` (layout and the pre-rendered static layer), `game.ts` (physics, NPCs, traffic, input, HUD) and `audio.ts` (synthesized music and sound effects, off until the visitor turns them on). Add `?streettest` to the URL to get a frame-stepping test hook on `window.__street`.
 - `public/`: images, favicon, `CNAME` and the social share image (`img/og.png`).
 

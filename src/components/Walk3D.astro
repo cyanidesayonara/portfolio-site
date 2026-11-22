@@ -53,6 +53,7 @@ const KEYS = [
         <button type="button" class="tb" data-sky="night" aria-pressed="false">Night</button>
       </span>
       <button type="button" class="tb" data-camera>Cam: Street</button>
+      <button type="button" class="tb" data-restart>Restart</button>
       <button type="button" class="tb" data-fullscreen aria-pressed="false">Fullscreen</button>
     </div>
 
@@ -89,17 +90,13 @@ const KEYS = [
       </div>
     </aside>
 
-    <div class="touch" aria-hidden="true">
+    <div class="touch" role="group" aria-label="Touch controls">
       <div class="stick" data-stick><i data-knob></i></div>
       <div class="acts">
+        <button type="button" data-touch="KeyV">Jump</button>
         <button type="button" data-touch="KeyE">Bark</button>
         <button type="button" data-touch="Space">Dig</button>
-        <button type="button" data-touch="KeyV">Jump</button>
         <button type="button" data-touch="KeyQ">Mark</button>
-        <button type="button" data-touch="KeyG">Grab</button>
-        <button type="button" data-touch="KeyX">Use</button>
-        <button type="button" data-touch="Enter">Go in</button>
-        <button type="button" data-touch="Tab">Goals</button>
       </div>
     </div>
   </div>
@@ -144,6 +141,8 @@ const KEYS = [
   .walk3d:global(.immersive) {
     position: fixed;
     inset: 0;
+    height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
     z-index: 1000;
     border-radius: 0;
     display: flex;
@@ -629,17 +628,39 @@ const KEYS = [
     bottom: 54px;
     transform: translateX(-50%);
     display: flex;
-    gap: 22px;
-    padding: 6px 16px;
-    border-radius: 999px;
-    background: rgba(11, 20, 48, 0.62);
-    font: 700 13px var(--font-body);
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100% - 24px);
+    gap: 8px;
     opacity: 0;
     transition: opacity 0.15s;
-    white-space: nowrap;
+    pointer-events: none;
   }
   .stage :global(.prompts.show) { opacity: 1; }
-  .stage :global(.prompts .pi) { display: inline-flex; align-items: center; gap: 4px; }
+  .stage :global(.prompts .pi) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 6px 14px;
+    border: 1.5px solid var(--saffron);
+    border-radius: 999px;
+    background: rgba(11, 20, 48, 0.88);
+    color: #f4f1ea;
+    font: 700 13px var(--font-body);
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+  }
+  .stage :global(.prompts .pi:hover),
+  .stage :global(.prompts .pi:active) {
+    background: var(--saffron);
+    color: var(--navy-deep);
+  }
+  .stage :global(.prompts.show) :global(.pi) { pointer-events: auto; }
+  .stage :global(.prompts:not(.show)) :global(.pi) { pointer-events: none; }
   .stage :global(.flash) { position: absolute; inset: 0; opacity: 0; }
   .stage :global(.flash.go) { animation: flash 0.4s ease-out; }
   @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
@@ -748,47 +769,71 @@ const KEYS = [
     pointer-events: none;
     z-index: 4;
   }
-  @media (pointer: coarse) {
+  @media (pointer: coarse), (hover: none) {
     .touch { display: flex; }
-    .stage :global(.prompts) { bottom: 170px; }
-    .stage :global(.minimap:not(.big)) { bottom: auto; top: 124px; }
+    .stage :global(.prompts) { bottom: 124px; }
+    .stage :global(.prompts .pi kbd) { display: none; }
+    .stage :global(.minimap:not(.big)) { bottom: auto; top: 142px; }
+    .focus-hint { display: none; }
   }
+  .walk3d:global(.has-touch) .touch { display: flex; }
+  .walk3d:global(.has-touch) .stage :global(.prompts) { bottom: 124px; }
+  .walk3d:global(.has-touch) .stage :global(.prompts .pi kbd) { display: none; }
+  .walk3d:global(.has-touch) .stage :global(.minimap:not(.big)) { bottom: auto; top: 142px; }
+  .walk3d:global(.has-touch) .focus-hint { display: none; }
   .stick {
     position: relative;
-    width: 112px;
-    height: 112px;
+    width: 108px;
+    height: 108px;
     border-radius: 50%;
-    background: rgba(11, 20, 48, 0.4);
+    background: rgba(11, 20, 48, 0.45);
     box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
     pointer-events: auto;
     touch-action: none;
+    transition: box-shadow 0.12s;
+  }
+  .stick:global(.sprinting) {
+    box-shadow: inset 0 0 0 2.5px #8bcb3c, 0 0 12px rgba(139, 203, 60, 0.45);
   }
   .stick i {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 48px;
-    height: 48px;
-    margin: -24px;
+    width: 44px;
+    height: 44px;
+    margin: -22px;
     border-radius: 50%;
-    background: rgba(244, 241, 234, 0.85);
+    background: rgba(244, 241, 234, 0.88);
+    transition: background-color 0.12s;
+  }
+  .stick:global(.sprinting) i {
+    background: #ffb020;
   }
   .acts {
     display: grid;
-    grid-template-columns: repeat(4, 54px);
-    gap: 6px;
+    grid-template-columns: repeat(2, 52px);
+    gap: 8px;
     pointer-events: auto;
   }
   .acts button {
     height: 46px;
-    border: 0;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
-    background: rgba(11, 20, 48, 0.78);
+    background: rgba(11, 20, 48, 0.82);
     color: #f4f1ea;
     font: 800 11px var(--font-display);
     text-transform: uppercase;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
     -webkit-touch-callout: none;
+    transition: background-color 0.1s, transform 0.1s;
+  }
+  .acts button:global(.held) {
+    background: var(--saffron);
+    color: var(--navy-deep);
+    border-color: var(--saffron);
+    transform: scale(0.94);
   }
 
   /* ---- Caption: keycaps ---- */
@@ -825,22 +870,36 @@ const KEYS = [
   kbd.wide { padding: 0 8px; }
   @media (max-width: 720px) {
     .stage { height: clamp(460px, 76vh, 680px); }
-    .stage :global(.vitals) { transform: scale(0.72); transform-origin: top left; left: 8px; top: 8px; }
+    .stage :global(.vitals) { transform: scale(0.68); transform-origin: top left; left: 8px; top: 8px; }
     .stage :global(.goals) { width: 128px; padding: 7px 10px; }
     .stage :global(.goals .gh) { font-size: 11px; }
     .stage :global(.goals .gh kbd) { display: none; }
     .stage :global(.goals.open) { width: calc(100% - 16px); z-index: 2; }
     .stage :global(.toasts) { top: 50px; }
-    .stage :global(.banner) { top: auto; bottom: 214px; max-width: calc(100% - 24px); font-size: 12px; }
-    .toolbar { left: 8px; right: 8px; bottom: auto; top: 84px; flex-wrap: nowrap; gap: 4px; overflow-x: auto; }
-    .toolbar .tb { min-height: 28px; padding: 4px 8px; font-size: 10.5px; white-space: nowrap; }
+    .stage :global(.banner) {
+      left: 8px;
+      top: 152px;
+      bottom: auto;
+      transform: translateY(-6px);
+      max-width: calc(100% - 114px);
+      padding: 5px 12px 5px 10px;
+      font-size: 11px;
+    }
+    .stage :global(.banner.show) { transform: none; }
+    .toolbar { left: 8px; right: 8px; bottom: auto; top: 88px; flex-wrap: wrap; gap: 4px; }
+    .toolbar .tb { min-height: 26px; padding: 3px 8px; font-size: 10.5px; white-space: nowrap; }
     @media (pointer: fine) { .toolbar { top: auto; bottom: 8px; } }
+    .touch { inset: auto 10px 12px 10px; }
+    .stick { width: 96px; height: 96px; }
+    .stage :global(.prompts) { bottom: 124px; }
     .stage :global(.shout) { font-size: 22px; }
-    .stage :global(.minimap:not(.big)) { width: 104px; height: 104px; right: 8px; bottom: auto; top: 124px; }
-    .stage :global(.minimap:not(.big) .mm-key) { display: none; }
+    .stage :global(.minimap:not(.big)) { width: 96px; height: 96px; right: 8px; bottom: auto; top: 152px; }
+    .stage :global(.minimap:not(.big) .mm-key kbd) { display: none; }
     figcaption { display: none; }
   }
-  @media (pointer: coarse) {
-    .focus-hint { display: none; }
+  @media (max-width: 400px) {
+    .stick { width: 88px; height: 88px; }
+    .acts { grid-template-columns: repeat(2, 48px); gap: 6px; }
+    .acts button { height: 42px; font-size: 10px; }
   }
 </style>
