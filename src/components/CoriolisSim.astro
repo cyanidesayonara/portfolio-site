@@ -26,7 +26,7 @@
 
   <div class="sim-stage">
     <div class="bezel">
-      <canvas width="640" height="640" data-sim-canvas></canvas>
+      <canvas width="640" height="640" data-sim-canvas role="img" aria-label="Simulated 128 by 128 LED panel; the current scene and palette are named below it"></canvas>
       <div class="sim-meta">
         <span data-sim-scene>Hello</span>
         <span data-sim-palette>Rainbow</span>
@@ -104,6 +104,7 @@
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!active && document.activeElement !== root) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const now = performance.now();
       const mapped = KEYMAP[e.code];
       if (mapped && !['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) {
@@ -168,27 +169,51 @@
       syncMeta();
     });
 
+    // The sim's own settings menu can also toggle audio, so the button follows the setting.
+    let shownAudio: boolean | null = null;
+    const syncAudio = () => {
+      const on = sim.settings.audioEnabled;
+      if (!audioBtn || on === shownAudio) return;
+      shownAudio = on;
+      audioBtn.setAttribute('aria-pressed', String(on));
+      audioBtn.innerHTML = `<kbd>A</kbd> ${on ? 'Sound on' : 'Sound off'}`;
+    };
     const toggleAudio = () => {
       sim.settings.audioEnabled = !sim.settings.audioEnabled;
-      if (audioBtn) {
-        audioBtn.setAttribute('aria-pressed', String(sim.settings.audioEnabled));
-        audioBtn.innerHTML = `<kbd>A</kbd> ${sim.settings.audioEnabled ? 'Sound on' : 'Sound off'}`;
-      }
+      syncAudio();
     };
     audioBtn?.addEventListener('click', toggleAudio);
 
+    // Run only while on screen and the tab is visible; with reduced motion,
+    // hold the first frame until someone interacts with the panel.
+    let engaged = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let onScreen = true;
+    let rafId = 0;
     const frame = () => {
       const now = performance.now();
       if (sim.tick(now)) {
         sim.renderToCanvas(ctx2d, 5, 1);
         syncMeta();
+        syncAudio();
       }
-      requestAnimationFrame(frame);
+      rafId = requestAnimationFrame(frame);
     };
+    const setRunning = () => {
+      const run = engaged && onScreen && !document.hidden;
+      if (run && !rafId) rafId = requestAnimationFrame(frame);
+      else if (!run && rafId) { cancelAnimationFrame(rafId); rafId = 0; sim.clearHeld(); }
+    };
+    new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; setRunning(); }).observe(canvas);
+    document.addEventListener('visibilitychange', setRunning);
+    const engage = () => { if (!engaged) { engaged = true; setRunning(); } };
+    root.addEventListener('focus', engage);
+    root.addEventListener('pointerdown', engage);
+
     sim.tick(performance.now());
     sim.renderToCanvas(ctx2d, 5, 1);
     syncMeta();
-    requestAnimationFrame(frame);
+    syncAudio();
+    setRunning();
   }
 </script>
 
