@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "units": "meters",
+  "mapBounds": { "x0": -96, "x1": 96, "z0": -134, "z1": 103 },
+  "swim": { "x0": -40, "x1": 44, "z": -90, "shoreZ": -60 },
+  "pipica": { "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "gateZ0": -29.2, "gateZ1": -26.8 },
+  "pier": { "x0": -50, "x1": -46, "root": -10, "rise": -30, "end": -130, "high": 1.2 },
+  "ramps": [-64, -40, -23, 6, 21, 34, 46, 64],
+  "tracks": [7.2, 10.8],
+  "zones": [
+    { "id": "sea", "x0": -96, "x1": 96, "z0": -134, "z1": -58, "mapColor": "#2d6a92" },
+    { "id": "shallow", "x0": -96, "x1": 96, "z0": -58, "z1": -51, "mapColor": "#3f86ad" },
+    { "id": "sand", "x0": -96, "x1": 96, "z0": -51, "z1": -20, "mapColor": "#dcc58f" },
+    { "id": "deck", "x0": -96, "x1": 96, "z0": -20, "z1": -10, "mapColor": "#a5794e" },
+    { "id": "prom", "x0": -96, "x1": 96, "z0": -10, "z1": 4, "mapColor": "#cfc9bb" },
+    { "id": "rail", "x0": -96, "x1": 96, "z0": 4, "z1": 14, "mapColor": "#6d665a" },
+    { "id": "rambla", "x0": -96, "x1": 96, "z0": 14, "z1": 34, "mapColor": "#e0d6c4" },
+    { "id": "townFill", "x0": -96, "x1": 96, "z0": 34, "z1": 103, "mapColor": "#62584c" },
+    { "id": "townStreet", "x0": -34, "x1": 34, "z0": 34, "z1": 103, "mapColor": "#bdb19e" },
+    { "id": "pipica", "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "mapColor": "#9bc46a" },
+    { "id": "underpass", "x0": -3, "x1": 3, "z0": -4, "z1": 22, "mapColor": "#9a9384" },
+    { "id": "pier", "x0": -50, "x1": -46, "z0": -134, "z1": -10, "mapColor": "#8d7356" }
+  ],
+  "districts": [
+    {
+      "id": "seafront",
+      "label": "The seafront",
+      "bounds": { "x0": -100000, "x1": 100000, "z0": -100000, "z1": 4 },
+      "streets": [
+        { "id": "promenade", "name": "Passeig Marítim", "width": 14, "surface": "paving", "points": [[-92, -3], [92, -3]] },
+        { "id": "boardwalk", "name": "Boardwalk", "width": 10, "surface": "deck", "points": [[-92, -15], [92, -15]] },
+        { "id": "pier", "name": "Old pier", "width": 4, "surface": "deck", "points": [[-48, -10], [-48, -130]] }
+      ],
+      "blocks": [],
+      "pavilions": [
+        { "id": "leash", "title": "Path of Leash Resistance", "sub": "Game", "href": "/projects/path-of-leash-resistance", "color": "#ffb020", "x": -31, "w": 12, "z0": -19.4, "z1": -12.4 },
+        { "id": "stemma", "title": "stemma", "sub": "Music studio", "href": "/projects/stemma", "color": "#1fc9b7", "x": -14, "w": 10, "z0": -19.4, "z1": -12.4 },
+        { "id": "coriolis", "title": "Coriolis", "sub": "LED gallery", "href": "/projects/coriolis", "color": "#5eea8c", "x": 13.5, "w": 10, "z0": -19.4, "z1": -12.4, "dark": true },
+        { "id": "about", "title": "About", "sub": "Café", "href": "/about", "color": "#8bcb3c", "x": 27.5, "w": 10, "z0": -19.4, "z1": -12.4 },
+        { "id": "blog", "title": "Blog", "sub": "Newsstand", "href": "/blog", "color": "#e5487a", "x": 40, "w": 6, "z0": -19.4, "z1": -12.4 },
+        { "id": "how", "title": "How I build", "sub": "Studio", "href": "/how-i-build", "color": "#3d73c7", "x": 53, "w": 10, "z0": -19.4, "z1": -12.4 }
+      ],
+      "landmarks": [],
+      "pois": [
+        { "id": "pipica", "kind": "park", "label": "Pipicà", "x": 70, "z": -28, "color": "#8bcb3c" },
+        { "id": "pier", "kind": "pier", "label": "Old pier", "x": -48, "z": -66, "color": "#c9a26b" },
+        { "id": "fountain-prom-w", "kind": "fountain", "label": "Water fountain", "x": -44, "z": -2, "color": "#1fc9b7" },
+        { "id": "fountain-prom-e", "kind": "fountain", "label": "Water fountain", "x": 30, "z": -3, "color": "#1fc9b7" }
+      ]
+    },
+    {
+      "id": "rambla",
+      "label": "The Rambla",
+      "bounds": { "x0": -100000, "x1": 100000, "z0": 4, "z1": 33.5 },
+      "streets": [
+        { "id": "rambla", "name": "La Rambla", "width": 20, "surface": "paving", "points": [[-92, 24], [92, 24]] },
+        { "id": "underpass", "name": "Underpass", "width": 4, "surface": "paving", "points": [[0, -4], [0, 22]] }
+      ],
+      "blocks": [],
+      "pavilions": [],
+      "landmarks": [
+        { "id": "station", "label": "Estació", "x0": 39, "x1": 55, "z0": 14.2, "z1": 19.4, "height": 8.2, "color": "#8e2f2c", "roofColor": "#e9ddc2" }
+      ],
+      "pois": [
+        { "id": "station", "kind": "station", "label": "Estació", "x": 47, "z": 17, "color": "#e5302a" },
+        { "id": "underpass", "kind": "underpass", "label": "Underpass", "x": 0, "z": 9, "color": "#f4f1ea" },
+        { "id": "fountain-rambla-w", "kind": "fountain", "label": "Water fountain", "x": -8, "z": 30, "color": "#1fc9b7" },
+        { "id": "fountain-rambla-e", "kind": "fountain", "label": "Water fountain", "x": 30, "z": 18, "color": "#1fc9b7" }
+      ]
+    },
+    {
+      "id": "town",
+      "label": "Carrer del Mar",
+      "bounds": { "x0": -100000, "x1": 100000, "z0": 33.5, "z1": 100000 },
+      "streets": [
+        { "id": "carrer-del-mar", "name": "Carrer del Mar", "width": 7, "surface": "paving", "points": [[0, 34], [0, 100]] },
+        { "id": "side-a", "name": "Side street A", "width": 6, "surface": "paving", "points": [[-34, 53], [34, 53]] },
+        { "id": "side-b", "name": "Side street B", "width": 6, "surface": "paving", "points": [[-34, 71], [34, 71]] },
+        { "id": "side-c", "name": "Side street C", "width": 6, "surface": "paving", "points": [[-34, 89], [34, 89]] }
+      ],
+      "blocks": [
+        { "x0": -20, "x1": -3.5, "z0": 34, "z1": 50, "floors": 4, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x", "-z", "+z"], "groundFloor": true },
+        { "x0": -41, "x1": -20, "z0": 34, "z1": 50, "floors": 5, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z", "+z"], "groundFloor": true },
+        { "x0": 3.5, "x1": 20, "z0": 34, "z1": 50, "floors": 4, "color": "#d9705a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 34, "z1": 50, "floors": 3, "color": "#e8d4a8", "roofColor": "#c2997a", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z", "+z"], "groundFloor": true },
+
+        { "x0": -20, "x1": -3.5, "z0": 56, "z1": 68, "floors": 5, "color": "#efe4cc", "roofColor": "#b88566", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["+x", "-z", "+z"], "groundFloor": true },
+        { "x0": -41, "x1": -20, "z0": 56, "z1": 68, "floors": 3, "color": "#c8735a", "roofColor": "#a87561", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+        { "x0": 3.5, "x1": 20, "z0": 56, "z1": 68, "floors": 4, "color": "#d9b48a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 56, "z1": 68, "floors": 5, "color": "#f2e9d8", "roofColor": "#c2997a", "shutterColor": "#8a5a3c", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+
+        { "x0": -20, "x1": -3.5, "z0": 74, "z1": 86, "floors": 4, "color": "#b9c3c9", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+x", "-z", "+z"], "groundFloor": true },
+        { "x0": -41, "x1": -20, "z0": 74, "z1": 86, "floors": 4, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+        { "x0": 3.5, "x1": 20, "z0": 74, "z1": 86, "floors": 5, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["-x", "-z", "+z"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 74, "z1": 86, "floors": 3, "color": "#d9705a", "roofColor": "#c2997a", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+
+        { "x0": -20, "x1": -3.5, "z0": 92, "z1": 101, "floors": 3, "color": "#e8d4a8", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": true },
+        { "x0": -41, "x1": -20, "z0": 92, "z1": 101, "floors": 4, "color": "#efe4cc", "roofColor": "#9a8a78", "shutterColor": "#8a5a3c", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
+        { "x0": 3.5, "x1": 20, "z0": 92, "z1": 101, "floors": 4, "color": "#c8735a", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 92, "z1": 101, "floors": 5, "color": "#d9b48a", "roofColor": "#c2997a", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
+
+        { "x0": 41, "x1": 70, "z0": 34, "z1": 60, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z", "-x"], "groundFloor": true },
+        { "x0": 70, "x1": 100, "z0": 34, "z1": 60, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -140, "x1": -95, "z0": 34, "z1": 60, "floors": 4, "color": "#e8d4a8", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": 100, "x1": 140, "z0": 34, "z1": 60, "floors": 4, "color": "#efe4cc", "roofColor": "#c2997a", "shutterColor": "#7a8a6a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -95, "x1": -90, "z0": 34, "z1": 60, "floors": 3, "color": "#d9b48a", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "industrial", "faces": ["-z"], "groundFloor": false },
+        { "x0": -42, "x1": -41, "z0": 34, "z1": 60, "floors": 3, "color": "#d9b48a", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "industrial", "faces": [], "groundFloor": false }
+      ],
+      "pavilions": [],
+      "landmarks": [
+        { "id": "distillery", "label": "Old distillery", "x0": -90, "x1": -42, "z0": 35, "z1": 57, "height": 9, "color": "#e6dcc6", "roofColor": "#b2563a" },
+        { "id": "chimney", "label": "Chimney", "x0": -51.6, "x1": -48.4, "z0": 50.4, "z1": 53.6, "height": 38, "color": "#b5694e", "roofColor": "#6e4234" }
+      ],
+      "pois": [
+        { "id": "carrer-del-mar", "kind": "street", "label": "Carrer del Mar", "x": 0, "z": 62, "color": "#f4f1ea" }
+      ]
+    }
+  ]
+}

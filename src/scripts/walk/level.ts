@@ -17,6 +17,8 @@
 import * as THREE from 'three';
 import type { Obstacle } from './leash';
 import { bakeStatic, bakeSteps, drain } from './bake';
+import { DirectBuilder } from './meshbuilder';
+import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
   M, box, cyl, rod, shadowed,
@@ -49,11 +51,11 @@ const SAND_Y = -0.4;
 export const TRAIN_Y = GROUND_Y + 0.35;
 export const TRAIN_Z = 9;
 const CUT = { x: 3, tunnelX: 2, rambla0: 22, rambla1: 14, sea0: 4, sea1: -4, floor: -2.7 };
-const RAMPS = [-64, -40, -23, 6, 21, 34, 46, 64];
-const PIER = { x0: -50, x1: -46, root: -10, rise: -30, end: -130, high: 1.2 };
+const RAMPS = SEAFRONT_LAYOUT.ramps;
+const PIER = SEAFRONT_LAYOUT.pier;
 /** The swimming zone, fenced by a buoy line: x0..x1 along the beach, out to z. */
-export const SWIM = { x0: -40, x1: 44, z: -90 };
-export const PIPICA = { x0: 60, x1: 80, z0: -34, z1: -22.5, gateZ0: -29.2, gateZ1: -26.8 };
+export const SWIM = SEAFRONT_LAYOUT.swim;
+export const PIPICA = SEAFRONT_LAYOUT.pipica;
 
 const sandFloor = (z: number) => (z > -24 ? SAND_Y : SAND_Y - (-24 - z) * 0.035);
 const pierDeckY = (z: number) => (z > PIER.root ? GROUND_Y : z > PIER.rise ? GROUND_Y + ((PIER.root - z) / (PIER.root - PIER.rise)) * (PIER.high - GROUND_Y) : PIER.high);
@@ -130,10 +132,7 @@ function ground(x0: number, x1: number, z0: number, z1: number, y: number, mat: 
   return m;
 }
 
-// Facade colors seen on the Rambla and Carrer del Mar: ochre, coral, cream, brick.
-const FACADES = [0xe3b45c, 0xd9705a, 0xeadcc0, 0xe8d4a8, 0xc8735a, 0xefe4cc, 0xd9b48a, 0xb9c3c9, 0xf2e9d8];
-const ROOFS = [0xa87561, 0xb88566, 0x9a8a78, 0xc2997a];
-const SHUTTERS = [0x5f7a5a, 0x6b5a48, 0x4f6f7a, 0x8a5a3c, 0x7a8a6a];
+const TOWN_Z0 = 33.5;
 
 export interface LevelOpts { coriolisTex: THREE.Texture }
 
@@ -256,132 +255,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
 
   yield 'Buildings';
   // ---- Buildings ----------------------------------------------------------------------
-  type Face = '+x' | '-x' | '+z' | '-z';
   const plasterMats = new Map<number, THREE.MeshStandardMaterial>();
   const facadeMat = (c: number) => {
     let m = plasterMats.get(c);
     if (!m) { m = new THREE.MeshStandardMaterial({ color: c, map: plaster, roughness: 0.92 }); plasterMats.set(c, m); }
     return m;
   };
-  const winGeo = new THREE.BoxGeometry(1.1, 2.0, 0.1);
-  const frameGeo = new THREE.BoxGeometry(1.36, 2.26, 0.08);
-  const shutterGeo = new THREE.BoxGeometry(0.56, 2.0, 0.06);
-  const slabGeo = new THREE.BoxGeometry(1.6, 0.12, 0.6);
-  const railGeo = (() => {
-    const parts: THREE.BufferGeometry[] = [];
-    const top = new THREE.BoxGeometry(1.6, 0.05, 0.05); top.translate(0, 0.95, 0.27); parts.push(top);
-    const bot = new THREE.BoxGeometry(1.6, 0.04, 0.04); bot.translate(0, 0.12, 0.27); parts.push(bot);
-    for (let i = 0; i <= 8; i++) { const b = new THREE.BoxGeometry(0.024, 0.85, 0.024); b.translate(-0.76 + i * 0.19, 0.53, 0.27); parts.push(b); }
-    for (const sx of [-0.79, 0.79]) { const b = new THREE.BoxGeometry(0.03, 0.85, 0.56); b.translate(sx, 0.53, 0); parts.push(b); }
-    return mergeGeos(parts);
-  })();
-  const corniceGeo = new THREE.BoxGeometry(1, 0.35, 0.45);
-  const shopGlassGeo = new THREE.BoxGeometry(1, 2.6, 0.08);
-  const rollerGeo = new THREE.BoxGeometry(1, 3.0, 0.06);
-  const awningGeo = new THREE.BoxGeometry(1, 0.06, 1.1);
-  const bladeGeo = new THREE.BoxGeometry(0.06, 0.6, 0.9);
-  const rollerMat = M(0x9aa0a8, 0.5, 0.6);
   const shopGlassMat = M(0x3a4d63, 0.12, 0.4);
-  const faceRot = (f: Face) => (f === '+z' ? 0 : f === '+x' ? Math.PI / 2 : f === '-x' ? -Math.PI / 2 : Math.PI);
-  const awningCols = [0x2f6b4f, 0x8a2f2c, 0x2a5aa8, 0xb5700a, 0x3d3d45];
-
-  /** A building block with facade detail (windows, shutters, balconies, shops) on the listed faces. */
-  const building = (x0: number, x1: number, z0: number, z1: number, floors: number, color: number, faces: Face[], groundFloor = true) => {
-    const h = 4.2 + floors * 3.05 + 0.6;
-    const roof = M(pick(ROOFS), 0.95);
-    const fm = facadeMat(color);
-    const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h, z1 - z0), [fm, fm, roof, roof, fm, fm]);
-    b.position.set((x0 + x1) / 2, GROUND_Y + h / 2, (z0 + z1) / 2);
-    b.castShadow = true;
-    b.receiveShadow = true;
-    root.add(b);
-    boxes.push({ x0, x1, z0, z1, top: GROUND_Y + h, kind: 'building' });
-    const shutter = M(pick(SHUTTERS), 0.7);
-    const trim = M(new THREE.Color(color).multiplyScalar(0.84).getHex(), 0.9);
-    for (const f of faces) {
-      const along = f === '+z' || f === '-z';
-      const a0 = along ? x0 : z0, a1 = along ? x1 : z1;
-      const fixed = f === '+z' ? z1 : f === '-z' ? z0 : f === '+x' ? x1 : x0;
-      const n = f === '+z' || f === '+x' ? 1 : -1;
-      const ry = faceRot(f);
-      const P = (s: number, y: number, out: number): [number, number, number] => (along ? [s, y, fixed + n * out] : [fixed + n * out, y, s]);
-      const tangentSign = f === '+z' || f === '-x' ? 1 : -1;
-      const len = a1 - a0;
-      const cols = Math.max(1, Math.floor(len / 3.2));
-      const pitch = len / cols;
-      for (let fl = 0; fl < floors; fl++) {
-        const y = GROUND_Y + 4.2 + fl * 3.05 + 1.15;
-        for (let c = 0; c < cols; c++) {
-          const s = a0 + pitch * (c + 0.5);
-          const lit = r() < 0.5;
-          inst.add('frame', frameGeo, trim, mtx(...P(s, y, 0.02), ry), false);
-          inst.add(lit ? 'winL' : 'winD', winGeo, lit ? litWindowMat : darkWindowMat, mtx(...P(s, y, 0.05), ry), false);
-          const off = r() < 0.6 ? 0.92 : 0.3;
-          for (const side of [-1, 1]) {
-            const sp = P(s + side * off * tangentSign * (along ? 1 : 1), y, 0.09);
-            if (!along) sp[2] = s + side * off;
-            else sp[0] = s + side * off;
-            inst.add(`sh${shutter.id}`, shutterGeo, shutter, mtx(...sp, ry), false);
-          }
-          if (fl < floors - 1 || r() < 0.5) {
-            inst.add('slab', slabGeo, () => M(0xb4ada0, 0.85), mtx(...P(s, y - 1.08, 0.3), ry));
-            inst.add('rail', railGeo, ironM, mtx(...P(s, y - 1.08, 0.3), ry));
-          }
-        }
-      }
-      inst.add('cornice', corniceGeo, trim, mtx(...P((a0 + a1) / 2, GROUND_Y + h - 0.4, 0.18), ry, len + 0.4, 1, 1));
-      inst.add('band', corniceGeo, trim, mtx(...P((a0 + a1) / 2, GROUND_Y + 4.15, 0.12), ry, len, 0.6, 0.6));
-      if (!groundFloor) continue;
-      for (let c = 0; c < cols; c++) {
-        const s = a0 + pitch * (c + 0.5);
-        const kind = r();
-        if (kind < 0.5) {
-          inst.add('sglass', shopGlassGeo, shopGlassMat, mtx(...P(s, GROUND_Y + 1.5, 0.04), ry, pitch * 0.82, 1, 1), false);
-          if (r() < 0.6) {
-            const ac = pick(awningCols);
-            inst.add(`aw${ac}`, awningGeo, () => M(ac, 0.8), mtx(...P(s, GROUND_Y + 3.05, 0.55), ry, pitch * 0.86, 1, 1, 0.3));
-          }
-          if (r() < 0.35) {
-            const bladeColor = pick([0xf4f1ea, 0xffb020, 0x1fc9b7, 0xe5487a]); // keep the seeded sequence as it was
-            inst.add('blade', bladeGeo, () => M(bladeColor, 0.6), mtx(...P(s - pitch * 0.4, GROUND_Y + 3.6, 0.5), ry + Math.PI / 2), false);
-          }
-        } else if (kind < 0.85) {
-          inst.add('roller', rollerGeo, rollerMat, mtx(...P(s, GROUND_Y + 1.6, 0.04), ry, pitch * 0.82, 1, 1), false);
-        } else {
-          inst.add('door', () => new THREE.BoxGeometry(1.3, 2.6, 0.08), () => M(0x5a4636, 0.7), mtx(...P(s, GROUND_Y + 1.35, 0.04), ry), false);
-        }
-      }
-    }
-    return b;
-  };
-  const fc = () => pick(FACADES);
-  const fl = () => 3 + Math.floor(r() * 3);
-
-  // Town blocks around Carrer del Mar and its side streets (A z 50–56, B 68–74, C 86–92).
-  const rows: [number, number][] = [[34, 50], [56, 68], [74, 86], [92, 101]];
-  for (const [za, zb] of rows) {
-    for (const side of [-1, 1]) {
-      const xa = side < 0 ? -41 : 3.5, xb = side < 0 ? -3.5 : 41;
-      // Split each block into a couple of buildings so the roofline varies.
-      const mid = side < 0 ? -20 : 20;
-      const faces = (part: 'inner' | 'outer'): Face[] => {
-        const f: Face[] = [];
-        if (part === 'inner') f.push(side < 0 ? '+x' : '-x');
-        if (za > 34) f.push('-z');
-        else f.push('-z');
-        if (zb < 101) f.push('+z');
-        return f;
-      };
-      building(side < 0 ? mid : xa, side < 0 ? xb : mid, za, zb, fl(), fc(), faces('inner'));
-      building(side < 0 ? xa : mid, side < 0 ? mid : xb, za, zb, fl(), fc(), faces('outer'));
-    }
-    yield 'Buildings';
-  }
-  // Rambla frontage beyond the town grid, and the old distillery by the pier beach.
-  building(41, 70, 34, 60, 4, fc(), ['-z', '-x']);
-  building(70, 100, 34, 60, 5, fc(), ['-z']);
-  building(-140, -95, 34, 60, 4, fc(), ['-z']);
-  building(100, 140, 34, 60, 4, fc(), ['-z']);
+  const wallPlasterMat = new THREE.MeshStandardMaterial({ map: plaster, vertexColors: true, roughness: 0.92 });
+  const townBuilder = new DirectBuilder(TOWN_Z0);
+  const townLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'town')!;
+  yield* buildDistrictBlocksSteps(townLayout, {
+    groundY: GROUND_Y,
+    builder: townBuilder,
+    wallMat: wallPlasterMat,
+    inst,
+    boxes,
+    litWindowMat,
+    darkWindowMat,
+    ironMat: ironM,
+    r,
+  });
   // The distillery: a long low cream building with red tile roofs and its chimney.
   const dist = new THREE.Group();
   const distBody = box(48, 7, 22, facadeMat(0xe6dcc6));
@@ -404,8 +298,6 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(dist, -66, GROUND_Y, 46);
   boxes.push({ x0: -90, x1: -42, z0: 35, z1: 57, top: 9, kind: 'building' });
   place(makeChimney(38), -50, GROUND_Y, 52);
-  building(-95, -90, 34, 60, 3, fc(), ['-z']);
-  building(-42, -41, 34, 60, 3, fc(), []);
 
   // Steel arches and bunting over Carrer del Mar.
   const archSign = signTexture('Carrer del Mar', 'Eix comercial', '#f4f1ea', { bg: '#2a5aa8', fg: '#f4f1ea', aspect: 1 });
@@ -849,15 +741,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
 
   yield 'Boardwalk pavilions: the projects, the blog and about';
   // ---- Boardwalk pavilions: the projects, the blog and about -------------------------
-  const pavilions: { id: string; title: string; sub: string; color: string; x: number; w: number; dark?: boolean }[] = [
-    { id: 'leash', title: 'Path of Leash Resistance', sub: 'Game', color: '#ffb020', x: -31, w: 12 },
-    { id: 'stemma', title: 'stemma', sub: 'Music studio', color: '#1fc9b7', x: -14, w: 10 },
-    { id: 'coriolis', title: 'Coriolis', sub: 'LED gallery', color: '#5eea8c', x: 13.5, w: 10, dark: true },
-    { id: 'about', title: 'About', sub: 'Café', color: '#8bcb3c', x: 27.5, w: 10 },
-    { id: 'blog', title: 'Blog', sub: 'Newsstand', color: '#e5487a', x: 40, w: 6 },
-    { id: 'how', title: 'How I build', sub: 'Studio', color: '#3d73c7', x: 53, w: 10 },
-  ];
-  const PZ0 = -19.4, PZ1 = -12.4;
+  const seafrontLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'seafront')!;
+  const pavilions = seafrontLayout.pavilions;
+  const PZ0 = pavilions[0].z0, PZ1 = pavilions[0].z1;
   for (const p of pavilions) {
     const g = new THREE.Group();
     const accent = parseInt(p.color.slice(1), 16);
@@ -1177,18 +1063,16 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
 
   yield 'Stops (doors of the pavilions)';
   // ---- Stops (doors of the pavilions) --------------------------------------------------
-  const stopFor = (id: string, label: string, kind: string, href: string, color: string) => {
-    const p = pavilions.find((x) => x.id === id)!;
-    return { id, label, kind, href, color, x: p.x + (id === 'coriolis' ? 0 : p.w * 0.34), z: PZ1 + 1.2, r: id === 'blog' ? 2.6 : 2.4 };
-  };
-  const stops: Stop[] = [
-    stopFor('leash', 'Path of Leash Resistance', 'Game', '/projects/path-of-leash-resistance', '#ffb020'),
-    stopFor('stemma', 'stemma', 'Music studio', '/projects/stemma', '#1fc9b7'),
-    { ...stopFor('coriolis', 'Coriolis', 'LED gallery', '/projects/coriolis', '#5eea8c'), x: cor.x + cor.w / 2 - 0.6 },
-    stopFor('about', 'About', 'Café', '/about', '#8bcb3c'),
-    { ...stopFor('blog', 'Blog', 'Newsstand', '/blog', '#e5487a'), x: 40, z: -9.0 },
-    stopFor('how', 'How I build', 'Studio', '/how-i-build', '#3d73c7'),
-  ];
+  const stops: Stop[] = pavilions.map((p) => ({
+    id: p.id,
+    label: p.title,
+    kind: p.sub,
+    href: p.href,
+    color: p.color,
+    x: p.id === 'coriolis' ? p.x + p.w / 2 - 0.6 : p.id === 'blog' ? 40 : p.x + p.w * 0.34,
+    z: p.id === 'blog' ? -9.0 : PZ1 + 1.2,
+    r: p.id === 'blog' ? 2.6 : 2.4,
+  }));
 
   yield 'Floor, surfaces, bounds';
   // ---- Floor, surfaces, bounds ---------------------------------------------------------
@@ -1210,19 +1094,16 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   };
   yield 'Districts';
   // ---- Districts ---------------------------------------------------------------------
-  // Each owns a slice of the map (scene graph, ground, surfaces, colliders). For
-  // now all three are always live; Phase 1 streams them in and out.
   const inCut = (x: number, z: number) => Math.abs(x) <= CUT.x && z < CUT.rambla0 && z > CUT.sea1;
   const BIG = 1e5;
-  // Just south of the town's front facades (z ≈ 33.9), so each facade stays with its building.
-  const TOWN_Z0 = 33.5;
+  const layoutById = new Map(SEAFRONT_LAYOUT.districts.map((d) => [d.id, d]));
   const districts: District[] = [
-    { id: 'seafront', label: 'The seafront', bounds: { x0: -BIG, x1: BIG, z0: -BIG, z1: CUT.sea0 }, root: new THREE.Group(), floor: seafrontFloor, surface: seafrontSurface, built: true, baked: false, state: 'live' },
+    { id: 'seafront', label: layoutById.get('seafront')!.label, bounds: layoutById.get('seafront')!.bounds, root: new THREE.Group(), floor: seafrontFloor, surface: seafrontSurface, built: true, baked: false, state: 'live' },
     {
-      id: 'rambla', label: 'The Rambla', bounds: { x0: -BIG, x1: BIG, z0: CUT.sea0, z1: TOWN_Z0 }, root: new THREE.Group(),
+      id: 'rambla', label: layoutById.get('rambla')!.label, bounds: layoutById.get('rambla')!.bounds, root: new THREE.Group(),
       floor: (x, z) => (inCut(x, z) ? cutY(z) : GROUND_Y), surface: () => 'paving', built: true, baked: false, state: 'live',
     },
-    { id: 'town', label: 'Carrer del Mar', bounds: { x0: -BIG, x1: BIG, z0: TOWN_Z0, z1: BIG }, root: new THREE.Group(), floor: () => GROUND_Y, surface: () => 'paving', built: true, baked: false, state: 'live' },
+    { id: 'town', label: layoutById.get('town')!.label, bounds: layoutById.get('town')!.bounds, root: new THREE.Group(), floor: () => GROUND_Y, surface: () => 'paving', built: true, baked: false, state: 'live' },
   ];
   const districtAt = (x: number, z: number) => districts.find((d) => inBounds(d.bounds, x, z)) ?? districts[0];
   const floor = (x: number, z: number, y: number) => districtAt(x, z).floor(x, z, y);
@@ -1243,6 +1124,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   for (const d of districts) { d.root.name = d.id; root.add(d.root); }
   root.add(horizon);
+  const townFlush = townBuilder.flushSteps(districts[2].root);
+  while (!townFlush.next().done) yield 'Buildings';
   const tSplit = performance.now();
   yield 'Instancing';
   inst.build((x, z) => districtAt(x, z).root);
@@ -1258,25 +1141,17 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   yield 'Colliders';
   // Colliders into the grid, tagged with their district.
   const grid = new ColliderGrid(8);
-  for (const b of boxes) { b.district = districtAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2).id; grid.addBox(b); }
+  for (const b of boxes) { b.district = b.district ?? districtAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2).id; grid.addBox(b); }
   for (const c of circles) { c.district = districtAt(c.x, c.z).id; grid.addCircle(c); }
-  // Stand-ins: each district's buildings as plain blocks (roof heights from the colliders).
+  // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
-  const standinMat = new THREE.MeshStandardMaterial({ color: 0xc4b8a4, roughness: 0.95 });
   for (const d of districts) {
-    const parts = boxes.filter((b) => b.kind === 'building' && b.district === d.id).map((b) => {
-      const g = new THREE.BoxGeometry(b.x1 - b.x0, b.top - GROUND_Y, b.z1 - b.z0);
-      g.translate((b.x0 + b.x1) / 2, (b.top + GROUND_Y) / 2, (b.z0 + b.z1) / 2);
-      return g;
-    });
-    if (!parts.length) continue;
-    const m = new THREE.Mesh(mergeGeos(parts), standinMat);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    m.visible = false;
-    d.standin = m;
-    standins.add(m);
+    const ld = layoutById.get(d.id);
+    const s = ld ? buildDistrictStandin(ld, GROUND_Y) : undefined;
+    if (!s) continue;
+    d.standin = s;
+    standins.add(s);
   }
   root.add(standins);
   /** Add a collider after the build (props placed by the game's systems). */
@@ -1310,7 +1185,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   ];
 
   return {
-    root, boxes, circles, poles, stops, mounds, lampSpots, lampGlass, litWindowMat, wetMats,
+    root, layout: SEAFRONT_LAYOUT, boxes, circles, poles, stops, mounds, lampSpots, lampGlass, litWindowMat, wetMats,
     floor, surface, inPipica, clampBounds, ramps: RAMPS, grid, districts, districtAt, addRuntimeCircle,
     /** Where the build time goes (ms): building props, splitting into districts, instancing + baking. */
     timings: { build: tBuilt - T0, split: tSplit - tBuilt, bake: tBaked - tSplit },
@@ -1351,7 +1226,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
 }
 
 /** Count of the build's steps, for a loading bar. */
-export const LEVEL_STEPS = 33;
+export const LEVEL_STEPS = 53;
 
 /** Wait for the next frame (or a moment, if the tab is hidden and frames are paused). */
 export const nextFrame = () => new Promise<void>((res) => {

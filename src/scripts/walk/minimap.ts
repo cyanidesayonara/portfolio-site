@@ -3,7 +3,7 @@
   with live markers on top. Small in the corner (centered on Millie, sea up,
   like the street camera), or the whole town when enlarged with [M].
 */
-import { SWIM, type Level } from './level';
+import type { Level } from './level';
 
 export interface MapMarker {
   x: number;
@@ -15,14 +15,10 @@ export interface MapMarker {
   kind: 'stop' | 'quest' | 'threat' | 'place' | 'train';
 }
 
-// World window drawn on the plan (meters). The pier runs on past the top edge.
-const X0 = -96, X1 = 96, Z0 = -134, Z1 = 103;
 const PPM = 4; // plan pixels per meter
 
 const C = {
-  sea: '#2d6a92', shallow: '#3f86ad', sand: '#dcc58f', deck: '#a5794e', prom: '#cfc9bb',
-  rail: '#6d665a', track: '#3d3a35', rambla: '#e0d6c4', street: '#bdb19e', building: '#7d6e60',
-  pavilion: '#5b4a3c', wall: '#4d463e', fence: '#2f6b4f', green: '#9bc46a', pier: '#8d7356',
+  track: '#3d3a35', building: '#7d6e60', pavilion: '#5b4a3c', wall: '#4d463e', fence: '#2f6b4f',
 };
 
 export class Minimap {
@@ -30,6 +26,7 @@ export class Minimap {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private plan: HTMLCanvasElement;
+  private bounds: Level['layout']['mapBounds'];
   private big = false;
   onToggle?: (big: boolean) => void;
 
@@ -41,6 +38,7 @@ export class Minimap {
     this.canvas = this.el.querySelector('canvas')!;
     this.ctx = this.canvas.getContext('2d')!;
     this.el.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(); });
+    this.bounds = level.layout.mapBounds;
     this.plan = this.drawPlan(level);
   }
 
@@ -53,6 +51,7 @@ export class Minimap {
   }
 
   private drawPlan(level: Level) {
+    const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = level.layout.mapBounds;
     const cv = document.createElement('canvas');
     cv.width = (X1 - X0) * PPM;
     cv.height = (Z1 - Z0) * PPM;
@@ -61,24 +60,15 @@ export class Minimap {
       g.fillStyle = col;
       g.fillRect((Math.min(x0, x1) - X0) * PPM, (Math.min(z0, z1) - Z0) * PPM, Math.abs(x1 - x0) * PPM, Math.abs(z1 - z0) * PPM);
     };
-    // Bands, sea to town.
-    R(X0, Z0, X1, -58, C.sea);
-    R(X0, -58, X1, -51, C.shallow);
-    R(X0, -51, X1, -20, C.sand);
-    R(X0, -20, X1, -10, C.deck);
-    R(X0, -10, X1, 4, C.prom);
-    R(X0, 4, X1, 14, C.rail);
-    for (const tz of [7.2, 10.8]) R(X0, tz - 0.4, X1, tz + 0.4, C.track);
-    R(X0, 14, X1, 34, C.rambla);
-    R(X0, 34, X1, Z1, '#62584c');
-    R(-34, 34, 34, Z1, C.street);
-    // Off-leash park.
-    R(60, -34, 80, -22.5, C.green);
-    // The underpass, cut through the railway.
-    R(-3, -4, 3, 22, '#9a9384');
+    // Zones from the layout data (sea, beach, boardwalk, promenade, rail, Rambla, town, pipicà, underpass, pier).
+    for (const z of level.layout.zones) {
+      R(z.x0, z.z0, z.x1, z.z1, z.mapColor);
+      if (z.id === 'rail') for (const tz of level.layout.tracks) R(X0, tz - 0.4, X1, tz + 0.4, C.track);
+    }
     // The swim zone's buoy line.
+    const S = level.layout.swim;
     g.fillStyle = '#ff7a2a';
-    for (const [x0, z0, x1, z1] of [[SWIM.x0, SWIM.z, SWIM.x1, SWIM.z], [SWIM.x0, -60, SWIM.x0, SWIM.z], [SWIM.x1, -60, SWIM.x1, SWIM.z]]) {
+    for (const [x0, z0, x1, z1] of [[S.x0, S.z, S.x1, S.z], [S.x0, S.shoreZ, S.x0, S.z], [S.x1, S.shoreZ, S.x1, S.z]]) {
       const len = Math.hypot(x1 - x0, z1 - z0);
       for (let d = 0; d <= len; d += 2.5) {
         const t = d / len;
@@ -87,12 +77,15 @@ export class Minimap {
         g.fill();
       }
     }
-    // The pier.
-    R(-50, Z0, -46, -10, C.pier);
-    // Colliders: buildings, pavilions, walls and fences.
+    // Buildings, pavilions and landmarks from the layout data.
+    for (const d of level.layout.districts) {
+      for (const b of d.blocks) R(b.x0, b.z0, b.x1, b.z1, C.building);
+      for (const p of d.pavilions) R(p.x - p.w / 2, p.z0, p.x + p.w / 2, p.z1, C.pavilion);
+      for (const lm of d.landmarks) R(lm.x0, lm.z0, lm.x1, lm.z1, C.building);
+    }
+    // Non-building colliders: walls, fences, kiosks and containers.
     for (const b of level.boxes) {
-      const col = b.kind === 'building' ? (b.z1 < 0 ? C.pavilion : C.building)
-        : b.kind === 'wall' ? C.wall
+      const col = b.kind === 'wall' ? C.wall
         : b.kind === 'fence' || b.kind === 'rail' ? C.fence
         : b.kind === 'kiosk' || b.kind === 'containers' ? C.wall
         : null;
@@ -107,6 +100,7 @@ export class Minimap {
 
   /** Redraw. `heading` is Millie's heading (radians, world XZ). */
   draw(dog: { x: number; z: number; heading: number }, human: { x: number; z: number }, markers: MapMarker[], camYaw = 0) {
+    const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = this.bounds;
     const cv = this.canvas;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
