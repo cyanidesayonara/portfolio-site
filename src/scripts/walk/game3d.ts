@@ -718,7 +718,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
     if (scared) {
       audio.flutter();
-      if (birds.some((b) => b.kind === 'gull' && b.fly > 5.9)) audio.gull();
+      { const g = birds.find((b) => b.kind === 'gull' && b.fly > 5.9); if (g) audio.gull({ x: g.x, z: g.z }); }
       completeGoal('birds');
     }
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) {
@@ -1506,7 +1506,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let lightPoolT = 0;
   let pierReached = false;
 
-  let runT = 0, dogNoiseT = 0;
+  let runT = 0, dogNoiseT = 0, ambT = 5;
   const listenDir = new THREE.Vector3();
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
@@ -1524,6 +1524,16 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const sp = Math.hypot(dog.vx, dog.vz);
     dog.speed = sp;
     dog.stillTime = sp < 0.2 ? dog.stillTime + dt : 0;
+    // Ambience: now and then a gull calls from somewhere along the shore, and resting
+    // pigeons coo when Millie is close to them.
+    ambT -= dt;
+    if (ambT <= 0) {
+      ambT = rand(7, 16);
+      const near = (kind: 'gull' | 'pigeon', r: number) => birds.filter((b) => b.kind === kind && Math.hypot(b.x - dog.x, b.z - dog.z) < r);
+      const pigeons = near('pigeon', 12).filter((b) => b.fly <= 0);
+      if (pigeons.length && Math.random() < 0.6) { const b = pickOne(pigeons); audio.coo({ x: b.x, z: b.z }); }
+      else { const gulls = near('gull', 90); if (gulls.length) { const b = pickOne(gulls); if (Math.random() < 0.4) audio.gullCall({ x: b.x, z: b.z }); else audio.gull({ x: b.x, z: b.z }); } }
+    }
     // Little dog noises: panting after a good run, a sniff when she stops by a pole or tree.
     runT = sp > 4 ? runT + dt : Math.max(0, runT - dt * 0.5);
     dogNoiseT -= dt;
@@ -1635,7 +1645,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (!tofu.home && !tofu.darting && d < 2.4 && tofu.i < spots.length - 1) {
         tofu.darting = true;
         tofu.i++;
-        audio.meow();
+        audio.meow({ x: tofu.x, z: tofu.z });
         if (tofu.i === 1) hud.say('tofu', 'Mrrp?', 1.2);
       }
       let tsp = 0;
@@ -1737,7 +1747,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const r of riders) {
       const blocked = [dog, human].some((p) => Math.abs(p.z - r.z) < 1.0 && (p.x - r.x) * r.dir > 0 && (p.x - r.x) * r.dir < 5);
       r.speed += clamp((blocked ? 0 : r.max) - r.speed, -10 * dt, 3 * dt);
-      if (blocked && r.rang <= 0 && Math.abs(r.x - dog.x) < 15) { audio.bell(); r.rang = 3; hud.say(`r${r.x | 0}`, 'Ring ring!', 1); }
+      if (blocked && r.rang <= 0 && Math.abs(r.x - dog.x) < 15) { audio.bell({ x: r.x, z: r.z }); r.rang = 3; hud.say(`r${r.x | 0}`, 'Ring ring!', 1); }
       if (r.rang > 0) r.rang -= dt;
       r.x += r.dir * r.speed * dt;
       if (r.x > 80) r.x = -80;
@@ -1812,12 +1822,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         } else if (dist < 70) tr.speed = Math.max(0.6, Math.min(16, Math.sqrt(4.4 * dist)));
       } else if (tr.stopped && tr.dwell > 0) {
         tr.dwell -= dt;
-        if (tr.dwell <= 0) { audio.trainHorn(); tr.stop = false; }
+        if (tr.dwell <= 0) { audio.trainHorn({ x: tr.x, z: tr.z }); tr.stop = false; }
       } else {
         tr.speed = Math.min(16, tr.speed + dt * (tr.stopped ? 1.6 : 4));
       }
       tr.x += tr.dir * tr.speed * dt;
-      if (!tr.horned && !tr.stop && Math.abs(tr.x - dog.x) < 110) { audio.trainHorn(); tr.horned = true; }
+      if (!tr.horned && !tr.stop && Math.abs(tr.x - dog.x) < 110) { audio.trainHorn({ x: tr.x, z: tr.z }); tr.horned = true; }
       if (!tr.rumbled && Math.abs(tr.x - dog.x) < 50 && tr.speed > 4) { audio.rumble(4); tr.rumbled = true; }
       if (Math.abs(tr.x) > 290) tr.wait = rand(22, 38);
     }

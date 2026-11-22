@@ -20,6 +20,13 @@ const SAMPLES = {
   howl: ['howl'],
   whine: ['whine'],
   splash: ['splash-1', 'splash-2', 'splash-3', 'splash-4'],
+  gull: ['gull-1', 'gull-2', 'gull-3', 'gull-4'],
+  gullCall: ['gull-call'],
+  coo: ['coo-1', 'coo-2'],
+  honk: ['honk-1', 'honk-2'],
+  trainHorn: ['train-horn'],
+  bell: ['bell-1', 'bell-2'],
+  meow: ['meow'],
 } satisfies Record<string, string[]>;
 export type SampleGroup = keyof typeof SAMPLES;
 
@@ -30,6 +37,8 @@ export interface SampleOpts {
   /** Playback rate (pitch and speed together); a random +-4 % is added. */
   rate?: number;
   delay?: number;
+  /** Distance (m) at which it has dropped to about half volume; loud things carry further. */
+  ref?: number;
 }
 
 export type StemGroup = 'vocals' | 'drums' | 'bass' | 'other';
@@ -202,13 +211,14 @@ export class WalkAudio {
     if (o.at) {
       const dx = o.at.x - this.listener.x, dz = o.at.z - this.listener.z;
       const d = Math.hypot(dx, dz);
-      if (d > 60) return true; // out of earshot: count it as played
-      vol *= 1 / (1 + Math.pow(d / 7, 1.4));
+      const ref = o.ref ?? 7;
+      if (d > ref * 9) return true; // out of earshot: count it as played
+      vol *= 1 / (1 + Math.pow(d / ref, 1.4));
       // Bearing relative to where the camera looks: right of it pans right.
       const right = (this.listener.fx * dz - this.listener.fz * dx) / (d || 1);
       const lp = c.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 16000 / (1 + d / 9);
+      lp.frequency.value = 16000 / (1 + d / (ref * 1.3));
       node.connect(lp);
       node = lp;
       if (c.createStereoPanner) {
@@ -408,8 +418,18 @@ export class WalkAudio {
     this.tone(500, 0.25, 'sine', 0.1, 260);
   }
   flutter() { for (let i = 0; i < 6; i++) this.hiss(0.06, 1400 + Math.random() * 600, 3, 0.08, 'bandpass', undefined, i * 0.05); }
-  gull() { this.tone(1500, 0.28, 'sawtooth', 0.05, 900); this.tone(1600, 0.22, 'sawtooth', 0.04, 1000, 0.32); }
-  bell() { this.tone(2300, 0.5, 'sine', 0.1); this.tone(2300, 0.5, 'sine', 0.08, undefined, 0.16); }
+  gull(at?: { x: number; z: number }) {
+    if (this.sample('gull', { at, vol: 0.6, ref: 12 })) { this.sample('gull', { at, vol: 0.5, ref: 12, delay: 0.3 }); return; }
+    this.tone(1500, 0.28, 'sawtooth', 0.05, 900); this.tone(1600, 0.22, 'sawtooth', 0.04, 1000, 0.32);
+  }
+  /** Ambience: a gull's long laughing call somewhere along the shore. */
+  gullCall(at: { x: number; z: number }) { this.sample('gullCall', { at, vol: 0.5, ref: 18 }); }
+  /** Ambience: pigeons cooing where they're resting. */
+  coo(at: { x: number; z: number }) { this.sample('coo', { at, vol: 0.45, ref: 4 }); }
+  bell(at?: { x: number; z: number }) {
+    if (this.sample('bell', { at, vol: 0.6, ref: 9 })) return;
+    this.tone(2300, 0.5, 'sine', 0.1); this.tone(2300, 0.5, 'sine', 0.08, undefined, 0.16);
+  }
   hey() { this.tone(330, 0.25, 'sawtooth', 0.06, 280); }
   splash(at?: { x: number; z: number }) {
     if (this.sample('splash', { at, vol: 0.9 })) return;
@@ -418,9 +438,13 @@ export class WalkAudio {
   stumble() { this.tone(220, 0.3, 'sine', 0.12, 110); this.hiss(0.2, 400, 1, 0.12, 'lowpass'); }
   whoosh(pitch = 1) { this.hiss(0.28, 600 * pitch, 2, 0.12, 'bandpass', 1500 * pitch); }
   fling() { this.whoosh(1.4); this.tone(200, 0.5, 'triangle', 0.12, 700); }
-  honk() { this.tone(370, 0.3, 'square', 0.06); this.tone(466, 0.3, 'square', 0.05); }
-  /** A two-tone train whistle. */
-  trainHorn() {
+  honk(at?: { x: number; z: number }) {
+    if (this.sample('honk', { at, vol: 0.6, ref: 14 })) return;
+    this.tone(370, 0.3, 'square', 0.06); this.tone(466, 0.3, 'square', 0.05);
+  }
+  /** The commuter train's horn: carries a long way. */
+  trainHorn(at?: { x: number; z: number }) {
+    if (this.sample('trainHorn', { at, vol: 0.75, ref: 30 })) return;
     this.tone(622, 0.55, 'triangle', 0.09);
     this.tone(784, 0.55, 'triangle', 0.07);
     this.tone(622, 0.9, 'triangle', 0.09, undefined, 0.65);
@@ -433,5 +457,8 @@ export class WalkAudio {
     this.hiss(0.7, 300, 0.5, 0.3, 'lowpass', 90, 0.6);
     for (let i = 0; i < 8; i++) this.hiss(0.05, 3000, 2, 0.06, 'highpass', undefined, 0.7 + i * 0.06 + Math.random() * 0.05);
   }
-  meow() { this.tone(700, 0.35, 'sawtooth', 0.05, 500); }
+  meow(at?: { x: number; z: number }) {
+    if (this.sample('meow', { at, vol: 0.6, ref: 5 })) return;
+    this.tone(700, 0.35, 'sawtooth', 0.05, 500);
+  }
 }
