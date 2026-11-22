@@ -4,7 +4,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Ground rules
 
-- **Branch:** PR #1 (`redesign-astro`), PR #2 (`walk-phase2-polish`), and PR #3 (`feat/transit-cutscene-polish`, merged at `f4523a4` and deployed) have all landed on `main`. `feat/walk-phase4-hill` (open PR) holds Phase 4 (`Dalt de la Vila`, terrain grid, slopes, stairs, church landmark, and the generic hilltop home finish). Continue on `feat/walk-phase4-hill` until Santtu merges it, or branch from it. Commit as you go and push.
+- **Branch:** everything through Phase 5 is on `main` and deployed: PR #4 (Phase 4 hill, `8c44cae`), PR #5 (fullscreen modes and the train handoff, `047c8df`) and PR #7 (Phase 5, `92ff9c4`). PR #6 (`feat/metro-link`, the metro entrance and cutscenes in both games) is open and unmerged. Branch from an up-to-date `main` for new work, commit as you go and push.
 - **Never merge to `main` without Santtu's explicit go-ahead.** Merging deploys the site to GitHub Pages (`.github/workflows/pages-deploy.yml`).
 - **Commit messages & PRs:** authored only by Santtu Nykänen. Never add `Co-authored-by` trailers or any AI/agent attribution anywhere (see `AGENTS.md`).
 - **Copy:** American English, professional. Santtu is a generalist developer, not a "game maker". Never invent stats or facts.
@@ -39,6 +39,8 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 | `plazaLife.ts` | The plaza at runtime: vendor, grandpa, waiter, dog-park regular and butcher; the newspaper, terrace and fetch quests; the botifarra chase (with simple alley routing). Hooks into `game3d.ts` for pickup/drop, bark, prompts, bubbles and the shared one-chase-at-a-time rule. |
 | `terrain.ts` | Phase 4 terrain primitives: `HeightGrid` (bilinear height sampling, flat/blended pads, vertex-colored smooth terrain mesh marked `userData.baked = true`) and `StairDef` (`stairFloor()`, `addStairsToBuilder()` for treads, risers and stepped cheek walls). |
 | `hill.ts` | Phase 4: Dalt de la Vila as a streamable hillside district (`makeHillDistrict()`) north of Carrer Major (`z >= 173`), plus `makeChurchLandmark()` (always-visible distant silhouette with fog-haze lerp, hidden when the live district is visible). Includes `hillFloor()`, sloped cobble street, east stone stairs, mid-terrace, `Museu`, third pipicà (`pipica3`), upper west ramp, grand church stairs, `Església` & `Campanar`, Mirador balustrade and a generic wooden Home door. `HILL` holds shared positions. |
+| `progress.ts` | Phase 5: goal areas (`AREAS`, `areaOfDistrict()`, `AREA_BONUS`) and saved progress in `localStorage` (`loadProgress()`, `saveProgress()`, `clearProgress()`). |
+| `strays.ts` | Phase 5: stray cats on the hill that bolt when Millie charges, gets close or barks; feeds the `cats` goal. |
 | `hillLife.ts` | Dalt de la Vila at runtime: museum guide, church caretaker, swinging bronze belfry bell, hilltop pigeons, third pipicà dog, bell-ring bark quest, mirador overlook quest and the generic Home door finish line. |
 | `horizon.ts` | Distant silhouettes faded into the fog color: inland hills and the city skyline down the coast. |
 | `data/seafront.json`, `layout.ts` | Portable town layout data (bounds, zones, tracks, streets, blocks with optional `baseY`, pavilions, landmarks with optional `baseY`/`alwaysVisible`, POIs) plus `buildDistrictBlocksSteps()` and colored `buildDistrictStandin()`. |
@@ -72,7 +74,7 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 | 2 | done | Layout as data: districts described in `data/seafront.json` (zones, street lines, block outlines with heights and facade style, pavilions, landmarks, POIs), with procedural facades (`layout.ts`). The minimap and colliders come from the same data, stand-ins carry block/pavilion/landmark colors, and `DirectBuilder` builds merged geometry directly instead of meshes-then-bake. |
 | 3 | done (`fcc520f`) | Plaça del Mercat north of Carrer del Mar: a square with a fountain, a market hall, a second pipicà, Carrer Major (shopping street), three quests (newspaper, terrace, fetch) and the botifarra chase. Generic Catalan look for now; refine from reference photos later. Two goals added (14 in all). |
 | 4 | done (merged in PR #4) | Terrain (`HeightGrid`, sloped streets, two stone stairways, upper ramp) and Dalt de la Vila (`hill.ts`, `hillLife.ts`): `Museu`, third pipicà, `Església` & always-visible `Campanar` landmark, Mirador overlook, generic wooden Home door, two new goals (16 in all). Verified in `?walktest` (routes, quests, pipicà, stress test, unloading); see the measured costs below. |
-| 5 | done (Phase 5 PR) | Goals grouped by area (`progress.ts` `AREAS`: seafront, Rambla and Carrer del Mar, Plaça del Mercat, Dalt de la Vila, anywhere); the goals card shows the area Millie is in, the others summed up, and finishing an area pays +5 bones. Progress (goals, partial counts, bones) is saved in `localStorage` (`walk3d-progress-v1`) with a reset button beside the open goals card. More life: stray cats on the hill (`strays.ts`, a new `cats` goal, 17 goals in all) and pigeons circling the bell tower. |
+| 5 | done (merged in PR #7) | Goals grouped by area (`progress.ts` `AREAS`: seafront, Rambla and Carrer del Mar, Plaça del Mercat, Dalt de la Vila, anywhere); the goals card shows the area Millie is in, the others summed up, and finishing an area pays +5 bones. Progress (goals, partial counts, bones) is saved in `localStorage` (`walk3d-progress-v1`) with a reset button beside the open goals card. More life: stray cats on the hill (`strays.ts`, a new `cats` goal, 17 goals in all) and pigeons circling the bell tower. |
 
 **Measured costs (headless SwiftShader `?walktest`):**
 - **Build:** ~1.5 s total build time (`LEVEL_STEPS = 53`), longest single step ~54 ms (`Districts`). Streaming slices stay ~0.2 ms at rest and ~1.5 ms max step when streaming `addTestDistrict()`.
@@ -84,12 +86,14 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 
 ## Next up
 
-1. **Review and merge the Phase 5 PR.** Saved counts work by adding this visit's progress on top of the saved count, so repeating a favor after a reload counts again (quest flags in `plazaLife`/`hillLife` are per page load). The Home door finish and its bones can be replayed after a reload.
-2. **Test on real phones and tablets:** fullscreen controls, touch buttons, audio by ear. Nothing has been verified on hardware yet.
-3. **Plaça del Mercat and Dalt de la Vila polish:** reference photos for the real squares and streets; more ambient walkers and shoppers there; maybe a market interior.
-4. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
-5. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
-6. **Phase 5:** goals per district, progress saved in the browser, more life.
+1. **Review and merge PR #6 (metro)** once Santtu has played it. All its signs are generic ("Metro", "L2", "SORTIDA"). Santtu wants the entrance moved deeper into town, where the real station is, once the level spreads that far; it can stay where it is until then.
+2. **Swimming animation (Santtu, for later):** when the water gets deep enough, both characters should swim. Today Millie just floats at `WATER_Y - SWIM_SINK` once the water is deeper than `SWIM_DEPTH` (`dogSwimming` in `game3d.ts`) with no paddling, and the human stops at waist depth (`HUMAN_WADE`) and says they are not swimming. Wanted: a dog paddle for Millie (legs, head up, wake), and a swim stroke for the human so they can follow her out instead of stopping. The sea is the only deep water now; any other body of water added later should reuse the same `surface === 'water'` and depth checks.
+3. **Test on real phones and tablets:** fullscreen modes, touch buttons, audio by ear. Nothing has been verified on hardware yet. Also check that real fullscreen comes back on the first key press or tap after the train (automation can't produce a real user gesture).
+4. **Saved-progress trade-offs (Phase 5):** saved counts add this visit's progress on top of the saved count, so a favor repeated after a reload counts again (quest flags in `plazaLife`/`hillLife` are per page load), and the Home door finish and its bones can be replayed. Persist quest flags if this matters.
+5. **Plaça del Mercat and Dalt de la Vila polish:** reference photos for the real squares and streets; more ambient walkers and shoppers; maybe a market interior. The grass bank behind the Museu is climbable up to the top-square wall (harmless dead end). Scattering plaza or hilltop pigeons doesn't count toward the `birds` goal.
+6. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
+7. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
+8. **Next phases:** more of the town (toward the harbor, the shopping center and the inland highway, per the expansion plan), each district with its own pipicà, quests and goals area in `progress.ts`.
 
 ## Polish backlog (from Santtu's playtesting)
 
