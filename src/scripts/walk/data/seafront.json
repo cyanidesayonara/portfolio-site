@@ -1,7 +1,7 @@
 {
   "version": 1,
   "units": "meters",
-  "mapBounds": { "x0": -96, "x1": 96, "z0": -134, "z1": 173 },
+  "mapBounds": { "x0": -96, "x1": 96, "z0": -134, "z1": 256 },
   "swim": { "x0": -40, "x1": 44, "z": -90, "shoreZ": -60 },
   "pipica": { "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "gateZ0": -29.2, "gateZ1": -26.8 },
   "pier": { "x0": -50, "x1": -46, "root": -10, "rise": -30, "end": -130, "high": 1.2 },
@@ -25,7 +25,17 @@
     { "id": "alleyW", "x0": -20, "x1": -14, "z0": 139, "z1": 155, "mapColor": "#bdb19e" },
     { "id": "alleyE", "x0": 14, "x1": 20, "z0": 139, "z1": 155, "mapColor": "#bdb19e" },
     { "id": "shopStreet", "x0": -62, "x1": 62, "z0": 155, "z1": 161, "mapColor": "#bdb19e" },
-    { "id": "pipica2", "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "mapColor": "#9bc46a" }
+    { "id": "pipica2", "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "mapColor": "#9bc46a" },
+    { "id": "hillFill", "x0": -48, "x1": 48, "z0": 173, "z1": 252, "mapColor": "#758262" },
+    { "id": "hillApproach", "x0": -3, "x1": 3, "z0": 161, "z1": 173, "mapColor": "#bdb19e" },
+    { "id": "hillBase", "x0": -22, "x1": 22, "z0": 173, "z1": 178, "mapColor": "#bdb19e" },
+    { "id": "hillClimb", "x0": -4, "x1": 4, "z0": 178, "z1": 196, "mapColor": "#c8b99e" },
+    { "id": "hillStairsE", "x0": 12, "x1": 16, "z0": 178, "z1": 196, "mapColor": "#d6cab4" },
+    { "id": "hillTerrace", "x0": -26, "x1": 26, "z0": 196, "z1": 204, "mapColor": "#cfc3ad" },
+    { "id": "pipica3", "x0": -25, "x1": -13, "z0": 197, "z1": 208, "mapColor": "#9bc46a" },
+    { "id": "hillStairsTop", "x0": -4.5, "x1": 4.5, "z0": 204, "z1": 218, "mapColor": "#d6cab4" },
+    { "id": "hillRampTop", "x0": -12, "x1": -6.5, "z0": 204, "z1": 218, "mapColor": "#c8b99e" },
+    { "id": "hillSquare", "x0": -24, "x1": 24, "z0": 218, "z1": 244, "mapColor": "#d8cdb6" }
   ],
   "districts": [
     {
@@ -120,7 +130,7 @@
     {
       "id": "plaza",
       "label": "Plaça del Mercat",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": 101, "z1": 100000 },
+      "bounds": { "x0": -100000, "x1": 100000, "z0": 101, "z1": 173 },
       "streets": [
         { "id": "plaza", "name": "Plaça del Mercat", "width": 40, "surface": "paving", "points": [[0, 101], [0, 139]] },
         { "id": "carrer-major", "name": "Carrer Major", "width": 6, "surface": "paving", "points": [[-62, 158], [62, 158]] },
@@ -135,8 +145,8 @@
         { "x0": -62, "x1": -41, "z0": 139, "z1": 155, "floors": 4, "color": "#e6dcc6", "roofColor": "#b2563a", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
         { "x0": 41, "x1": 62, "z0": 139, "z1": 155, "floors": 3, "color": "#d9705a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
         { "x0": -62, "x1": -30, "z0": 161, "z1": 173, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
-        { "x0": -30, "x1": -3, "z0": 161, "z1": 173, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
-        { "x0": 3, "x1": 30, "z0": 161, "z1": 173, "floors": 4, "color": "#e8d4a8", "roofColor": "#c2997a", "shutterColor": "#2a5aa8", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
+        { "x0": -30, "x1": -3, "z0": 161, "z1": 173, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+        { "x0": 3, "x1": 30, "z0": 161, "z1": 173, "floors": 4, "color": "#e8d4a8", "roofColor": "#c2997a", "shutterColor": "#2a5aa8", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
         { "x0": 30, "x1": 62, "z0": 161, "z1": 173, "floors": 4, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
         { "x0": -70, "x1": -62, "z0": 139, "z1": 173, "floors": 4, "color": "#d8cdb6", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
         { "x0": 62, "x1": 70, "z0": 139, "z1": 173, "floors": 4, "color": "#d8cdb6", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true }
@@ -151,7 +161,44 @@
         { "id": "market", "kind": "landmark", "label": "Mercat", "x": 0, "z": 145, "color": "#e5487a" },
         { "id": "pipica2", "kind": "pipica", "label": "Pipicà", "x": 13, "z": 132, "color": "#8bcb3c" }
       ]
+    },
+    {
+      "id": "hill",
+      "label": "Dalt de la Vila",
+      "bounds": { "x0": -100000, "x1": 100000, "z0": 173, "z1": 100000 },
+      "streets": [
+        { "id": "hill-climb", "name": "Baixada del Turó", "width": 8, "surface": "paving", "points": [[0, 173], [0, 196]] },
+        { "id": "hill-stairs-e", "name": "Escales del Museu", "width": 4, "surface": "paving", "points": [[14, 178], [14, 196]] },
+        { "id": "hill-terrace", "name": "Terrassa del Museu", "width": 8, "surface": "paving", "points": [[-26, 200], [26, 200]] },
+        { "id": "hill-stairs-top", "name": "Escales de l'Església", "width": 9, "surface": "paving", "points": [[0, 204], [0, 218]] },
+        { "id": "hill-ramp-top", "name": "Pujada de Dalt", "width": 5.5, "surface": "paving", "points": [[-9.25, 204], [-9.25, 218]] },
+        { "id": "hill-square", "name": "Plaça de l'Església", "width": 48, "surface": "paving", "points": [[0, 218], [0, 236]] }
+      ],
+      "blocks": [
+        { "x0": -42, "x1": -22, "z0": 173, "z1": 184, "floors": 4, "baseY": 0, "color": "#e8d4a8", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
+        { "x0": 22, "x1": 42, "z0": 173, "z1": 184, "floors": 4, "baseY": 0, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true },
+        { "x0": -40, "x1": -26, "z0": 196, "z1": 212, "floors": 3, "baseY": 5.08, "color": "#efe4cc", "roofColor": "#a87561", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": false },
+        { "x0": 30, "x1": 42, "z0": 196, "z1": 212, "floors": 3, "baseY": 5.08, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": false },
+        { "x0": -36, "x1": -24, "z0": 218, "z1": 236, "floors": 3, "baseY": 10.38, "color": "#e6dcc6", "roofColor": "#b2563a", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": false },
+        { "x0": 24, "x1": 36, "z0": 218, "z1": 236, "floors": 3, "baseY": 10.38, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
+        { "x0": -36, "x1": -10.5, "z0": 236, "z1": 248, "floors": 3, "baseY": 10.38, "color": "#dcd2bd", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-z", "+x"], "groundFloor": false },
+        { "x0": 10.5, "x1": 36, "z0": 236, "z1": 248, "floors": 3, "baseY": 10.38, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z", "-x"], "groundFloor": false }
+      ],
+      "pavilions": [],
+      "landmarks": [
+        { "id": "museu", "label": "Museu", "x0": 16, "x1": 30, "z0": 196, "z1": 210, "height": 9.5, "baseY": 5.08, "color": "#dfc8a2", "roofColor": "#a85c42" },
+        { "id": "church", "label": "Església", "x0": -10, "x1": 10, "z0": 232, "z1": 246, "height": 14, "baseY": 10.38, "alwaysVisible": true, "color": "#e6dcc6", "roofColor": "#b2563a" },
+        { "id": "belltower", "label": "Campanar", "x0": 5, "x1": 10.5, "z0": 232, "z1": 237.5, "height": 25, "baseY": 10.38, "alwaysVisible": true, "color": "#dfd3ba", "roofColor": "#a85c42" }
+      ],
+      "pois": [
+        { "id": "museu", "kind": "landmark", "label": "Museu", "x": 23, "z": 203, "color": "#ffb020" },
+        { "id": "pipica3", "kind": "pipica", "label": "Pipicà", "x": -19, "z": 202.5, "color": "#8bcb3c" },
+        { "id": "church", "kind": "landmark", "label": "Església", "x": 0, "z": 232, "color": "#f4f1ea" },
+        { "id": "mirador", "kind": "place", "label": "Mirador", "x": 14, "z": 219.5, "color": "#1fc9b7" },
+        { "id": "home", "kind": "stop", "label": "Home", "x": -23.4, "z": 227.5, "color": "#8bcb3c" }
+      ]
     }
   ],
-  "pipica2": { "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "gateZ0": 129.6, "gateZ1": 132.0 }
+  "pipica2": { "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "gateZ0": 129.6, "gateZ1": 132.0 },
+  "pipica3": { "x0": -25, "x1": -13, "z0": 197, "z1": 208, "gateZ0": 200.5, "gateZ1": 203.0 }
 }

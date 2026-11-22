@@ -20,6 +20,8 @@ import { makeTofu, makeDevil } from './props';
 import { Minimap, type MapMarker } from './minimap';
 import { createLife } from './life';
 import { createPlazaLife, type PlazaItem } from './plazaLife';
+import { createHillLife } from './hillLife';
+import { HILL } from './hill';
 import { bakeStatic, collapseRig } from './bake';
 import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
@@ -264,6 +266,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false },
     { id: 'plaza', label: 'Help out on Plaça del Mercat', done: false, count: 0, target: 3 },
     { id: 'butcher', label: 'Get away with the butcher\'s botifarra', done: false },
+    { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2 },
+    { id: 'hill_top', label: 'Climb to the hilltop church and head home', done: false },
   ];
   const goal = (id: string) => goals.find((g) => g.id === id)!;
   const completeGoal = (id: string) => {
@@ -319,7 +323,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const stains: THREE.Mesh[] = [];
 
   // ---- Collectibles ---------------------------------------------------------------------
-  const boneSpots: [number, number][] = [[10, 108], [-17, 148], [40, 158.4], [1.5, 48], [-20, 53], [22, 71], [-14, 89], [30, 88.8], [-40, 24], [40, 29], [60, 20], [-60, -5], [70, -3], [-48, -60], [-48, -100], [70, -27], [0, -40], [-1, 9]];
+  const boneSpots: [number, number][] = [[0, 186], [14, 187], [0, 211], [12, 224], [10, 108], [-17, 148], [40, 158.4], [1.5, 48], [-20, 53], [22, 71], [-14, 89], [30, 88.8], [-40, 24], [40, 29], [60, 20], [-60, -5], [70, -3], [-48, -60], [-48, -100], [70, -27], [0, -40], [-1, 9]];
   const bonesList = boneSpots.map(([x, z]) => {
     const m = makeBone();
     scene.add(m);
@@ -398,6 +402,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     chaseEnded: () => { chaseCooldown = 10; },
     collide: (p, r, y) => collide(p, r, y),
   });
+  // Dalt de la Vila: hilltop people, church bell, mirador and generic home door (hillLife.ts).
+  const hill = createHillLife({
+    scene, hud, audio, dog, addBones, completeGoal, bumpGoal, burst,
+    humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
+    offLeash: () => offLeash,
+  });
+  const hillDistrict = level.districts.find((d) => d.id === HILL.id)!;
   // Cyclists on the Rambla bike lane.
   interface Rider { g: THREE.Group; wheels: THREE.Object3D[]; rider: PersonModel; x: number; z: number; dir: number; speed: number; max: number; rang: number; light: THREE.MeshStandardMaterial }
   const riders: Rider[] = [];
@@ -719,6 +730,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     audio.bark();
     life.bark();
     plaza.bark();
+    hill.bark();
     burst(dog.x + Math.cos(dog.heading) * 0.5, dog.y + 0.75, dog.z + Math.sin(dog.heading) * 0.5, 0xffb020, 5, 1.5, 1.2, 0.4, 2);
     let scared = 0;
     for (const b of birds) {
@@ -1011,6 +1023,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     leash.reset(dog, handXZ());
     camSnap = true;
     plaza.reset();
+    hill.reset();
     hud.banner('Back where we started', 'news');
   };
   let departing = false;
@@ -1196,7 +1209,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       const bx = bench.x, bz = bench.z;
       const d = Math.hypot(bx - human.x, bz - human.z);
       if (d > 0.4) { wantX = (bx - human.x) / d; wantZ = (bz - human.z) / d; human.state = 'walk'; }
-      else { human.state = 'bench'; human.vx *= 0.8; human.vz *= 0.8; human.heading = 0; }
+      else { human.state = 'bench'; human.vx *= 0.8; human.vz *= 0.8; human.heading = bench.heading ?? 0; }
     } else if (human.state === 'stumble') {
       human.stumbleT -= dt;
       human.vx *= 1 - dt * 1.4; human.vz *= 1 - dt * 1.4;
@@ -1548,6 +1561,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const listenDir = new THREE.Vector3();
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
+    level.churchLandmark.visible = !hillDistrict.root.visible;
     const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
     if (slowmo > 0) slowmo -= rawDt;
     time += dt;
@@ -1755,6 +1769,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     // ---- NPCs ----
     life.update(dt, time, skyMode);
     plaza.update(dt, time);
+    hill.update(dt, time);
     for (const w of walkers) {
       if (w.saidT > 0) w.saidT -= dt;
       const wVis = Math.hypot(w.x - dog.x, w.z - dog.z) < 52;
@@ -2065,6 +2080,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!coriolisFocus && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
     if (!dog.carrying && ((!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) || (!questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9))) prompts.push({ key: 'G', label: 'Pick up' });
     { const pl = plaza.prompt(); if (pl) prompts.push({ key: 'G', label: pl }); }
+    { const hl = hill.prompt(); if (hl) prompts.push(hl); }
     if (dog.carrying) prompts.push({ key: 'G', label: 'Drop' });
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) prompts.push({ key: 'E', label: 'Bark at the Dimoni' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) prompts.push({ key: 'E', label: 'Bark at La Neteja' });
@@ -2088,6 +2104,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         { x: -48, z: -66, color: '#c9a26b', label: 'Old pier', kind: 'place' },
         { x: 0, z: 9, color: '#f4f1ea', label: 'Underpass', kind: 'place' },
         { x: 0, z: 62, color: '#f4f1ea', label: 'Carrer del Mar', kind: 'place' },
+        { x: 23, z: 203, color: '#ffb020', label: 'Museu', kind: 'place' },
+        { x: -19, z: 202.5, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
+        { x: 0, z: 232, color: '#f4f1ea', label: 'Església', kind: 'place' },
+        { x: 14, z: 219.5, color: '#1fc9b7', label: 'Mirador', kind: 'place' },
+        { x: HILL.home.x, z: HILL.home.z, color: '#8bcb3c', label: 'Home', kind: 'stop' },
       );
       if (!quest.ball) marks.push({ x: Q.kid.x, z: Q.kid.z - 1, color: '#ffc93c', label: 'Lost ball', kind: 'quest' });
       if (!quest.tofu) marks.push({ x: tofu.x, z: tofu.z, color: '#ffc93c', label: 'Tofu', kind: 'quest' });
@@ -2098,6 +2119,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         if (!pq.paper) marks.push({ x: -11.5, z: 106.2, color: '#ffc93c', label: 'Newspaper', kind: 'quest' });
         if (!pq.terrace) marks.push({ x: -14, z: 129, color: '#ffc93c', label: 'Terrace', kind: 'quest' });
         if (!pq.fetch) marks.push({ x: 12.5, z: 131.5, color: '#ffc93c', label: 'Fetch', kind: 'quest' }); }
+      { const hq = hill.quests();
+        if (!hq.bell) marks.push({ x: HILL.portal.x, z: HILL.portal.z, color: '#ffc93c', label: 'Church bell', kind: 'quest' });
+        if (!hq.mirador) marks.push({ x: 14, z: 219.5, color: '#ffc93c', label: 'Mirador', kind: 'quest' });
+        if (!hq.home) marks.push({ x: HILL.home.x, z: HILL.home.z, color: '#ffc93c', label: 'Home', kind: 'quest' }); }
       marks.push({ x: plaza.debug.butcher.x, z: plaza.debug.butcher.z, color: '#ff6b5a', label: 'Butcher', kind: 'threat' });
       marks.push({ x: sw.x, z: sw.z, color: '#5ab4ff', label: 'La Neteja', kind: 'threat' });
       marks.push({ x: cf.x, z: level.correfoc.z, color: '#ff8a2a', label: 'Correfoc', kind: 'threat' });
@@ -2175,7 +2200,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
     // Rain follows the camera.
     if (rain.visible) {
-      rain.position.set(camLook.x, 0, camLook.z);
+      rain.position.set(camLook.x, Math.max(0, camLook.y - 2), camLook.z);
       for (let i = 0; i < RAIN; i++) {
         rainArr[i * 6 + 1] -= 16 * dt; rainArr[i * 6 + 4] -= 16 * dt;
         if (rainArr[i * 6 + 1] < -1) { rainArr[i * 6 + 1] += 18; rainArr[i * 6 + 4] += 18; }
@@ -2212,13 +2237,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     place('grocer', Q.grocer.x, RAMBLA_Y + 2.1, Q.grocer.z);
     place('baker', Q.baker.x, RAMBLA_Y + 2.1, Q.baker.z);
     place('sweeper', sw.x, RAMBLA_Y + 2.8, sw.z);
-    for (const w of walkers) place(w.id, w.x, 2.1, w.z);
+    for (const w of walkers) place(w.id, w.x, w.m.group.position.y + 2.1, w.z);
     for (const r of riders) place(`r${r.x | 0}`, r.x, 2.3, r.z);
     for (const b of life.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
+    for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
 
     // Sun and shadows follow the action.
-    sun.position.set(camLook.x + 30, 48, camLook.z + 22);
+    sun.position.set(camLook.x + 30, camLook.y + 48, camLook.z + 22);
     sun.target.position.copy(camLook);
     sun.target.updateMatrixWorld();
   };
@@ -2248,13 +2274,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       for (let i = 1; i <= steps; i++) {
         const t = i / steps;
         const px = lerp(dog.x, bx, t), pz = lerp(dog.z, bz, t);
-        if (level.grid.boxesNear(px, pz, 0.3).some((b) => b.top > 4 && px > b.x0 - 0.3 && px < b.x1 + 0.3 && pz > b.z0 - 0.3 && pz < b.z1 + 0.3)) {
+        if (level.grid.boxesNear(px, pz, 0.3).some((b) => b.top > dog.y + 3 && px > b.x0 - 0.3 && px < b.x1 + 0.3 && pz > b.z0 - 0.3 && pz < b.z1 + 0.3)) {
           const tt = (i - 1) / steps;
           bx = lerp(dog.x, bx, tt); bz = lerp(dog.z, bz, tt);
           break;
         }
       }
-      camWantPos.set(bx, dog.y + (inTunnel ? 1.6 : 3.2 * camPitch * Math.sqrt(camZoom)), bz);
+      const camFloor = level.floor(bx, bz, dog.y + 12);
+      camWantPos.set(bx, Math.max(dog.y + (inTunnel ? 1.6 : 3.2 * camPitch * Math.sqrt(camZoom)), camFloor + 1.2), bz);
       camWantLook.set(dog.x + Math.cos(followYaw) * 3, dog.y + 0.9, dog.z + Math.sin(followYaw) * 3);
     } else if (camMode === 'overhead') {
       camYaw = 0;
@@ -2286,7 +2313,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       // In the tunnel, sit a little to the side so the human doesn't fill the frame.
       camWantPos.set(dog.x + tunnelT * 1.1, dog.y + height, dog.z + back);
       camWantLook.set(dog.x, dog.y + lerp(0.6, 1.1, tunnelT), dog.z - lerp(2.6, 9, tunnelT));
-      if (dog.y > 1.5) camWantPos.y += 1; // on the pier
+      if (dog.z < -10 && dog.y > 1.5) camWantPos.y += 1; // on the pier
+      if (tunnelT < 0.2) camWantPos.y = Math.max(camWantPos.y, level.floor(camWantPos.x, camWantPos.z, dog.y + 12) + 3.0);
       if (camKick > 0) { camWantPos.y += camKick * 4; camWantPos.z += camKick * 5; camKick = Math.max(0, camKick - dt * 1.6); }
     }
     const k = camSnap ? 1 : 1 - Math.exp(-dt * rate);
@@ -2396,7 +2424,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     (window as unknown as Record<string, unknown>).__walk = {
       dog, human, leash, level, goals, quest,
       get offLeash() { return offLeash; },
-      plaza,
+      plaza, hill,
       get whirl() { return whirl; },
       get camMode() { return camMode; },
       get sky() { return skyMode; },

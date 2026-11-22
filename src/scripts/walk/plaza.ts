@@ -12,7 +12,7 @@
 */
 import * as THREE from 'three';
 import { M, box, cyl, shadowed, makeBench, makeWaterBowl, makeFountain, makePlaneTree, makeKiosk, makeCafeSet, makeFruitCrate } from './models';
-import { makeLanternPost, makeBunting } from './props';
+import { makeLanternPost, makeBunting, makeFingerpost } from './props';
 import { DirectBuilder } from './meshbuilder';
 import { bakeSteps } from './bake';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, type DistrictData, type InstanceSink } from './layout';
@@ -119,6 +119,7 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   // ---- Ground: flagstones on the square, panots elsewhere, sand in the pipicà ----
   root.add(env.ground(-20, 20, 101, 139, Y + 0.002, mats.flag, mats.flagTile));
   root.add(env.ground(-62, 62, 139, 161, Y, mats.panot, mats.panotTile));
+  root.add(env.ground(-3.2, 3.2, 161, 173.2, Y + 0.001, mats.panot, mats.panotTile));
   root.add(env.ground(-41, -20, 101, 139, Y - 0.001, mats.panot, mats.panotTile));
   root.add(env.ground(20, 41, 101, 139, Y - 0.001, mats.panot, mats.panotTile));
   root.add(env.ground(PIP.x0, PIP.x1, PIP.z0, PIP.z1, Y + 0.006, mats.sand, 4));
@@ -296,6 +297,11 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   for (const [ax, bx] of [[-40, -10], [10, 40]]) {
     place(makeBunting(new THREE.Vector3(ax, Y + 5.4, 155.2), new THREE.Vector3(bx, Y + 5.4, 160.8)), 0, 0, 0);
   }
+  place(makeFingerpost([
+    { title: 'Dalt de la Vila', sub: 'Església · Museu', color: '#8bcb3c', angle: Math.PI / 2 },
+    { title: 'Plaça del Mercat', sub: 'Carrer Major', color: '#ffb020', angle: -Math.PI / 2 },
+  ]), 3.6, Y, 160.4);
+  addCircle(3.6, 160.4, 0.12, Y + 3.5, 'pole', true, true);
   shadowed(sign);
   yield;
 
