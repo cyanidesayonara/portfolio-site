@@ -276,6 +276,14 @@ export class WalkAudio {
     this.tone(380, 0.08, 'sawtooth', 0.18, 240, 0.13);
     this.hiss(0.09, 850, 2.5, 0.12, 'bandpass', undefined, 0.13);
   }
+  /** Another dog's bark: higher for small dogs. */
+  smallBark(scale = 0.8) {
+    const f = 520 / Math.max(0.5, scale);
+    this.tone(f, 0.07, 'sawtooth', 0.12, f * 0.62);
+    this.hiss(0.07, f * 2, 2.5, 0.08);
+  }
+  /** A palas ball off a wooden bat. */
+  pock() { this.tone(900, 0.05, 'triangle', 0.08, 600); this.hiss(0.03, 2500, 2, 0.05, 'bandpass'); }
   jump() { this.tone(300, 0.16, 'square', 0.08, 620); }
   land() { this.hiss(0.08, 300, 1, 0.12, 'lowpass'); }
   pee() { this.hiss(0.7, 2600, 1.2, 0.06, 'bandpass', 1800); }
