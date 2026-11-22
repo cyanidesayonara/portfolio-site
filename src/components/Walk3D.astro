@@ -56,7 +56,10 @@ const KEYS = [
       </span>
       <button type="button" class="tb" data-camera>Cam: Street</button>
       <button type="button" class="tb" data-restart>Restart</button>
-      <button type="button" class="tb" data-fullscreen aria-pressed="false">Fullscreen</button>
+      <span class="seg" role="group" aria-label="Screen">
+        <button type="button" class="tb" data-fs="window" aria-pressed="false" title="Fill the browser window">Fill window</button>
+        <button type="button" class="tb" data-fs="screen" aria-pressed="false" title="Real fullscreen">Fullscreen</button>
+      </span>
     </div>
 
     <aside class="panel stemma-panel" data-stemma-panel aria-label="stemma jukebox">
@@ -211,6 +214,8 @@ const KEYS = [
   .toolbar {
     position: absolute;
     left: 12px;
+    /* Wrap before the minimap (168px wide at the bottom right) instead of under it. */
+    right: 192px;
     bottom: 12px;
     display: flex;
     flex-wrap: wrap;
@@ -227,6 +232,8 @@ const KEYS = [
   }
   .seg .tb:first-child { border-radius: 999px 0 0 999px; }
   .seg .tb:last-child { border-radius: 0 999px 999px 0; }
+  .tb[hidden] { display: none; }
+  .seg .tb:first-child:has(+ .tb[hidden]) { border-radius: 999px; }
   .tb {
     min-height: 32px;
     padding: 6px 12px;
@@ -868,6 +875,7 @@ const KEYS = [
     .stage :global(.prompts) { bottom: 124px; }
     .stage :global(.prompts .pi kbd) { display: none; }
     .stage :global(.minimap:not(.big)) { bottom: auto; top: 142px; }
+    .toolbar { right: 12px; } /* the map is up top here */
     .focus-hint { display: none; }
   }
   .walk3d:global(.has-touch) .touch { display: flex; }

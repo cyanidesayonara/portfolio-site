@@ -43,7 +43,8 @@ const KEYS = [
       <div class="tools">
         <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
         <button class="sound" type="button" data-restart>Restart</button>
-        <button class="sound" type="button" data-fullscreen aria-pressed="false">Fullscreen</button>
+        <button class="sound" type="button" data-fs="window" aria-pressed="false" title="Fill the browser window">Fill window</button>
+        <button class="sound" type="button" data-fs="screen" aria-pressed="false" title="Real fullscreen">Fullscreen</button>
       </div>
     </div>
     <ul class="keys" aria-label="Controls">
@@ -246,6 +247,7 @@ const KEYS = [
     display: inline-flex;
     align-items: center;
   }
+  .street:global(.live) .sound[hidden] { display: none; }
   .sound[aria-pressed='true'] {
     background: var(--saffron);
     border-color: var(--saffron);

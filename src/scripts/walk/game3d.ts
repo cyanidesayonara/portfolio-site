@@ -662,6 +662,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     level.grid.circlesNear(x, z, rad).filter((c) => c.obstacle && activeCircle(c, y) && Math.abs(c.x - x) < rad && Math.abs(c.z - z) < rad).map((c) => c.obstacle!);
 
   const debug = { hops: 0 };
+  // Leash corrections: warn once before the first, explain the first few.
+  let patienceWarned = false;
+  let corrections = 0;
   const handPos = new THREE.Vector3();
   const collarPos = new THREE.Vector3();
   // The leash hand, computed from the body (the model's matrices lag a frame,
@@ -972,15 +975,27 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   host.addEventListener('pointercancel', endDrag);
   root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => applySky(b.dataset.sky as SkyMode)));
 
-  // Fullscreen: fill the window with a reveal, and ask the browser for real fullscreen too.
-  const fullBtn = q<HTMLButtonElement>('[data-fullscreen]');
+  // Two fullscreen modes: "window" fills the browser window (works everywhere,
+  // keeps the tabs and address bar), "screen" also asks for real fullscreen.
+  // A page change (the train to the 2D street) always drops real fullscreen, so
+  // the mode rides along in the URL (?fs=) and is restored on arrival.
+  type FsMode = 'off' | 'window' | 'screen';
+  const fsButtons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-fs]'));
+  const canRealFs = !!document.documentElement.requestFullscreen && document.fullscreenEnabled !== false;
+  if (!canRealFs) fsButtons.filter((b) => b.dataset.fs === 'screen').forEach((b) => { b.hidden = true; });
+  let fsMode: FsMode = 'off';
   let full = false;
   let untrackViewport: (() => void) | null = null;
-  const setFull = (on: boolean) => {
-    if (on === full) return;
-    const from = root.getBoundingClientRect();
-    full = on;
-    if (on) {
+  const syncFsButtons = () => {
+    for (const b of fsButtons) b.setAttribute('aria-pressed', String(b.dataset.fs === fsMode));
+  };
+  const setFsMode = (mode: FsMode) => {
+    if (mode === fsMode) return;
+    const wasFull = full;
+    fsMode = mode;
+    full = mode !== 'off';
+    if (full && !wasFull) {
+      const from = root.getBoundingClientRect();
       root.classList.add('immersive');
       untrackViewport = trackVisibleViewport(root);
       document.documentElement.style.overflow = 'hidden';
@@ -988,23 +1003,45 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       const inset = `inset(${from.top}px ${vw - from.right}px ${vh - from.bottom}px ${from.left}px round 28px)`;
       root.animate([{ clipPath: inset }, { clipPath: 'inset(0px 0px 0px 0px round 0px)' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' });
       camKick = 1;
-      document.documentElement.requestFullscreen?.().catch(() => {});
-      host.focus({ preventScroll: true });
-    } else {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    } else if (!full && wasFull) {
       root.classList.remove('immersive');
       untrackViewport?.();
       untrackViewport = null;
       document.documentElement.style.overflow = '';
     }
-    if (fullBtn) {
-      fullBtn.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
-      fullBtn.setAttribute('aria-pressed', String(on));
+    if (mode === 'screen' && !document.fullscreenElement) {
+      // Refused (no user gesture, or the browser said no): stay window-filling.
+      document.documentElement.requestFullscreen?.().catch(() => { if (fsMode === 'screen') { fsMode = 'window'; syncFsButtons(); } });
+    } else if (mode !== 'screen' && document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
     }
+    if (full) host.focus({ preventScroll: true });
+    syncFsButtons();
   };
+  const setFull = (on: boolean) => setFsMode(on ? (canRealFs ? 'screen' : 'window') : 'off');
   let camKick = 0;
-  fullBtn?.addEventListener('click', () => setFull(!full));
-  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && full) setFull(false); });
+  // Pressing the active mode's button leaves it; the other switches modes.
+  fsButtons.forEach((b) => b.addEventListener('click', () => {
+    const m = b.dataset.fs as FsMode;
+    setFsMode(fsMode === m ? 'off' : m);
+  }));
+  // Leaving real fullscreen with the browser's own Escape or gesture: back to the page.
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsMode === 'screen') setFsMode('off'); });
+  // Restore the mode after the train: window-filling at once, real fullscreen on
+  // the first key or tap (browsers only allow it in response to one).
+  const restoreFs = (mode: string | null) => {
+    if (mode !== 'window' && mode !== 'screen') return;
+    setFsMode('window');
+    if (mode !== 'screen' || !canRealFs) return;
+    const upgrade = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.code === 'Escape') return;
+      host.removeEventListener('keydown', upgrade, true);
+      host.removeEventListener('pointerdown', upgrade, true);
+      if (fsMode === 'window') setFsMode('screen');
+    };
+    host.addEventListener('keydown', upgrade, true);
+    host.addEventListener('pointerdown', upgrade, true);
+  };
 
   q('[data-c-exit]')?.addEventListener('click', () => { if (coriolisFocus) toggleCoriolis(); });
   root.querySelectorAll<HTMLButtonElement>('[data-c-key]').forEach((b) => b.addEventListener('click', () => {
@@ -1041,6 +1078,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       audio.trainHorn();
       const dest = new URL(stop.href || '/?via=train', location.origin);
       if (audio.on) dest.searchParams.set('sound', '1');
+      if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
       void playDepartureDoors(host, 'Boarding R1 · Back to 2D street…', reducedMotion).then(() => {
         location.href = dest.pathname + dest.search + dest.hash;
       });
@@ -1303,7 +1341,15 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         const back = (human.vx * (dog.x - human.x) + human.vz * (dog.z - human.z)) < 0 ? 1.5 : 1;
         human.patience -= 0.14 * clamp(tPx / 900, 1, 2) * back * dt;
       } else if (leash.taut < 0.2) human.patience = Math.min(1, human.patience + 0.18 * dt);
-      if (human.patience < 0.45 && !human.ughSaid) { humanSay(pickOne(['Ugh.', 'Millie…', 'Seriously?'])); human.ughSaid = true; }
+      if (human.patience < 0.45 && !human.ughSaid) {
+        humanSay(pickOne(['Ugh.', 'Millie…', 'Seriously?']));
+        human.ughSaid = true;
+        // Warn before the first yank, so it never comes out of nowhere.
+        if (!patienceWarned) {
+          patienceWarned = true;
+          hud.toast('Your human is losing patience', 'Pulling hard on the leash wears it down. Keep it up and they will yank you back.', '#ffb020', 5);
+        }
+      }
       if (human.patience > 0.6) human.ughSaid = false;
       if (human.patience <= 0 && human.heyT <= 0) { human.heyT = 0.8; humanSay('HEY!', 1.2, 'loud'); audio.hey(); }
       if (human.heyT > 0) {
@@ -1316,7 +1362,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
           } else {
             human.state = 'haul'; human.haulT = 0.5;
             leash.rest *= 0.65;
-            hud.shout('CORRECTION', 'bad');
+            humanSay('That’s enough pulling!', 1.8, 'loud');
+            hud.shout('YANKED BACK', 'bad');
+            // Explain it the first few times; after that the shout is enough.
+            if (corrections++ < 2) {
+              hud.toast('Leash correction', 'You pulled too hard for too long, so your human yanked the leash short. Walk without pulling for a while and they calm down.', '#e5487a', 6);
+            }
           }
           human.patience = 0.7;
           human.grace = 8;
@@ -2407,11 +2458,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   renderer.render(scene, camera);
   await transit.finish();
   if (viaTrain) {
-    hud.toast('Arrived at Estació', 'Welcome to the 3D seafront!');
+    const fsWanted = searchParams.get('fs');
+    restoreFs(fsWanted);
+    hud.toast('Arrived at Estació', fsWanted === 'screen' && canRealFs ? 'Welcome to the 3D seafront! Press any key for fullscreen.' : 'Welcome to the 3D seafront!');
     host.focus({ preventScroll: true });
     if (!walktest) {
       searchParams.delete('via');
       searchParams.delete('sound');
+      searchParams.delete('fs');
       const qs = searchParams.toString();
       history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
     }
