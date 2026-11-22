@@ -1,5 +1,5 @@
 /*
-  Procedural canvas textures for the Badalona level. Nothing is loaded from
+  Procedural canvas textures for the seafront level. Nothing is loaded from
   disk: panots, sand, asphalt, deck planks, masonry and the sea's ripples are
   all drawn here, the way Path of Leash Resistance draws everything in code.
 */
@@ -469,7 +469,7 @@ export function muralTexture() {
   g.beginPath(); g.arc(464, 80, 9, 0, Math.PI * 2); g.fill();
   g.font = "800 46px 'Bricolage Grotesque Variable', system-ui, sans-serif";
   g.fillStyle = '#0b1430';
-  g.fillText('BDN', 40, 70);
+  g.fillText('MAR', 40, 70);
   return tex(c, 1);
 }
 

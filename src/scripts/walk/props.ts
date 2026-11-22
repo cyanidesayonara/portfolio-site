@@ -1,5 +1,5 @@
 /*
-  Badalona-specific street furniture, landmarks and characters, built from
+  Seafront-town street furniture, landmarks and characters, built from
   the photo reference: cast-iron lanterns on the Rambla, spotlight masts on
   the seafront, square café umbrellas, tamarisks, the pier's legs and
   railings, the distillery chimney, the Tres Xemeneies on the horizon,

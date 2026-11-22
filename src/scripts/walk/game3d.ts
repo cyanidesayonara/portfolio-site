@@ -1,7 +1,7 @@
 /*
-  Path of Leash Resistance in 3D: a walk along the Badalona seafront.
+  Path of Leash Resistance in 3D: a walk along a Catalan seafront town.
   Millie pulls her human around town, through the rail underpass and out
-  along the Rambla, the beach and the Pont del Petroli. The leash, the
+  along the Rambla, the beach and the old pier. The leash, the
   human's moods and the pole whirl follow the real game's rules (leash.ts).
 */
 import * as THREE from 'three';
@@ -16,6 +16,7 @@ import {
   type DogModel, type PersonModel, type Pose, type BikeStyle,
 } from './models';
 import { makeTofu, makeDevil } from './props';
+import { bakeStatic, collapseRig } from './bake';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
 
 type CamMode = 'street' | 'follow' | 'overhead';
@@ -129,6 +130,9 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const level: Level = buildLevel(scene, { coriolisTex });
   const audio = new WalkAudio();
   const hud = new Hud(host);
+  // Sunbathers, anglers and terrace regulars hold still, so they get baked into the scenery.
+  const statics = new THREE.Group();
+  scene.add(statics);
 
   // ---- Lamp light pool (nearest lamps get real lights at night) --------------------
   const lampPool: THREE.PointLight[] = [];
@@ -140,11 +144,11 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
 
   // ---- Characters ---------------------------------------------------------------------
   const dogM: DogModel = makeDog(MILLIE);
-  scene.add(dogM.group);
+  scene.add(collapseRig(dogM.group));
   const dogShadow = blobShadow(0.45);
   scene.add(dogShadow);
   const humanM: PersonModel = makePerson(HUMAN_LOOK);
-  scene.add(humanM.group);
+  scene.add(collapseRig(humanM.group));
   const humanShadow = blobShadow(0.4);
   scene.add(humanShadow);
 
@@ -206,7 +210,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false },
     { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false },
     { id: 'stemma', label: 'Change the music at stemma (X)', done: false },
-    { id: 'pier', label: 'Reach the end of the Pont del Petroli', done: false },
+    { id: 'pier', label: 'Walk to the end of the pier', done: false },
     { id: 'dimoni', label: 'Wake the Dimoni on the beach (E)', done: false },
   ];
   const goal = (id: string) => goals.find((g) => g.id === id)!;
@@ -286,29 +290,29 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const kid = makePerson({ top: 0xffb020, hair: 0x2a1d14, hairStyle: 'short', height: 0.62, prop: 'none', shorts: true });
   kid.group.position.set(Q.kid.x, Q.kid.y, Q.kid.z);
   kid.group.rotation.y = Q.kid.ry;
-  scene.add(kid.group);
+  scene.add(collapseRig(kid.group));
   const questBall = { x: Q.ball.x, z: Q.ball.z, m: sphere(0.14, M(0xe5487a, 0.5)), held: false, done: false };
   questBall.m.castShadow = true;
   scene.add(questBall.m);
   // Tofu (from the real game) has got out again: herd her home, spot by spot.
   const tofuM = makeTofu();
-  scene.add(tofuM.group);
+  scene.add(collapseRig(tofuM.group));
   const tofu = { i: 0, x: Q.tofu.spots[0][0], z: Q.tofu.spots[0][1], darting: false, heading: 0, alert: 0, home: false };
   // Fruit crate outside the fruiteria.
   const crate = makeFruitCrate();
   crate.group.position.set(Q.crate.x, RAMBLA_Y, Q.crate.z);
   crate.group.rotation.y = Q.crate.ry;
-  scene.add(crate.group);
+  scene.add(collapseRig(crate.group));
   const rolling: { m: THREE.Mesh; x: number; z: number; y: number; vx: number; vz: number; vy: number }[] = [];
   const grocer = makePerson({ top: 0x667a5c, hair: 0x8a8a8a, hairStyle: 'short', prop: 'none' });
   grocer.group.position.set(Q.grocer.x, RAMBLA_Y, Q.grocer.z);
   grocer.group.rotation.y = Q.grocer.ry;
-  scene.add(grocer.group);
+  scene.add(collapseRig(grocer.group));
   // Baker at the forn door.
   const baker = makePerson({ top: 0xf4f1ea, trousers: 0xf4f1ea, hair: 0x2a1d14, hairStyle: 'bun', prop: 'none' });
   baker.group.position.set(Q.baker.x, RAMBLA_Y, Q.baker.z);
   baker.group.rotation.y = Q.baker.ry;
-  scene.add(baker.group);
+  scene.add(collapseRig(baker.group));
   let begT = 0;
 
   // ---- NPCs ---------------------------------------------------------------------------
@@ -322,7 +326,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         hairStyle: pickOne(['short', 'ponytail', 'bun', 'bald', 'long']), prop: pickOne(['phone', 'coffee', 'bag', 'none']),
         height: rand(0.92, 1.06), trousers: pickOne([0x40455c, 0x2a2f3d, 0x6b5a48, 0x3d73c7]),
       });
-      scene.add(m.group);
+      scene.add(collapseRig(m.group));
       const i = Math.floor(Math.random() * path.length);
       walkers.push({ m, path, i, x: path[i][0], z: path[i][1], speed: rand(1.0, 1.5), pause: 0, dir: Math.random() < 0.5 ? 1 : -1, saidT: 0, id: `w${pi}-${k}` });
     }
@@ -335,24 +339,24 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     const rider = makePerson({ top: pickOne(NPC_TOPS), hair: pickOne(NPC_HAIRS), skin: pickOne(NPC_SKINS), hairStyle: 'short', prop: 'none' });
     const b = makeBike(st, rider);
     rider.animate(0, { speed: 2, pose: st === 'scooter' ? 'stand' : 'ride' });
-    scene.add(b.group);
+    scene.add(collapseRig(b.group));
     const dir = i % 2 ? 1 : -1;
     riders.push({ g: b.group, wheels: b.wheels, rider, x: rand(-70, 70), z: dir > 0 ? 0.65 : 1.45, dir, speed: 0, max: st === 'road' ? 7.5 : st === 'scooter' ? 5 : 5.5, rang: 0, light: b.light });
   });
   // La Neteja, the street sweeper.
   const sweeper = makeSweeper();
-  scene.add(sweeper.group);
+  scene.add(collapseRig(sweeper.group));
   const sw = { x: Q.sweeper.x, z: Q.sweeper.z0, dir: 1, speed: 1.6, sprayT: 0 };
   // The train.
   const train = makeTrain(3);
-  scene.add(train.group);
+  scene.add(collapseRig(train.group));
   const tr = { x: -400, dir: 1, speed: 0, wait: 6, horned: false, rumbled: false, z: TRAIN_Z, stop: false, stopped: false, dwell: 0 };
   train.group.position.set(-400, TRAIN_Y + 0.35, TRAIN_Z);
   // A correfoc crew waiting on the Rambla: drummers and devils with fire forks.
   const cf = { x: level.correfoc.x0 };
   const devils = Array.from({ length: 6 }, (_, i) => {
     const d = makeDevil();
-    scene.add(d.person.group);
+    scene.add(collapseRig(d.person.group));
     return { ...d, id: `dv${i}`, x: level.correfoc.x0 + (i % 3) * 1.4, z: level.correfoc.z - 2 + Math.floor(i / 3) * 3 + (i % 2) * 0.8, ox: (i % 3) * 1.4, oz: -2 + Math.floor(i / 3) * 3 + (i % 2) * 0.8 };
   });
   const drummers = [0, 1].map((i) => {
@@ -363,7 +367,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     p.group.add(drum);
     p.group.position.set(level.correfoc.x0 + 4, GROUND_Y, level.correfoc.z - 1 + i * 2.4);
     p.group.rotation.y = Math.PI;
-    scene.add(p.group);
+    scene.add(collapseRig(p.group));
     return p;
   });
   // People at the café terraces.
@@ -372,7 +376,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     p.animate(0, { speed: 0, pose: 'sit' });
     p.group.position.set(seat.x, GROUND_Y, seat.z);
     p.group.rotation.y = seat.ry;
-    scene.add(p.group);
+    statics.add(p.group);
   }
 
   // Chases (the real game's threat grid): La Neteja is slow and scares only
@@ -423,7 +427,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       const b = makeBird(kind);
       const y = level.floor(x, z, 3);
       b.group.position.set(x, y, z);
-      scene.add(b.group);
+      scene.add(collapseRig(b.group));
       birds.push({ b, hx: x, hz: z, x, y, z, vx: 0, vy: 0, vz: 0, fly: 0, kind, baseY: y });
     }
   };
@@ -435,7 +439,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     p.animate(0, { speed: 0, pose: 'lie' });
     p.group.position.set(s.x, level.floor(s.x, s.z, 0) + 0.02, s.z);
     p.group.rotation.y = Math.PI / 2 + s.ry;
-    scene.add(p.group);
+    statics.add(p.group);
   }
   for (const f of level.fishers) {
     const p = makePerson({ top: pickOne([0x667a5c, 0x4c6185, 0x6b5a48]), hair: 0x8a8a8a, hairStyle: pickOne(['short', 'bald']), prop: 'none' });
@@ -445,15 +449,16 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     const rodM = makeFishingRod();
     rodM.position.set(0.3, 1.0, 0);
     p.group.add(rodM);
-    scene.add(p.group);
+    statics.add(p.group);
   }
+  bakeStatic(statics);
   // Free dogs in the pipicà.
   const freeDogs = [
     { look: { fur: 0xc98b4a, dark: 0x8a5a2a, muzzle: 0xe8c79a, paws: 0xf4efe2, collar: 0x1fc9b7, scale: 0.85, ears: 'prick' as const } },
     { look: { fur: 0xf4f1ea, dark: 0xd8cfc0, muzzle: 0xf4f1ea, paws: 0xf4f1ea, collar: 0xe5487a, scale: 0.7, ears: 'drop' as const } },
   ].map((d, i) => {
     const m = makeDog(d.look);
-    scene.add(m.group);
+    scene.add(collapseRig(m.group));
     return { m, x: 66 + i * 6, z: -27, tx: 70, tz: -28, heading: 0, speed: 0, t: rand(0, 3) };
   });
 
@@ -1499,7 +1504,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         if (dist <= 0.3) {
           tr.stopped = true; tr.speed = 0; tr.dwell = 9;
           audio.chime();
-          if (Math.abs(ST - dog.x) < 40 && dog.z > -12 && dog.z < 34) hud.banner('Rodalies R1 · Badalona', 'news');
+          if (Math.abs(ST - dog.x) < 40 && dog.z > -12 && dog.z < 34) hud.banner('Rodalies R1', 'news');
         } else if (dist < 70) tr.speed = Math.max(0.6, Math.min(16, Math.sqrt(4.4 * dist)));
       } else if (tr.stopped && tr.dwell > 0) {
         tr.dwell -= dt;
@@ -1883,6 +1888,10 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       get camMode() { return camMode; },
       get sky() { return skyMode; },
       get bones() { return bones; },
+      get chase() { return chase; },
+      get sweeper() { return sw; },
+      get correfocX() { return cf.x; },
+      get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
       tick: (frames = 1) => { for (let i = 0; i < frames; i++) update(1 / 60); renderer.render(scene, camera); },
       teleport: (x: number, z: number) => {
