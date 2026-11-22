@@ -7,6 +7,7 @@
   "pier": { "x0": -50, "x1": -46, "root": -10, "rise": -30, "end": -130, "high": 1.2 },
   "ramps": [-64, -40, -23, 6, 21, 34, 46, 64],
   "tracks": [7.2, 10.8],
+  "metro": { "x0": -78, "x1": -72.4, "z0": 25.2, "z1": 27.6, "depth": 3, "line": "L2", "lineColor": "#9b2d8f" },
   "zones": [
     { "id": "sea", "x0": -96, "x1": 96, "z0": -134, "z1": -58, "mapColor": "#2d6a92" },
     { "id": "shallow", "x0": -96, "x1": 96, "z0": -58, "z1": -51, "mapColor": "#3f86ad" },
@@ -19,6 +20,7 @@
     { "id": "townStreet", "x0": -34, "x1": 34, "z0": 34, "z1": 103, "mapColor": "#bdb19e" },
     { "id": "pipica", "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "mapColor": "#9bc46a" },
     { "id": "underpass", "x0": -3, "x1": 3, "z0": -4, "z1": 22, "mapColor": "#9a9384" },
+    { "id": "metro", "x0": -78, "x1": -72.4, "z0": 25.2, "z1": 27.6, "mapColor": "#4a4458" },
     { "id": "pier", "x0": -50, "x1": -46, "z0": -134, "z1": -10, "mapColor": "#8d7356" },
     { "id": "plazaFill", "x0": -70, "x1": 70, "z0": 101, "z1": 173, "mapColor": "#62584c" },
     { "id": "plaza", "x0": -20, "x1": 20, "z0": 101, "z1": 139, "mapColor": "#cfc3ad" },
@@ -80,6 +82,7 @@
       "pois": [
         { "id": "station", "kind": "station", "label": "Estació", "x": 47, "z": 17, "color": "#e5302a" },
         { "id": "underpass", "kind": "underpass", "label": "Underpass", "x": 0, "z": 9, "color": "#f4f1ea" },
+        { "id": "metro", "kind": "metro", "label": "Metro", "x": -75.2, "z": 26.4, "color": "#9b2d8f" },
         { "id": "fountain-rambla-w", "kind": "fountain", "label": "Water fountain", "x": -8, "z": 30, "color": "#1fc9b7" },
         { "id": "fountain-rambla-e", "kind": "fountain", "label": "Water fountain", "x": 30, "z": 18, "color": "#1fc9b7" }
       ]

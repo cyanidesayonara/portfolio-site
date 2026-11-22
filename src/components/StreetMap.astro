@@ -15,6 +15,7 @@ const STOPS = [
   { id: 'how', label: 'How I build', short: 'How I build', kind: '', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
   { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
   { id: 'station', label: 'Estació', short: 'Estació (3D)', kind: 'Train to 3D', href: '/walk?via=train', color: '#e5302a', ink: '#f4f1ea' },
+  { id: 'metro', label: 'Metro', short: 'Metro (3D)', kind: 'Metro to 3D', href: '/walk?via=metro', color: '#9b2d8f', ink: '#f4f1ea' },
   { id: 'park', label: 'The park', short: 'Park', kind: 'Off-leash', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
 ];
 // The same keys as Path of Leash Resistance's default layout.
@@ -103,7 +104,8 @@ const KEYS = [
   canvas {
     display: block;
     width: 100%;
-    height: clamp(300px, 34vw, 420px);
+    /* Tall enough for both sides of the road, closer to the 3D walk's window. */
+    height: clamp(400px, min(46vw, 66vh), 600px);
     cursor: pointer;
     touch-action: pan-y;
     user-select: none;

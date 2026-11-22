@@ -50,7 +50,8 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 | `fade.ts` | See-through dither for anything between the camera and Millie. Millie and her human are exempt. |
 | `minimap.ts` | A top-down plan drawn once from level data, plus live markers. Turns with the follow camera; `M` enlarges it. |
 | `hud.ts`, `audio.ts`, `theme.ts`, `textures.ts` | HUD DOM, Web Audio (stemma jukebox stems; recorded CC0 effects from `public/audio/sfx` with positional panning, distance falloff and synth fallback; `N` skips songs), day/rain/night presets, procedural canvas textures. |
-| `transit.ts` | Animated R1 commuter-train loading cutscene and sliding-door reveal connecting the 2D street `Estació` stop to 3D `Estació` and back (`?via=train`). |
+| `transit.ts` | Animated R1 commuter-train loading cutscene and sliding-door reveal connecting the 2D street `Estació` stop to 3D `Estació` and back (`?via=train`), plus the metro's own ride (an L2-style car through the tunnel into an underground platform) and its walk-down-the-stairs departure (`?via=metro`). |
+| `metro.ts` | The metro entrance at the west end of the Rambla, placed from `metro` in `data/seafront.json`: an open stairwell cut into the Rambla's slabs (`groundAroundMetro()`), stairs down to a lit landing, railings and glass, a lintel and a totem. Signs only say "Metro" and "L2"; the real station stays unnamed. A railing collider keeps Millie at the head, where the `metro` stop links to the 2D street's metro entrance (across the road from its `Estació`). |
 
 `src/scripts/viewport.ts` sizes both games' window-filling fullscreen mode from `visualViewport`. `src/components/Walk3D.astro` holds the markup, toolbar, panels and all HUD CSS, and lazy-loads `game3d`. `src/pages/walk.astro` is the page. The home page (`src/pages/index.astro`) still uses the 2D `StreetMap.astro`.
 

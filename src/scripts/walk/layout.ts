@@ -111,9 +111,13 @@ export interface TownLayout {
   pier: { x0: number; x1: number; root: number; rise: number; end: number; high: number };
   ramps: number[];
   tracks: number[];
+  /** The metro entrance: an open stairwell on the Rambla going down toward +x from its head at x0. */
+  metro: MetroDef;
   zones: ZoneDef[];
   districts: DistrictData[];
 }
+
+export interface MetroDef { x0: number; x1: number; z0: number; z1: number; depth: number; line: string; lineColor: string }
 
 export const SEAFRONT_LAYOUT = seafrontRaw as unknown as TownLayout;
 

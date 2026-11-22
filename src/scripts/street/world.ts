@@ -14,6 +14,7 @@ export type Lot =
   | { type: 'shop'; x: number; w: number; stop: Stop }
   | { type: 'station'; x: number; w: number; stop: Stop }
   | { type: 'park'; x: number; w: number; stop: Stop }
+  | { type: 'metro'; x: number; w: number; y: number; h: number; stop: Stop }
   | { type: 'house'; x: number; w: number; tone: number };
 export type StopLot = Extract<Lot, { stop: Stop }>;
 
@@ -25,7 +26,7 @@ export type Circle = {
   what: 'lamp' | 'tree' | 'hydrant' | 'bin' | 'bollard' | 'table' | 'fountain';
   marked?: boolean;
 };
-export type Box = { shape: 'box'; x: number; y: number; w: number; h: number; what: 'bench' | 'planter' };
+export type Box = { shape: 'box'; x: number; y: number; w: number; h: number; what: 'bench' | 'planter' | 'railing' };
 export type Solid = Circle | Box;
 
 export type World = {
@@ -39,10 +40,11 @@ export type World = {
   bones: { x: number; y: number }[];
   drinks: { x: number; y: number; kind: 'bowl' | 'fountain' }[];
   park: StopLot;
+  metro: Extract<Lot, { type: 'metro' }> | null;
   width: number;
 };
 
-export const WH = 340;
+export const WH = 440;
 export const FACADE = 120;
 export const WALK_TOP = 126;
 export const CURB = 214;
@@ -51,13 +53,18 @@ export const LANE_BOT = 262;
 export const LANE = 240;
 export const ROAD_TOP = 262;
 export const CAR_LANES = { east: 320, west: 284 };
+// The far side of the road: a curb, a second sidewalk with the metro
+// entrance, and the edge of the next block (seen from above) along the bottom.
+export const ROAD_BOT = 342;
+export const FAR_CURB = 348;
+export const FAR_EDGE = 418;
 
 const HOUSE_TONES = ['#e3d3b4', '#d8b98f', '#cf8f6c', '#b9c3c9', '#e8dcc6'];
 const FONT = "'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif";
 const BODY = "'Inter Variable', 'Inter', system-ui, sans-serif";
 
-export const doorX = (l: StopLot) => (l.type === 'park' ? l.x + 70 : l.x + l.w / 2);
-export const doorY = (l: StopLot) => (l.type === 'park' ? 138 : WALK_TOP + 10);
+export const doorX = (l: StopLot) => (l.type === 'park' ? l.x + 70 : l.type === 'metro' ? l.x - 14 : l.x + l.w / 2);
+export const doorY = (l: StopLot) => (l.type === 'park' ? 138 : l.type === 'metro' ? l.y + l.h / 2 : WALK_TOP + 10);
 
 // A tiny deterministic random, so the street looks the same every visit.
 function rng(seed: number) {
@@ -76,7 +83,9 @@ export function buildWorld(stops: Stop[]): World {
     x += w;
   };
   house(160);
+  const metroStop = stops.find((s) => s.id === 'metro');
   stops.forEach((stop, i) => {
+    if (stop.id === 'metro') return;
     if (stop.id === 'park') {
       house(130);
       lots.push({ type: 'park', x, w: 320, stop });
@@ -93,6 +102,14 @@ export function buildWorld(stops: Stop[]): World {
     if (i % 2 === 1) house(130);
   });
   const width = x;
+  // The metro entrance: across the road from the train station, stairs going
+  // down toward +x from a head at its west end.
+  const stationLot = lots.find((l) => l.type === 'station');
+  let metro: Extract<Lot, { type: 'metro' }> | null = null;
+  if (metroStop && stationLot) {
+    metro = { type: 'metro', x: stationLot.x + stationLot.w / 2 - 36, w: 92, y: 360, h: 30, stop: metroStop };
+    lots.push(metro);
+  }
   const stopLots = lots.filter((l): l is StopLot => l.type !== 'house');
   const park = stopLots.find((l) => l.type === 'park')!;
   const shops = stopLots.filter((l) => l.type === 'shop');
@@ -110,6 +127,22 @@ export function buildWorld(stops: Stop[]): World {
   }
   for (const c of crossings) {
     for (const bx of [c - 14, c + 70]) solids.push({ shape: 'circle', x: bx, y: 208, r: 3.5, what: 'bollard' });
+  }
+  // The far curb: lamps and trees, kept clear of the crossings and the metro.
+  for (let px = 195, i = 0; px < width - 40; px += 170, i++) {
+    if (nearCrossing(px)) continue;
+    if (metro && px > metro.x - 50 && px < metro.x + metro.w + 30) continue;
+    solids.push(i % 2 === 0 ? { shape: 'circle', x: px, y: 362, r: 4.5, what: 'lamp' } : { shape: 'circle', x: px, y: 366, r: 7, what: 'tree' });
+  }
+  if (metro) {
+    // Railings around three sides of the stairwell; the west end is open.
+    solids.push(
+      { shape: 'box', x: metro.x, y: metro.y - 4, w: metro.w + 4, h: 4, what: 'railing' },
+      { shape: 'box', x: metro.x, y: metro.y + metro.h, w: metro.w + 4, h: 4, what: 'railing' },
+      { shape: 'box', x: metro.x + metro.w, y: metro.y, w: 4, h: metro.h, what: 'railing' },
+      // The stairs themselves: she waits at the top while the cutscene takes her down.
+      { shape: 'box', x: metro.x + 4, y: metro.y, w: metro.w - 4, h: metro.h, what: 'railing' },
+    );
   }
 
   // Benches with planters, in front of the houses (never a shop door).
@@ -154,7 +187,7 @@ export function buildWorld(stops: Stop[]): World {
   drinks.push({ x: park.x + 70, y: 196, kind: 'fountain' });
   solids.push({ shape: 'circle', x: park.x + 70, y: 196, r: 6, what: 'fountain' });
 
-  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], bones, drinks, park, width };
+  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], bones, drinks, park, metro, width };
 }
 
 // ---- Static layer --------------------------------------------------------------
@@ -166,6 +199,7 @@ export function drawStatic(c: CanvasRenderingContext2D, w: World) {
     if (l.type === 'house') drawHouse(c, w, l);
     else if (l.type === 'shop') drawShop(c, w, l);
     else if (l.type === 'station') drawStation(c, w, l);
+    else if (l.type === 'metro') drawMetro(c, l);
     else drawPark(c, l);
   }
   for (const s of w.solids) drawSolidBase(c, s);
@@ -228,9 +262,9 @@ function drawGround(c: CanvasRenderingContext2D, w: World) {
   for (let tx = 220; tx < w.width; tx += 260) bikeIcon(c, tx, LANE + 11, -1);
   // Road, with a little grain
   c.fillStyle = '#4a4f5c';
-  c.fillRect(0, ROAD_TOP, w.width, WH - ROAD_TOP);
+  c.fillRect(0, ROAD_TOP, w.width, ROAD_BOT - ROAD_TOP);
   c.fillStyle = 'rgba(255,255,255,0.05)';
-  for (let i = 0; i < w.width / 3; i++) c.fillRect(rand() * w.width, ROAD_TOP + rand() * (WH - ROAD_TOP), 1.5, 1.5);
+  for (let i = 0; i < w.width / 3; i++) c.fillRect(rand() * w.width, ROAD_TOP + rand() * (ROAD_BOT - ROAD_TOP), 1.5, 1.5);
   c.fillStyle = '#e8e4da';
   for (let tx = 0; tx < w.width; tx += 60) c.fillRect(tx, (CAR_LANES.east + CAR_LANES.west) / 2 - 1, 30, 2);
   // Manholes
@@ -250,6 +284,162 @@ function drawGround(c: CanvasRenderingContext2D, w: World) {
     c.fillStyle = 'rgba(244, 241, 234, 0.92)';
     for (let k = 0; k < 8; k++) c.fillRect(zx, LANE_TOP + 4 + k * 15, 56, 8);
   }
+  drawFarSide(c, w);
+}
+
+// The other side of the road: curb, a second panot sidewalk, and the next
+// block's rooftops along the bottom edge.
+function drawFarSide(c: CanvasRenderingContext2D, w: World) {
+  c.fillStyle = 'rgba(0,0,0,0.12)';
+  c.fillRect(0, ROAD_BOT - 2, w.width, 2);
+  c.fillStyle = '#c4baa6';
+  c.fillRect(0, ROAD_BOT, w.width, FAR_CURB - ROAD_BOT);
+  c.fillStyle = '#e4dbca';
+  c.fillRect(0, FAR_CURB, w.width, FAR_EDGE - FAR_CURB);
+  c.strokeStyle = '#d3c8b2';
+  c.lineWidth = 1;
+  c.beginPath();
+  for (let tx = 0; tx < w.width; tx += 22) {
+    c.moveTo(tx, FAR_CURB);
+    c.lineTo(tx, FAR_EDGE);
+  }
+  for (let ty = FAR_CURB + 22; ty < FAR_EDGE; ty += 22) {
+    c.moveTo(0, ty);
+    c.lineTo(w.width, ty);
+  }
+  c.stroke();
+  c.fillStyle = '#d7ccb5';
+  for (let tx = 0; tx < w.width; tx += 22) {
+    for (let ty = FAR_CURB; ty < FAR_EDGE - 11; ty += 22) {
+      for (const [ox, oy] of [[6, 6], [16, 6], [6, 16], [16, 16]]) {
+        c.beginPath();
+        c.arc(tx + ox, ty + oy, 2.6, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  // The next block, seen from above: terracotta roofs behind a cream parapet,
+  // in varied widths so it does not mirror the near side.
+  const rand = rng(11);
+  const roofs = ['#b2563a', '#a87561', '#c2997a', '#9a8a78', '#b88566'];
+  for (let x = 0, i = 0; x < w.width; i++) {
+    const bw = 110 + Math.floor(rand() * 90);
+    c.fillStyle = roofs[i % roofs.length];
+    c.fillRect(x, FAR_EDGE, bw, WH - FAR_EDGE);
+    c.fillStyle = 'rgba(0,0,0,0.08)';
+    for (let ty = FAR_EDGE + 8; ty < WH; ty += 6) c.fillRect(x, ty, bw, 1.5);
+    c.fillStyle = '#e9ddc2';
+    c.fillRect(x, FAR_EDGE, bw, 3);
+    c.fillStyle = 'rgba(0,0,0,0.12)';
+    c.fillRect(x + bw - 2, FAR_EDGE, 2, WH - FAR_EDGE);
+    x += bw;
+  }
+  c.fillStyle = 'rgba(40, 30, 20, 0.1)';
+  c.fillRect(0, FAR_EDGE - 5, w.width, 5);
+}
+
+// The metro entrance, seen from above: an open stairwell going down toward
+// +x, railings on three sides, and a sign plate. Like the 3D walk, it never
+// names the real station; it just says Metro.
+function drawMetro(c: CanvasRenderingContext2D, l: Extract<Lot, { type: 'metro' }>) {
+  const { x, y, w, h } = l;
+  // Granite surround
+  c.fillStyle = '#b9b4aa';
+  c.fillRect(x - 6, y - 8, w + 14, h + 16);
+  // The steps get darker as they go down, to a lit landing at the bottom.
+  const steps = 14;
+  const run = (w - 18) / steps;
+  for (let i = 0; i < steps; i++) {
+    const v = Math.round(206 - (i / (steps - 1)) * 150);
+    c.fillStyle = `rgb(${v}, ${v - 2}, ${v - 8})`;
+    c.fillRect(x + i * run, y, run + 0.5, h);
+    c.fillStyle = 'rgba(0,0,0,0.25)';
+    c.fillRect(x + (i + 1) * run - 1.2, y, 1.2, h);
+  }
+  const land = c.createLinearGradient(x + w - 18, 0, x + w, 0);
+  land.addColorStop(0, '#2b2a30');
+  land.addColorStop(1, '#5d5866');
+  c.fillStyle = land;
+  c.fillRect(x + w - 18, y, 18, h);
+  c.fillStyle = 'rgba(255, 236, 190, 0.55)';
+  c.fillRect(x + w - 5, y + 6, 4, h - 12);
+  // Handrails down both walls
+  c.fillStyle = '#d9dde3';
+  c.fillRect(x, y + 2, w - 18, 1.6);
+  c.fillRect(x, y + h - 3.6, w - 18, 1.6);
+  // Stainless railings with glass panels
+  c.fillStyle = 'rgba(170, 210, 230, 0.35)';
+  c.fillRect(x, y - 5, w + 4, 4);
+  c.fillRect(x, y + h + 1, w + 4, 4);
+  c.fillRect(x + w, y - 5, 4, h + 10);
+  c.fillStyle = '#8d949e';
+  c.fillRect(x, y - 5, w + 4, 1.3);
+  c.fillRect(x, y + h + 3.7, w + 4, 1.3);
+  c.fillRect(x + w + 2.7, y - 5, 1.3, h + 10);
+  for (let px = x; px <= x + w + 2; px += 18) {
+    c.fillRect(px, y - 5.5, 2.4, 2.4);
+    c.fillRect(px, y + h + 3, 2.4, 2.4);
+  }
+  // A tactile strip at the head of the stairs
+  c.fillStyle = '#e6c23a';
+  c.fillRect(x - 6, y, 4, h);
+  // The totem's base beside the head (its sign is drawn above the characters).
+  const tx = x - 26, ty = y - 4;
+  c.fillStyle = 'rgba(30, 20, 10, 0.2)';
+  c.beginPath();
+  c.ellipse(tx + 3, ty + 3, 6, 4, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#5c6473';
+  c.beginPath();
+  c.arc(tx, ty, 3.5, 0, Math.PI * 2);
+  c.fill();
+  // A sign plate on the sidewalk side, like the station's nameplate.
+  const sx = x + 6, sy = y + h + 9, sw = w - 12;
+  c.fillStyle = '#14203d';
+  c.beginPath();
+  c.roundRect(sx, sy, sw, 14, 3);
+  c.fill();
+  c.fillStyle = '#9b2d8f';
+  c.beginPath();
+  c.roundRect(sx + 3, sy + 2.5, 15, 9, 2);
+  c.fill();
+  c.fillStyle = '#f4f1ea';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.font = `800 6.5px ${FONT}`;
+  c.fillText('L2', sx + 10.5, sy + 7.3);
+  c.textAlign = 'left';
+  c.font = `700 6.5px ${BODY}`;
+  c.fillText('METRO TO 3D SEAFRONT', sx + 22, sy + 7.5, sw - 26);
+}
+
+/** The metro totem's sign, drawn above the characters like the lamp heads. */
+export function drawMetroTop(c: CanvasRenderingContext2D, l: Extract<Lot, { type: 'metro' }>) {
+  const tx = l.x - 26, ty = l.y - 4;
+  c.strokeStyle = '#5c6473';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.moveTo(tx, ty);
+  c.lineTo(tx, ty - 22);
+  c.stroke();
+  c.save();
+  c.translate(tx, ty - 30);
+  c.rotate(Math.PI / 4);
+  c.fillStyle = '#d52b1e';
+  c.fillRect(-8, -8, 16, 16);
+  c.restore();
+  c.fillStyle = '#f4f1ea';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.font = `900 11px ${FONT}`;
+  c.fillText('M', tx, ty - 29.5);
+  c.fillStyle = '#9b2d8f';
+  c.beginPath();
+  c.roundRect(tx + 9, ty - 35, 16, 10, 2);
+  c.fill();
+  c.fillStyle = '#f4f1ea';
+  c.font = `800 7px ${FONT}`;
+  c.fillText('L2', tx + 17, ty - 29.6);
 }
 
 function bikeIcon(c: CanvasRenderingContext2D, bx: number, by: number, dir: number) {
@@ -488,6 +678,7 @@ function shadow(c: CanvasRenderingContext2D, x: number, y: number, rx: number, r
 
 function drawSolidBase(c: CanvasRenderingContext2D, s: Solid) {
   if (s.shape === 'box') {
+    if (s.what === 'railing') return; // drawn with the metro entrance
     c.fillStyle = 'rgba(30, 20, 10, 0.2)';
     c.fillRect(s.x + 3, s.y + 3, s.w, s.h);
     if (s.what === 'bench') {
