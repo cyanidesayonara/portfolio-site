@@ -17,6 +17,7 @@ import {
 } from './models';
 import { makeTofu, makeDevil } from './props';
 import { Minimap, type MapMarker } from './minimap';
+import { createLife } from './life';
 import { bakeStatic, collapseRig } from './bake';
 import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
@@ -335,6 +336,12 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       walkers.push({ m, path, i, x: path[i][0], z: path[i][1], speed: rand(1.0, 1.5), pause: 0, dir: Math.random() < 0.5 ? 1 : -1, saidT: 0, id: `w${pi}-${k}` });
     }
   });
+  // Ambient life: dog walkers, joggers, the beach, neighbors, kids (life.ts).
+  const life = createLife({
+    scene, level, hud, audio, dog, human,
+    collide: (p, r, y) => collide(p, r, y),
+    onFriend: (name) => { addBones(1); hud.shout('NEW FRIEND', 'good'); humanSay(`Aww, hi ${name}!`, 1.6); },
+  });
   // Cyclists on the Rambla bike lane.
   interface Rider { g: THREE.Group; wheels: THREE.Object3D[]; rider: PersonModel; x: number; z: number; dir: number; speed: number; max: number; rang: number; light: THREE.MeshStandardMaterial }
   const riders: Rider[] = [];
@@ -647,6 +654,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
 
   const doBark = () => {
     audio.bark();
+    life.bark();
     burst(dog.x + Math.cos(dog.heading) * 0.5, dog.y + 0.75, dog.z + Math.sin(dog.heading) * 0.5, 0xffb020, 5, 1.5, 1.2, 0.4, 2);
     let scared = 0;
     for (const b of birds) {
@@ -855,6 +863,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     human.x = level.start.human.x; human.z = level.start.human.z; human.y = RAMBLA_Y; human.vx = human.vz = 0;
     human.state = 'walk'; whirl = null; offLeash = false; dog.carrying = null; ball.held = false; questBall.held = false;
     leash.reset(dog, handXZ());
+    camSnap = true;
     hud.banner('Back where we started', 'news');
   };
   const onKey = (code: string, e?: KeyboardEvent) => {
@@ -1292,7 +1301,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   // ---- Per-frame world update ---------------------------------------------------------
   const wallTarget = new THREE.Vector3();
   const camPos = new THREE.Vector3(level.start.dog.x, 12, level.start.dog.z + 7);
-  const camLook = new THREE.Vector3(0, 1, 30);
+  const camLook = new THREE.Vector3(level.start.dog.x, 1, level.start.dog.z);
+  let camSnap = true; // jump straight to the framing (first frame, restart, teleport)
   const tmpV = new THREE.Vector3();
   let lightPoolT = 0;
   let pierReached = false;
@@ -1486,8 +1496,11 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     } else begT = 0;
 
     // ---- NPCs ----
+    life.update(dt, time);
     for (const w of walkers) {
       if (w.saidT > 0) w.saidT -= dt;
+      const wVis = Math.hypot(w.x - dog.x, w.z - dog.z) < 52;
+      w.m.group.visible = wVis;
       const [tx, tz] = w.path[w.i];
       const dx = tx - w.x, dz = tz - w.z, d = Math.hypot(dx, dz);
       let speed = w.speed;
@@ -1510,7 +1523,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       const head = Math.atan2(dz, dx);
       w.m.group.position.set(w.x, level.floor(w.x, w.z, 0.5), w.z);
       w.m.group.rotation.y = angLerp(w.m.group.rotation.y, -head, Math.min(1, dt * 6));
-      w.m.animate(time + w.x, { speed: speed > 0 && d > 0.3 ? speed : 0, pose: 'walk' });
+      if (wVis) w.m.animate(time + w.x, { speed: speed > 0 && d > 0.3 ? speed : 0, pose: 'walk' });
     }
     for (const r of riders) {
       const blocked = [dog, human].some((p) => Math.abs(p.z - r.z) < 1.0 && (p.x - r.x) * r.dir > 0 && (p.x - r.x) * r.dir < 5);
@@ -1522,8 +1535,11 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       if (r.x < -80) r.x = 80;
       r.g.position.set(r.x, RAMBLA_Y, r.z);
       r.g.rotation.y = r.dir > 0 ? 0 : Math.PI;
-      r.wheels.forEach((wh) => { wh.rotation.z -= r.speed * dt * 3; });
-      r.rider.animate(time, { speed: r.speed, pose: r.max === 5 ? 'stand' : 'ride' });
+      r.g.visible = Math.hypot(r.x - dog.x, r.z - dog.z) < 60;
+      if (r.g.visible) {
+        r.wheels.forEach((wh) => { wh.rotation.z -= r.speed * dt * 3; });
+        r.rider.animate(time, { speed: r.speed, pose: r.max === 5 ? 'stand' : 'ride' });
+      }
       // A fast rider who hits the human knocks them down.
       if (r.speed > 2 && Math.hypot(r.x - human.x, r.z - human.z) < 0.7 && human.state !== 'stumble' && !whirl) {
         human.state = 'stumble'; human.stumbleT = 1.2;
@@ -1922,6 +1938,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     place('sweeper', sw.x, RAMBLA_Y + 2.8, sw.z);
     for (const w of walkers) place(w.id, w.x, 2.1, w.z);
     for (const r of riders) place(`r${r.x | 0}`, r.x, 2.3, r.z);
+    for (const b of life.bubbles()) place(b.id, b.x, b.y, b.z);
 
     // Sun and shadows follow the action.
     sun.position.set(camLook.x + 30, 48, camLook.z + 22);
@@ -1993,7 +2010,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       if (dog.y > 1.5) pos.y += 1; // on the pier
       if (camKick > 0) { pos.y += camKick * 4; pos.z += camKick * 5; camKick = Math.max(0, camKick - dt * 1.6); }
     }
-    const k = 1 - Math.exp(-dt * rate);
+    const k = camSnap ? 1 : 1 - Math.exp(-dt * rate);
+    camSnap = false;
     camPos.lerp(pos, k);
     camLook.lerp(look, k);
     camera.position.copy(camPos);
@@ -2071,7 +2089,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },
-      beachDevils,
+      beachDevils, life,
       get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
       tick: (frames = 1) => { for (let i = 0; i < frames; i++) update(1 / 60); renderer.render(scene, camera); },
@@ -2079,6 +2097,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         dog.x = x; dog.z = z; dog.y = level.floor(x, z, 5); dog.vx = dog.vz = 0;
         human.x = x - 1.2; human.z = z + 0.5; human.y = level.floor(human.x, human.z, 5); human.vx = human.vz = 0;
         leash.reset(dog, handXZ());
+        camSnap = true;
       },
       render: () => renderer.render(scene, camera),
     };
