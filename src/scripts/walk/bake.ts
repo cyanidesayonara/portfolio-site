@@ -90,38 +90,57 @@ const CHUNK = 36;
 const tmpPos = new THREE.Vector3();
 
 /**
- * Merge every static mesh under `root` (marked-dynamic subtrees are left alone). Returns meshes merged.
+ * Merge every static mesh under `root` (marked-dynamic subtrees are left alone).
  * `originZ` starts the chunk grid at a district's edge, so districts don't leave sliver chunks.
+ *
+ * A generator, so the work can be spread over frames: it yields every few meshes
+ * and every merged bucket. The scene only changes at the very end, in one step
+ * (victims out, merged meshes in), so a half-done bake never shows. The return
+ * value is the number of meshes merged.
  */
-export function bakeStatic(root: THREE.Object3D, originZ = 0) {
+export function* bakeSteps(root: THREE.Object3D, originZ = 0): Generator<void, number, void> {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const buckets = new Map<string, Bucket>();
   const victims: THREE.Mesh[] = [];
+  const found: THREE.Mesh[] = [];
   const walk = (o: THREE.Object3D) => {
     if (o.userData.dynamic) return;
-    if (mergeable(o)) {
-      // Chunk by position so off-screen parts of the level still get culled.
-      o.getWorldPosition(tmpPos);
-      const key = `${bucketKey(o)}|${Math.floor(tmpPos.x / CHUNK)},${Math.floor((tmpPos.z - originZ) / CHUNK)}`;
-      const mat = o.material as THREE.MeshStandardMaterial;
-      const vc = key.startsWith('vc');
-      let b = buckets.get(key);
-      if (!b) { b = { mat: vc ? vcMaterial(mat.side, !!mat.flatShading) : mat, parts: [], cast: o.castShadow, receive: o.receiveShadow }; buckets.set(key, b); }
-      b.parts.push(prepared(o, new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), vc));
-      victims.push(o);
-    }
-    for (const c of [...o.children]) walk(c);
+    if (mergeable(o)) found.push(o);
+    for (const c of o.children) walk(c);
   };
   walk(root);
-  for (const v of victims) v.parent?.remove(v);
-  buckets.forEach((b) => {
-    if (!b.parts.length) return;
+  let n = 0;
+  for (const o of found) {
+    // Chunk by position so off-screen parts of the level still get culled.
+    o.getWorldPosition(tmpPos);
+    const key = `${bucketKey(o)}|${Math.floor(tmpPos.x / CHUNK)},${Math.floor((tmpPos.z - originZ) / CHUNK)}`;
+    const mat = o.material as THREE.MeshStandardMaterial;
+    const vc = key.startsWith('vc');
+    let b = buckets.get(key);
+    if (!b) { b = { mat: vc ? vcMaterial(mat.side, !!mat.flatShading) : mat, parts: [], cast: o.castShadow, receive: o.receiveShadow }; buckets.set(key, b); }
+    b.parts.push(prepared(o, new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), vc));
+    victims.push(o);
+    if (++n % 8 === 0) yield;
+  }
+  const merged: THREE.Mesh[] = [];
+  for (const b of buckets.values()) {
+    if (!b.parts.length) continue;
     const mesh = new THREE.Mesh(merge(b.parts), b.mat);
     mesh.castShadow = b.cast;
     mesh.receiveShadow = b.receive;
-    root.add(mesh);
-  });
+    merged.push(mesh);
+    yield;
+  }
+  // The swap: one step, no half-baked frames. One filter pass per parent (remove()
+  // one by one is quadratic in a big district).
+  const gone = new Set<THREE.Object3D>(victims);
+  const parents = new Set<THREE.Object3D>();
+  for (const v of victims) if (v.parent) parents.add(v.parent);
+  for (const p of parents) p.children = p.children.filter((c) => !gone.has(c));
+  for (const v of victims) v.parent = null;
+  for (const m of merged) root.add(m);
+  yield;
   // Empty groups left behind cost a little traversal; drop them.
   const prune = (o: THREE.Object3D) => {
     for (const c of [...o.children]) {
@@ -131,6 +150,16 @@ export function bakeStatic(root: THREE.Object3D, originZ = 0) {
   };
   prune(root);
   return victims.length;
+}
+
+/** Run a generator to the end right now. */
+export function drain<R>(g: Generator<unknown, R, void>): R {
+  for (;;) { const r = g.next(); if (r.done) return r.value; }
+}
+
+/** Bake all at once (small things: statics, horizon). */
+export function bakeStatic(root: THREE.Object3D, originZ = 0) {
+  return drain(bakeSteps(root, originZ));
 }
 
 /** Inside an animated model: merge the leaf meshes directly under each joint. */

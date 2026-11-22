@@ -22,6 +22,108 @@ export interface District {
   root: THREE.Group;
   floor: (x: number, z: number, y: number) => number;
   surface: (x: number, z: number, y: number) => Surface;
+  /** Streaming state (see Streamer). */
+  built: boolean;
+  baked: boolean;
+  state: 'live' | 'standin';
+  /** Cheap far-away look: merged blocks, landmarks. Lives outside `root`. */
+  standin?: THREE.Object3D;
+  /** Merge the district's static meshes, in steps. */
+  bake?: () => Generator<void, unknown, void>;
+  /**
+   * Districts that can stream: build the content into `root` (and colliders into
+   * the grid) in steps, and tear it down again. Districts without these are
+   * resident: built once at load and never unloaded.
+   */
+  build?: () => Generator<void, unknown, void>;
+  unload?: () => void;
+}
+
+/** Distance from a point to a district's bounds (0 inside). */
+export const distToBounds = (b: Bounds, x: number, z: number) =>
+  Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1));
+
+/**
+ * Streams districts around Millie, with hysteresis so nothing flickers at an edge:
+ * - within `near`: live (full detail; built and baked first if needed),
+ * - beyond `far`: the stand-in instead,
+ * - beyond `unloadAt`: streamable districts are torn down.
+ * Building and baking run as generators under a per-frame time budget.
+ */
+export class Streamer {
+  near = 80;
+  far = 100;
+  unloadAt = 170;
+  budgetMs = 4;
+  private job: null | { d: District; g: Generator<void, unknown, void>; kind: 'build' | 'bake' } = null;
+  /** Work log for the perf readout and tests. */
+  readonly stats = { built: 0, baked: 0, unloaded: 0, lastSliceMs: 0, maxSliceMs: 0, maxStepMs: 0, maxStepKind: '' };
+
+  constructor(readonly districts: District[], private grid: ColliderGrid) {}
+
+  private nextJob(x: number, z: number) {
+    let best: District | null = null, bestD = Infinity, kind: 'build' | 'bake' = 'bake';
+    for (const d of this.districts) {
+      const dist = distToBounds(d.bounds, x, z);
+      if (!d.built && d.build && dist < this.near + 30 && dist < bestD) { best = d; bestD = dist; kind = 'build'; }
+      else if (d.built && !d.baked && d.bake && dist < bestD) { best = d; bestD = dist; kind = 'bake'; }
+    }
+    if (!best) return null;
+    const g = kind === 'build' ? best.build!() : best.bake!();
+    return { d: best, g, kind };
+  }
+
+  private finish(job: NonNullable<Streamer['job']>) {
+    if (job.kind === 'build') { job.d.built = true; this.stats.built++; if (!job.d.bake) job.d.baked = true; }
+    else { job.d.baked = true; this.stats.baked++; }
+  }
+
+  /** Call every frame with Millie's position. */
+  update(x: number, z: number) {
+    for (const d of this.districts) {
+      const dist = distToBounds(d.bounds, x, z);
+      if (d.state === 'live' && dist > this.far) d.state = 'standin';
+      else if (d.state === 'standin' && dist < this.near) d.state = 'live';
+      if (d.build && d.unload && d.built && dist > this.unloadAt && this.job?.d !== d) {
+        d.unload();
+        this.grid.removeDistrict(d.id);
+        d.built = false; d.baked = false;
+        this.stats.unloaded++;
+      }
+      const show = d.state === 'live' && d.built;
+      d.root.visible = show;
+      if (d.standin) d.standin.visible = !show;
+    }
+    // Background work under the time budget.
+    const t0 = performance.now();
+    while (performance.now() - t0 < this.budgetMs) {
+      if (!this.job) this.job = this.nextJob(x, z);
+      if (!this.job) break;
+      const ts = performance.now();
+      const done = this.job.g.next().done;
+      const sm = performance.now() - ts;
+      if (sm > this.stats.maxStepMs) { this.stats.maxStepMs = sm; this.stats.maxStepKind = `${this.job.kind} ${this.job.d.id}`; }
+      if (done) { this.finish(this.job); this.job = null; }
+    }
+    const ms = performance.now() - t0;
+    this.stats.lastSliceMs = ms;
+    this.stats.maxSliceMs = Math.max(this.stats.maxSliceMs, ms);
+  }
+
+  /** Steps that build and bake everything within `near` of (x, z): for the loading screen. */
+  *warm(x: number, z: number): Generator<number, void, void> {
+    const todo = this.districts.filter((d) => distToBounds(d.bounds, x, z) < this.near && (!d.built || !d.baked));
+    let done = 0;
+    for (const d of todo) {
+      if (!d.built && d.build) { const g = d.build(); while (!g.next().done) yield done / todo.length; d.built = true; this.stats.built++; }
+      if (!d.baked && d.bake) { const g = d.bake(); while (!g.next().done) yield done / todo.length; this.stats.baked++; }
+      d.baked = true;
+      done++;
+      yield done / todo.length;
+    }
+  }
+
+  get busy() { return !!this.job; }
 }
 
 export const inBounds = (b: Bounds, x: number, z: number) => x >= b.x0 && x < b.x1 && z >= b.z0 && z < b.z1;

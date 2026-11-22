@@ -16,7 +16,7 @@
 */
 import * as THREE from 'three';
 import type { Obstacle } from './leash';
-import { bakeStatic } from './bake';
+import { bakeStatic, bakeSteps, drain } from './bake';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
   M, box, cyl, rod, shadowed,
@@ -59,9 +59,10 @@ const pierDeckY = (z: number) => (z > PIER.root ? GROUND_Y : z > PIER.rise ? GRO
 // ---- Instancing collector -------------------------------------------------------------
 class Instancer {
   private sets = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; mats: THREE.Matrix4[]; cast: boolean }>();
-  add(key: string, geo: THREE.BufferGeometry, mat: THREE.Material, m: THREE.Matrix4, cast = true) {
+  /** Geometry and material may be factories: they only run for the first instance of a key. */
+  add(key: string, geo: THREE.BufferGeometry | (() => THREE.BufferGeometry), mat: THREE.Material | (() => THREE.Material), m: THREE.Matrix4, cast = true) {
     let s = this.sets.get(key);
-    if (!s) { s = { geo, mat, mats: [], cast }; this.sets.set(key, s); }
+    if (!s) { s = { geo: typeof geo === 'function' ? geo() : geo, mat: typeof mat === 'function' ? mat() : mat, mats: [], cast }; this.sets.set(key, s); }
     s.mats.push(m.clone());
   }
   /** One InstancedMesh per key and per target (district) that `assign` picks by position. */
@@ -134,7 +135,11 @@ const SHUTTERS = [0x5f7a5a, 0x6b5a48, 0x4f6f7a, 0x8a5a3c, 0x7a8a6a];
 
 export interface LevelOpts { coriolisTex: THREE.Texture }
 
-export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
+/**
+ * Build the level in steps (a generator): it yields between sections so the
+ * loader can spread the work over frames. `buildLevel` runs it all at once.
+ */
+export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const T0 = performance.now();
   const root = new THREE.Group();
   scene.add(root);
@@ -171,20 +176,25 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   };
 
   const stops0: Stop[] = [];
+  yield 'Ground materials';
   // ---- Ground materials -------------------------------------------------------------
   const slab = slabTexture();
   const slabMat = new THREE.MeshStandardMaterial({ map: slab.map, roughness: 0.9 });
   const flag = flagstoneTexture();
   const flagMat = new THREE.MeshStandardMaterial({ map: flag.map, roughness: 0.85 });
+  yield 'Textures';
   const panot = panotTextures();
   const panotMat = new THREE.MeshStandardMaterial({ map: panot.map, bumpMap: panot.bumpMap, bumpScale: 1.2, roughness: 0.92 });
+  yield 'Textures';
   const conc = concreteTexture();
   const concMat = new THREE.MeshStandardMaterial({ map: conc.map, roughness: 0.9 });
   const sandMat = new THREE.MeshStandardMaterial({ map: sandTexture(), roughness: 1 });
+  yield 'Textures';
   const deckMap = deckTexture();
   const deckMat = new THREE.MeshStandardMaterial({ map: deckMap, roughness: 0.85, color: 0xb9ab9a });
   wetMats.push(slabMat, flagMat, panotMat, concMat);
   const plaster = plasterTexture();
+  yield 'Ground';
 
   // Town: flagstones down Carrer del Mar, panots in the side streets.
   root.add(ground(-3.5, 3.5, 34, 101, GROUND_Y + 0.002, flagMat, flag.tileMeters));
@@ -222,6 +232,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     root.add(rm);
   }
 
+  yield 'The sea';
   // The sea.
   const waterNormal = waterNormalTexture();
   waterNormal.repeat.set(70, 70);
@@ -241,6 +252,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   foam.userData.always = true;
   root.add(foam);
 
+  yield 'Buildings';
   // ---- Buildings ----------------------------------------------------------------------
   type Face = '+x' | '-x' | '+z' | '-z';
   const plasterMats = new Map<number, THREE.MeshStandardMaterial>();
@@ -310,7 +322,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
             inst.add(`sh${shutter.id}`, shutterGeo, shutter, mtx(...sp, ry), false);
           }
           if (fl < floors - 1 || r() < 0.5) {
-            inst.add('slab', slabGeo, M(0xb4ada0, 0.85), mtx(...P(s, y - 1.08, 0.3), ry));
+            inst.add('slab', slabGeo, () => M(0xb4ada0, 0.85), mtx(...P(s, y - 1.08, 0.3), ry));
             inst.add('rail', railGeo, ironM, mtx(...P(s, y - 1.08, 0.3), ry));
           }
         }
@@ -325,13 +337,16 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
           inst.add('sglass', shopGlassGeo, shopGlassMat, mtx(...P(s, GROUND_Y + 1.5, 0.04), ry, pitch * 0.82, 1, 1), false);
           if (r() < 0.6) {
             const ac = pick(awningCols);
-            inst.add(`aw${ac}`, awningGeo, M(ac, 0.8), mtx(...P(s, GROUND_Y + 3.05, 0.55), ry, pitch * 0.86, 1, 1, 0.3));
+            inst.add(`aw${ac}`, awningGeo, () => M(ac, 0.8), mtx(...P(s, GROUND_Y + 3.05, 0.55), ry, pitch * 0.86, 1, 1, 0.3));
           }
-          if (r() < 0.35) inst.add('blade', bladeGeo, M(pick([0xf4f1ea, 0xffb020, 0x1fc9b7, 0xe5487a]), 0.6), mtx(...P(s - pitch * 0.4, GROUND_Y + 3.6, 0.5), ry + Math.PI / 2), false);
+          if (r() < 0.35) {
+            const bladeColor = pick([0xf4f1ea, 0xffb020, 0x1fc9b7, 0xe5487a]); // keep the seeded sequence as it was
+            inst.add('blade', bladeGeo, () => M(bladeColor, 0.6), mtx(...P(s - pitch * 0.4, GROUND_Y + 3.6, 0.5), ry + Math.PI / 2), false);
+          }
         } else if (kind < 0.85) {
           inst.add('roller', rollerGeo, rollerMat, mtx(...P(s, GROUND_Y + 1.6, 0.04), ry, pitch * 0.82, 1, 1), false);
         } else {
-          inst.add('door', new THREE.BoxGeometry(1.3, 2.6, 0.08), M(0x5a4636, 0.7), mtx(...P(s, GROUND_Y + 1.35, 0.04), ry), false);
+          inst.add('door', () => new THREE.BoxGeometry(1.3, 2.6, 0.08), () => M(0x5a4636, 0.7), mtx(...P(s, GROUND_Y + 1.35, 0.04), ry), false);
         }
       }
     }
@@ -358,6 +373,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
       building(side < 0 ? mid : xa, side < 0 ? xb : mid, za, zb, fl(), fc(), faces('inner'));
       building(side < 0 ? xa : mid, side < 0 ? mid : xb, za, zb, fl(), fc(), faces('outer'));
     }
+    yield 'Buildings';
   }
   // Rambla frontage beyond the town grid, and the old distillery by the pier beach.
   building(41, 70, 34, 60, 4, fc(), ['-z', '-x']);
@@ -400,6 +416,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     root.add(makeBunting(new THREE.Vector3(-8, GROUND_Y + 5.8, z - 3), new THREE.Vector3(-8, GROUND_Y + 5.8, z + 3)));
   }
 
+  yield 'Town furniture and quest props';
   // ---- Town furniture and quest props ----------------------------------------------
   for (const z of [36, 58, 76, 94]) {
     for (const sx of [-2.6, 2.6]) {
@@ -450,6 +467,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   }, 512, 205), roughness: 0.9 }));
   place(mural, 16, GROUND_Y + 3.0, 68.06, 0);
 
+  yield 'Borders: works';
   // ---- Borders: works ------------------------------------------------------------------
   const obresLine = (x0: number, z0: number, x1: number, z1: number, cones = true, y = GROUND_Y) => {
     const len = Math.hypot(x1 - x0, z1 - z0);
@@ -501,6 +519,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     boxes.push({ x0: ex - 3, x1: ex + 3, z0: -90, z1: -20.3, top: 3, kind: 'rocks' });
   }
 
+  yield 'The Rambla';
   // ---- The Rambla ---------------------------------------------------------------------
   for (const [rowZ, off] of [[31, 0], [16.6, 4]] as const) {
     for (let x = -88 + off; x <= 88; x += 8) {
@@ -513,6 +532,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
       pit.receiveShadow = true;
       root.add(pit);
     }
+    yield 'Palms';
   }
   for (let x = -84; x <= 84; x += 16) {
     if (Math.abs(x) < 6 || (x > 36 && x < 58)) continue;
@@ -545,13 +565,14 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   place(makeKiosk(0x1fc9b7), 70, GROUND_Y, 24, -Math.PI / 2);
   boxes.push({ x0: 69, x1: 71, z0: 22.6, z1: 25.4, top: GROUND_Y + 2.8, kind: 'kiosk' });
 
+  yield 'The railway at grade';
   // ---- The railway at grade --------------------------------------------------------------
   const ballast = box(300, 0.18, 9.4, M(0x8e877b, 1));
   ballast.position.set(0, GROUND_Y + 0.05, TRAIN_Z);
   ballast.receiveShadow = true;
   root.add(ballast);
   for (const tz of [TRAIN_Z - 1.6, TRAIN_Z + 1.6]) {
-    for (let x = -148; x < 148; x += 0.75) inst.add('sleeper', new THREE.BoxGeometry(0.24, 0.1, 2.5), M(0x7a7368, 0.9), mtx(x, GROUND_Y + 0.18, tz), false);
+    for (let x = -148; x < 148; x += 0.75) inst.add('sleeper', () => new THREE.BoxGeometry(0.24, 0.1, 2.5), () => M(0x7a7368, 0.9), mtx(x, GROUND_Y + 0.18, tz), false);
     for (const dz of [-0.72, 0.72]) {
       const rail = box(300, 0.12, 0.08, M(0x9aa0a8, 0.3, 0.9));
       rail.position.set(0, GROUND_Y + 0.28, tz + dz);
@@ -575,12 +596,19 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   }
   // Fences: low curb with dark vertical bars, both sides, open only at the underpass cut.
   const fenceMat = M(0x1f2a24, 0.5, 0.5);
+  // One merged geometry per segment length, shared (the bars are ~60 boxes each).
+  const fenceGeos = new Map<number, THREE.BufferGeometry>();
+  const fenceGeo = (len: number) => {
+    const k = Math.round(len * 100) / 100;
+    let g = fenceGeos.get(k);
+    if (!g) { g = mergeGeos(railFenceGeometry(k)); fenceGeos.set(k, g); }
+    return g;
+  };
   for (const fz of [14, 4]) {
     for (const [fx0, fx1] of [[-148, -CUT.x], [CUT.x, 148]]) {
       for (let x = fx0; x < fx1; x += 8) {
         const len = Math.min(8, fx1 - x);
-        const g = mergeGeos(railFenceGeometry(len));
-        const m = new THREE.Mesh(g, fenceMat);
+        const m = new THREE.Mesh(fenceGeo(len), fenceMat);
         m.position.set(x + len / 2, GROUND_Y, fz);
         m.castShadow = true;
         root.add(m);
@@ -592,6 +620,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   boxes.push({ x0: -148, x1: -CUT.x, z0: 4, z1: 14, top: 9, kind: 'tracks' });
   boxes.push({ x0: CUT.x, x1: 148, z0: 4, z1: 14, top: 9, kind: 'tracks' });
 
+  yield 'The station: platforms under steel canopies, an oxblood building on the Rambla';
   // ---- The station: platforms under steel canopies, an oxblood building on the Rambla ----
   const STATION_X = 47;
   for (const [pz0, pz1] of [[11.3, 13.6], [4.4, 6.7]] as const) {
@@ -656,6 +685,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
   stops0.push({ id: 'station', label: 'Estació', kind: 'Rodalies R1', href: '', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 1, r: 0 });
 
+  yield 'The underpass';
   // ---- The underpass ----------------------------------------------------------------------
   const cutY = (z: number) => {
     if (z >= CUT.rambla0 || z <= CUT.sea1) return GROUND_Y;
@@ -780,6 +810,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   passSign2.rotation.y = Math.PI;
   root.add(passSign2);
 
+  yield 'The seafront promenade';
   // ---- The seafront promenade ----------------------------------------------------------
   for (let x = -84; x <= 84; x += 24) {
     if (Math.abs(x) < 8) continue;
@@ -814,6 +845,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     root.add(gm);
   }
 
+  yield 'Boardwalk pavilions: the projects, the blog and about';
   // ---- Boardwalk pavilions: the projects, the blog and about -------------------------
   const pavilions: { id: string; title: string; sub: string; color: string; x: number; w: number; dark?: boolean }[] = [
     { id: 'leash', title: 'Path of Leash Resistance', sub: 'Game', color: '#ffb020', x: -31, w: 12 },
@@ -903,6 +935,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     boxes.push({ x0: sx - 0.35, x1: sx + 0.35, z0: PZ1 + 0.5, z1: PZ1 + 1.1, top: GROUND_Y + 1.15, kind: 'speaker' });
   }
 
+  yield 'Beach';
   // ---- Beach ---------------------------------------------------------------------------
   // White tent beach bar.
   const bar = new THREE.Group();
@@ -996,6 +1029,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     mounds.push({ x: mx, z: mz, name, dug: false, mesh: m, loot });
   }
 
+  yield 'Pipicà';
   // ---- Pipicà ---------------------------------------------------------------------------
   const P = PIPICA;
   const pFence = M(0x2f6b4f, 0.55, 0.4);
@@ -1004,7 +1038,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     const len = Math.hypot(x1 - x0, z1 - z0);
     for (let s = 0; s <= len; s += 0.25) {
       const t = s / len;
-      inst.add('pbar', new THREE.BoxGeometry(0.03, 1.2, 0.03), pFence, mtx(x0 + (x1 - x0) * t, SAND_Y + 0.6, z0 + (z1 - z0) * t), false);
+      inst.add('pbar', () => new THREE.BoxGeometry(0.03, 1.2, 0.03), pFence, mtx(x0 + (x1 - x0) * t, SAND_Y + 0.6, z0 + (z1 - z0) * t), false);
     }
     const rail = box(len, 0.06, 0.06, pFence);
     rail.position.set((x0 + x1) / 2, pTop - 0.05, (z0 + z1) / 2);
@@ -1036,6 +1070,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   const humanBench = { x: P.x0 - 2.6, z: -28 };
   place(makeBench(), humanBench.x - 0.35, SAND_Y, humanBench.z, Math.PI / 2);
 
+  yield 'The old oil pier';
   // ---- The old oil pier -----------------------------------------------------------------
   const deckTex2 = deckTexture();
   deckTex2.rotation = Math.PI / 2; // planks laid crosswise
@@ -1096,6 +1131,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   place(makePierLeg(PIER.high - WATER_Y + 2, 6), (PIER.x0 + PIER.x1) / 2, PIER.high - 0.6, PIER.end - 14);
   const fishers = [{ x: PIER.x1 - 0.5, z: -70, ry: Math.PI }, { x: PIER.x0 + 0.5, z: -96, ry: 0 }, { x: PIER.x1 - 0.5, z: -118, ry: Math.PI }];
 
+  yield 'Horizon: the Tres Xemeneies to the southwest, the Serralada inland';
   // ---- Horizon: the Tres Xemeneies to the southwest, the Serralada inland ------------
   const xem = makeXemeneies();
   xem.position.set(-760, WATER_Y, -120);
@@ -1113,6 +1149,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
 
   const poles: Obstacle[] = circles.filter((c) => c.obstacle).map((c) => c.obstacle!);
 
+  yield 'Stops (doors of the pavilions)';
   // ---- Stops (doors of the pavilions) --------------------------------------------------
   const stopFor = (id: string, label: string, kind: string, href: string, color: string) => {
     const p = pavilions.find((x) => x.id === id)!;
@@ -1127,6 +1164,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     stopFor('how', 'How I build', 'Studio', '/how-i-build', '#3d73c7'),
   ];
 
+  yield 'Floor, surfaces, bounds';
   // ---- Floor, surfaces, bounds ---------------------------------------------------------
   const onPier = (x: number, z: number) => x >= PIER.x0 && x <= PIER.x1 && z <= PIER.root && z >= PIER.end;
   const seafrontFloor = (x: number, z: number, y: number): number => {
@@ -1144,6 +1182,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     if (z >= -20 || (Math.abs(x) <= CUT.x && z < CUT.rambla0 && z > CUT.sea1)) return z < -10 && z >= -20 ? 'deck' : 'paving';
     return sandFloor(z) < WATER_Y ? 'water' : 'sand';
   };
+  yield 'Districts';
   // ---- Districts ---------------------------------------------------------------------
   // Each owns a slice of the map (scene graph, ground, surfaces, colliders). For
   // now all three are always live; Phase 1 streams them in and out.
@@ -1152,12 +1191,12 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   // Just south of the town's front facades (z ≈ 33.9), so each facade stays with its building.
   const TOWN_Z0 = 33.5;
   const districts: District[] = [
-    { id: 'seafront', label: 'The seafront', bounds: { x0: -BIG, x1: BIG, z0: -BIG, z1: CUT.sea0 }, root: new THREE.Group(), floor: seafrontFloor, surface: seafrontSurface },
+    { id: 'seafront', label: 'The seafront', bounds: { x0: -BIG, x1: BIG, z0: -BIG, z1: CUT.sea0 }, root: new THREE.Group(), floor: seafrontFloor, surface: seafrontSurface, built: true, baked: false, state: 'live' },
     {
       id: 'rambla', label: 'The Rambla', bounds: { x0: -BIG, x1: BIG, z0: CUT.sea0, z1: TOWN_Z0 }, root: new THREE.Group(),
-      floor: (x, z) => (inCut(x, z) ? cutY(z) : GROUND_Y), surface: () => 'paving',
+      floor: (x, z) => (inCut(x, z) ? cutY(z) : GROUND_Y), surface: () => 'paving', built: true, baked: false, state: 'live',
     },
-    { id: 'town', label: 'Carrer del Mar', bounds: { x0: -BIG, x1: BIG, z0: TOWN_Z0, z1: BIG }, root: new THREE.Group(), floor: () => GROUND_Y, surface: () => 'paving' },
+    { id: 'town', label: 'Carrer del Mar', bounds: { x0: -BIG, x1: BIG, z0: TOWN_Z0, z1: BIG }, root: new THREE.Group(), floor: () => GROUND_Y, surface: () => 'paving', built: true, baked: false, state: 'live' },
   ];
   const districtAt = (x: number, z: number) => districts.find((d) => inBounds(d.bounds, x, z)) ?? districts[0];
   const floor = (x: number, z: number, y: number) => districtAt(x, z).floor(x, z, y);
@@ -1170,7 +1209,8 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   horizon.name = 'horizon';
   const bb = new THREE.Box3(), bc = new THREE.Vector3();
   for (const o of [...root.children]) {
-    if (o.userData.always) { horizon.add(o); continue; }
+    // Lights stay always-on: hiding one would change the light count and recompile every material.
+    if (o.userData.always || (o as THREE.Light).isLight) { horizon.add(o); continue; }
     bb.setFromObject(o);
     if (bb.isEmpty()) bc.copy(o.position); else bb.getCenter(bc);
     districtAt(bc.x, bc.z).root.add(o);
@@ -1178,15 +1218,41 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   for (const d of districts) { d.root.name = d.id; root.add(d.root); }
   root.add(horizon);
   const tSplit = performance.now();
+  yield 'Instancing';
   inst.build((x, z) => districtAt(x, z).root);
-  for (const d of districts) bakeStatic(d.root, Math.abs(d.bounds.z0) < BIG ? d.bounds.z0 : d.bounds.z1);
+  yield 'Horizon';
+  // Districts bake later, in steps, nearest first (the Streamer); the horizon is small.
+  for (const d of districts) {
+    const originZ = Math.abs(d.bounds.z0) < BIG ? d.bounds.z0 : d.bounds.z1;
+    d.bake = () => bakeSteps(d.root, originZ);
+  }
   bakeStatic(horizon);
   const tBaked = performance.now();
 
+  yield 'Colliders';
   // Colliders into the grid, tagged with their district.
   const grid = new ColliderGrid(8);
   for (const b of boxes) { b.district = districtAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2).id; grid.addBox(b); }
   for (const c of circles) { c.district = districtAt(c.x, c.z).id; grid.addCircle(c); }
+  // Stand-ins: each district's buildings as plain blocks (roof heights from the colliders).
+  const standins = new THREE.Group();
+  standins.name = 'standins';
+  const standinMat = new THREE.MeshStandardMaterial({ color: 0xc4b8a4, roughness: 0.95 });
+  for (const d of districts) {
+    const parts = boxes.filter((b) => b.kind === 'building' && b.district === d.id).map((b) => {
+      const g = new THREE.BoxGeometry(b.x1 - b.x0, b.top - GROUND_Y, b.z1 - b.z0);
+      g.translate((b.x0 + b.x1) / 2, (b.top + GROUND_Y) / 2, (b.z0 + b.z1) / 2);
+      return g;
+    });
+    if (!parts.length) continue;
+    const m = new THREE.Mesh(mergeGeos(parts), standinMat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    m.visible = false;
+    d.standin = m;
+    standins.add(m);
+  }
+  root.add(standins);
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
@@ -1197,6 +1263,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     if (!onPier(p.x, p.z)) p.z = Math.max(p.z, -64);
   };
 
+  yield 'Paths for pedestrians';
   // ---- Paths for pedestrians -------------------------------------------------------------
   const pedPaths: [number, number][][] = [
     [[-1.6, 38], [-1.6, 60], [-1.4, 80], [-1.6, 97]],
@@ -1249,6 +1316,33 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     correfoc: { x0: 80, x1: -2, z: 24 },
     station: { x: STATION_X },
   };
+}
+
+/** Build the whole level right now. */
+export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
+  return drain(buildLevelSteps(scene, opts));
+}
+
+/** Count of the build's steps, for a loading bar. */
+export const LEVEL_STEPS = 32;
+
+/** Wait for the next frame (or a moment, if the tab is hidden and frames are paused). */
+export const nextFrame = () => new Promise<void>((res) => {
+  const t = setTimeout(res, 50);
+  requestAnimationFrame(() => { clearTimeout(t); res(); });
+});
+
+/** Run a generator under a time budget per frame, reporting progress after each slice. */
+export async function runSliced<Y, R>(g: Generator<Y, R, void>, onSlice?: (last: Y | undefined) => void, budgetMs = 12): Promise<R> {
+  for (;;) {
+    const t0 = performance.now();
+    let r: IteratorResult<Y, R>;
+    let last: Y | undefined;
+    do { r = g.next(); if (!r.done) last = r.value; } while (!r.done && performance.now() - t0 < budgetMs);
+    if (r.done) return r.value;
+    onSlice?.(last);
+    await nextFrame();
+  }
 }
 
 export type Level = ReturnType<typeof buildLevel>;

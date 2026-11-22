@@ -261,15 +261,18 @@ export function waterNormalTexture() {
       Math.sin(u * 17 + v * 19 + 2.1) * 0.07
     );
   };
+  // h() repeats every S pixels, so sample it once into a wrapped grid.
+  const H = new Float64Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) H[y * S + x] = h(x, y);
+  const at = (x: number, y: number) => H[((y + S) % S) * S + ((x + S) % S)];
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
-      const dx = h(x + 1, y) - h(x - 1, y);
-      const dy = h(x, y + 1) - h(x, y - 1);
-      const n = new THREE.Vector3(-dx * 2.2, -dy * 2.2, 1).normalize();
+      const nx = -(at(x + 1, y) - at(x - 1, y)) * 2.2, ny = -(at(x, y + 1) - at(x, y - 1)) * 2.2;
+      const len = Math.hypot(nx, ny, 1);
       const i = (y * S + x) * 4;
-      img.data[i] = (n.x * 0.5 + 0.5) * 255;
-      img.data[i + 1] = (n.y * 0.5 + 0.5) * 255;
-      img.data[i + 2] = (n.z * 0.5 + 0.5) * 255;
+      img.data[i] = (nx / len * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (ny / len * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (1 / len * 0.5 + 0.5) * 255;
       img.data[i + 3] = 255;
     }
   }

@@ -9,7 +9,8 @@ import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim
 import { WalkAudio, STEM_GROUPS, type StemGroup, type SongMeta } from './audio';
 import { Hud, type GoalRow } from './hud';
 import { Leash, applyTug, capStretch, WhirlDetector, type Obstacle } from './leash';
-import { buildLevel, PIPICA, WATER_Y, RAMBLA_Y, GROUND_Y, TRAIN_Y, TRAIN_Z, type Level } from './level';
+import { buildLevelSteps, runSliced, LEVEL_STEPS, PIPICA, WATER_Y, RAMBLA_Y, GROUND_Y, TRAIN_Y, TRAIN_Z, type Level } from './level';
+import { Streamer, type District } from './world';
 import {
   makeDog, makePerson, makeBike, makeSweeper, makeTrain, makeBird, makeBone, makeBall, makeFruitCrate,
   makeFishingRod, blobShadow, MILLIE, HUMAN_LOOK, NPC_TOPS, NPC_HAIRS, NPC_SKINS, M, sphere,
@@ -18,7 +19,7 @@ import {
 import { makeTofu, makeDevil } from './props';
 import { Minimap, type MapMarker } from './minimap';
 import { createLife } from './life';
-import { bakeStatic, collapseRig } from './bake';
+import { bakeStatic, bakeSteps, collapseRig } from './bake';
 import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
 
@@ -51,7 +52,7 @@ const STEP_UP = 0.35;
 
 export interface WalkOptions { home?: boolean }
 
-export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
+export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const host = root.querySelector<HTMLElement>('[data-stage]');
   if (!host) return;
   const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s);
@@ -130,9 +131,40 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   coriolisTex.colorSpace = THREE.SRGBColorSpace;
   coriolisTex.magFilter = THREE.NearestFilter;
 
+  // Build in slices behind a loading bar, so the page never freezes; then bake what's
+  // near the start. The rest bakes in the background while you play (the Streamer).
+  const loading = document.createElement('div');
+  loading.className = 'loading';
+  loading.innerHTML = '<span>Building the seafront…</span><i><b></b></i>';
+  host.appendChild(loading);
+  const bar = loading.querySelector('b')!;
   const buildT0 = performance.now();
-  const level: Level = buildLevel(scene, { coriolisTex });
+  let stepsDone = 0;
+  // Longest single step (the page can't respond during one): what to split next.
+  const loadStats = { maxStepMs: 0, maxStep: '', steps: [] as [string, number][] };
+  const counted = function* <Y, R>(g: Generator<Y, R, void>): Generator<Y, R, void> {
+    let label = 'start';
+    for (;;) {
+      const t = performance.now();
+      const r = g.next();
+      const ms = performance.now() - t;
+      loadStats.steps.push([label, Math.round(ms)]);
+      if (ms > loadStats.maxStepMs) { loadStats.maxStepMs = ms; loadStats.maxStep = label; }
+      if (r.done) return r.value;
+      label = String(r.value);
+      stepsDone++;
+      yield r.value;
+    }
+  };
+  const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex })), () => {
+    bar.style.width = `${Math.min(70, (stepsDone / LEVEL_STEPS) * 70)}%`;
+  }, 14);
+  const streamer = new Streamer(level.districts, level.grid);
+  await runSliced(streamer.warm(level.start.dog.x, level.start.dog.z), (f) => {
+    bar.style.width = `${70 + (f ?? 0) * 30}%`;
+  }, 14);
   const buildMs = performance.now() - buildT0;
+  loading.remove();
   const audio = new WalkAudio();
   const hud = new Hud(host);
   let mapFrame = 0;
@@ -1347,6 +1379,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   let pierReached = false;
 
   const update = (rawDt: number) => {
+    streamer.update(dog.x, dog.z);
     const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
     if (slowmo > 0) slowmo -= rawDt;
     time += dt;
@@ -2107,7 +2140,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     perf.worst = perf.worstWindow;
     perf.frames = 0; perf.worstWindow = 0; perf.t = now;
     const i = renderer.info;
-    perfEl.textContent = `${fps.toFixed(0)} fps · worst ${perf.worst.toFixed(0)} ms · ${i.render.calls} calls · ${(i.render.triangles / 1000).toFixed(0)}k tris · ${i.memory.geometries} geos · build ${buildMs.toFixed(0)} ms · ${level.districtAt(dog.x, dog.z).label}`;
+    perfEl.textContent = `${fps.toFixed(0)} fps · worst ${perf.worst.toFixed(0)} ms · ${i.render.calls} calls · ${(i.render.triangles / 1000).toFixed(0)}k tris · ${i.memory.geometries} geos · build ${buildMs.toFixed(0)} ms · ${level.districtAt(dog.x, dog.z).label} · stream ${streamer.stats.maxSliceMs.toFixed(1)} ms${streamer.busy ? ' …' : ''}`;
   };
   const loop = (now: number) => {
     const frameMs = now - prev;
@@ -2155,7 +2188,33 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },
-      buildMs,
+      buildMs, streamer, loadStats,
+      /** A streamable test district far off the map (x 400–460), to exercise build/bake/unload. */
+      addTestDistrict: () => {
+        const d: District = {
+          id: 'test', label: 'Test district', bounds: { x0: 400, x1: 460, z0: 0, z1: 60 }, root: new THREE.Group(),
+          floor: () => GROUND_Y, surface: () => 'paving', built: false, baked: false, state: 'standin',
+          build: function* () {
+            for (let i = 0; i < 400; i++) {
+              const h = 1 + Math.random() * 3, x = 401 + Math.random() * 58, z = 1 + Math.random() * 58;
+              const m = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1), M(0x888888 + (i % 7) * 0x111111, 0.8));
+              m.position.set(x, GROUND_Y + h / 2, z);
+              d.root.add(m);
+              level.grid.addBox({ x0: x - 0.5, x1: x + 0.5, z0: z - 0.5, z1: z + 0.5, top: GROUND_Y + h, kind: 'test', district: 'test' });
+              if (i % 20 === 19) yield;
+            }
+          },
+          unload: () => {
+            d.root.traverse((o) => { (o as THREE.Mesh).geometry?.dispose(); });
+            d.root.clear();
+          },
+        };
+        d.bake = () => bakeSteps(d.root, 0);
+        d.root.name = 'test';
+        level.root.add(d.root);
+        level.districts.unshift(d);
+        return d;
+      },
       beachDevils, life,
       get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
