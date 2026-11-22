@@ -39,9 +39,25 @@ jobs:
         with:
           path: dist
 
+  attribution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No co-author or tool attribution in any commit
+        run: |
+          found="$(git log --format='%H%n%B' 87ef5859e60706db81d839902ee6d7eba4672b10..HEAD | grep -niE '^(co-authored-by|generated-by|assisted-by|made-with):|cursoragent@|noreply@anthropic|generated with \[?claude' || true)"
+          if [ -n "$found" ]; then
+            echo "Attribution trailers are not allowed in this repo:"
+            git log --format='%h %s' -i -E --grep='^(co-authored-by|generated-by|assisted-by|made-with):|cursoragent@|noreply@anthropic|generated with \[?claude' 87ef5859e60706db81d839902ee6d7eba4672b10..HEAD
+            exit 1
+          fi
+
   deploy:
     if: github.event_name != 'pull_request'
-    needs: build
+    needs: [build, attribution]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

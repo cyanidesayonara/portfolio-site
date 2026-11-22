@@ -4,9 +4,9 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Ground rules
 
-- **Branch:** work on `redesign-astro` (open as PR #1 against `main`). Commit as you go and push.
+- **Branch:** PR #1 (`redesign-astro`) has been merged to `main`; put new work on a feature branch with a PR against `main`. Commit as you go and push.
 - **Never merge to `main` without Santtu's explicit go-ahead.** Merging deploys the site to GitHub Pages (`.github/workflows/pages-deploy.yml`).
-- **Commit messages** end with the co-author line the session asks for.
+- **Commit messages & PRs:** authored only by Santtu Nykänen. Never add `Co-authored-by` trailers or any AI/agent attribution anywhere (see `AGENTS.md`).
 - **Copy:** American English, professional. Santtu is a generalist developer, not a "game maker". Never invent stats or facts.
 - **Blog drafts** stay `draft: true` until Santtu approves each one.
 - **Keep the town unnamed on screen.** The level is modeled on a real Catalan seafront town, but the game never names it: the station is just "Estació", the pier is "the old pier", the arch says "Carrer del Mar / Eix comercial".
@@ -52,8 +52,8 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 
 | Phase | Status | What |
 | --- | --- | --- |
-| 0 | done (`ce7c71b`) | Districts, collider grid, floor and surface dispatch, perf readout. |
-| 1 | done (`42b3cfc`) | Streamer, sliced build behind a loading bar, sliced baking, stand-ins, unloading (tested with the synthetic district). |
+| 0 | done (`e96692d`) | Districts, collider grid, floor and surface dispatch, perf readout. |
+| 1 | done (`cab9081`) | Streamer, sliced build behind a loading bar, sliced baking, stand-ins, unloading (tested with the synthetic district). |
 | 2 | next | Layout as data: districts described in JSON (street lines, block outlines with heights and facade style, landmarks, points of interest), with procedural facades. The minimap and colliders come from the same data. Build merged geometry directly instead of meshes-then-bake, which also cuts the garbage-collection pauses seen while streaming. |
 | 3 | | The first new district: the center north of Carrer del Mar (a square, a shopping street, a second pipicà, a new chase, 2–3 quests). |
 | 4 | | Terrain (height grid, sloped streets, stairs) and the hill district, with the church as a landmark that's always visible. |
