@@ -19,7 +19,8 @@ import {
 import { makeTofu, makeDevil } from './props';
 import { Minimap, type MapMarker } from './minimap';
 import { createLife } from './life';
-import { bakeStatic, bakeSteps, collapseRig } from './bake';
+import { bakeStatic, collapseRig } from './bake';
+import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
 
@@ -233,7 +234,6 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let stemmaOpen = false;
   let camMode: CamMode = 'street';
   let skyMode: SkyMode = isNightTheme() ? 'night' : 'day';
-  let skyOverride = false;
   let nearStop: Level['stops'][number] | null = null;
   let time = 0;
   let slowmo = 0;
@@ -573,7 +573,6 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
   applySky(skyMode);
   onThemeChange((night) => {
-    skyOverride = false;
     applySky(night ? 'night' : skyMode === 'rain' && !night ? 'rain' : 'day');
   });
 
@@ -877,11 +876,37 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     zoomBy(Math.exp(e.deltaY * 0.0012));
   }, { passive: false });
   let drag: null | { id: number; x: number; y: number; moved: boolean } = null;
+  const touches = new Map<number, { x: number; y: number }>();
+  let pinchDist = 0;
+  const pinchSpan = () => {
+    const [a, b] = [...touches.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
   host.addEventListener('pointerdown', (e) => {
-    if (e.target !== renderer.domElement || e.pointerType === 'touch' || e.button !== 0) return;
+    if (e.target !== renderer.domElement) return;
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        drag = null;
+        pinchDist = pinchSpan();
+      } else if (touches.size === 1) {
+        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+      }
+      return;
+    }
+    if (e.button !== 0) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
   });
   host.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        const dist = pinchSpan();
+        if (pinchDist > 10 && dist > 10) zoomBy(pinchDist / dist);
+        pinchDist = dist;
+        return;
+      }
+    }
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
@@ -889,10 +914,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     drag.x = e.clientX; drag.y = e.clientY;
     orbitBy(dx * 0.006, dy * 0.006);
   });
-  const endDrag = (e: PointerEvent) => { if (drag && e.pointerId === drag.id) drag = null; };
+  const endDrag = (e: PointerEvent) => {
+    if (touches.delete(e.pointerId) && touches.size < 2) pinchDist = 0;
+    if (drag && e.pointerId === drag.id) drag = null;
+  };
   host.addEventListener('pointerup', endDrag);
   host.addEventListener('pointercancel', endDrag);
-  root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => { skyOverride = true; applySky(b.dataset.sky as SkyMode); }));
+  root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => applySky(b.dataset.sky as SkyMode)));
 
   // Fullscreen: fill the window with a reveal, and ask the browser for real fullscreen too.
   const fullBtn = q<HTMLButtonElement>('[data-fullscreen]');
@@ -967,9 +995,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       case 'Minus': case 'NumpadSubtract': zoomBy(1.15); break;
       case 'Equal': case 'NumpadAdd': zoomBy(1 / 1.15); break;
       case 'BracketLeft': case 'BracketRight': orbitBy(0); break;
-      case 'Digit1': skyOverride = true; applySky('day'); break;
-      case 'Digit2': skyOverride = true; applySky('rain'); break;
-      case 'Digit3': skyOverride = true; applySky('night'); break;
+      case 'Digit1': applySky('day'); break;
+      case 'Digit2': applySky('rain'); break;
+      case 'Digit3': applySky('night'); break;
       case 'KeyR': resetWalk(); break;
       case 'KeyX':
         if (nearCoriolis()) toggleCoriolis();
@@ -991,7 +1019,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const ck = CORIOLIS_KEYS[code];
     if (ck) coriolis.setHeld(ck, false);
   };
-  const releaseAll = () => { held.clear(); coriolis.clearHeld(); touchVec.x = touchVec.z = 0; };
+  const releaseAll = () => { held.clear(); coriolis.clearHeld(); touchVec.x = touchVec.z = 0; touches.clear(); pinchDist = 0; drag = null; };
   host.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement;
     // Buttons inside the stage keep Enter/Space/Tab for themselves; every other key drives the game.
@@ -1935,7 +1963,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     humanM.group.rotation.y = -human.heading;
     const hsp = Math.hypot(human.vx, human.vz);
     const pose: Pose = human.state === 'whirl' ? 'whirl' : human.state === 'stumble' || human.state === 'haul' ? 'stumble'
-      : human.state === 'bench' || (human.state === 'sit' && human.seated) ? 'sit' : human.state === 'phone' && human.stateT > 0 ? 'phone' : 'walk';
+      : human.state === 'bench' || (human.state === 'sit' && human.seated) ? 'sit'
+      : human.state === 'selfie' && human.stateT > 0 ? 'selfie'
+      : human.state === 'phone' && human.stateT > 0 ? 'phone' : 'walk';
     // How hard Millie is towing them, toward where they're heading (not when they're the ones hauling).
     const towing = human.state === 'haul' ? 0 : clamp((lastTension - 2) / 14, 0, 1) * clamp(Math.cos(Math.atan2(dog.z - human.z, dog.x - human.x) - human.heading) + 0.3, 0, 1);
     humanPull += (towing - humanPull) * Math.min(1, dt * 6);
@@ -2210,21 +2240,21 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
           id: 'test', label: 'Test district', bounds: { x0: 400, x1: 460, z0: 0, z1: 60 }, root: new THREE.Group(),
           floor: () => GROUND_Y, surface: () => 'paving', built: false, baked: false, state: 'standin',
           build: function* () {
+            const builder = new DirectBuilder(0);
             for (let i = 0; i < 400; i++) {
               const h = 1 + Math.random() * 3, x = 401 + Math.random() * 58, z = 1 + Math.random() * 58;
-              const m = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1), M(0x888888 + (i % 7) * 0x111111, 0.8));
-              m.position.set(x, GROUND_Y + h / 2, z);
-              d.root.add(m);
+              const col = 0x888888 + (i % 7) * 0x111111;
+              builder.addBox(x - 0.5, GROUND_Y, z - 0.5, x + 0.5, GROUND_Y + h, z + 0.5, col);
               level.grid.addBox({ x0: x - 0.5, x1: x + 0.5, z0: z - 0.5, z1: z + 0.5, top: GROUND_Y + h, kind: 'test', district: 'test' });
-              if (i % 20 === 19) yield;
+              if (i % 40 === 39) yield;
             }
+            yield* builder.flushSteps(d.root);
           },
           unload: () => {
             d.root.traverse((o) => { (o as THREE.Mesh).geometry?.dispose(); });
             d.root.clear();
           },
         };
-        d.bake = () => bakeSteps(d.root, 0);
         d.root.name = 'test';
         level.root.add(d.root);
         level.districts.unshift(d);

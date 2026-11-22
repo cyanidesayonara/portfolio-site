@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import type { Level } from './level';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';
-import { makeDog, makePerson, NPC_HAIRS, NPC_SKINS, NPC_TOPS, M, type DogLook, type DogModel, type PersonModel } from './models';
+import { makeDog, makePerson, NPC_HAIRS, NPC_SKINS, NPC_TOPS, M, type DogLook } from './models';
 import { collapseRig } from './bake';
 
 const VIEW = 48;
@@ -71,7 +71,7 @@ function giveWay(w: P, ctx: LifeCtx, dt: number, r = 1.0) {
 const handOf = (x: number, z: number, h: number) => ({ x: x + 0.3 * Math.cos(h) + 0.25 * Math.sin(h), z: z + 0.3 * Math.sin(h) - 0.25 * Math.cos(h) });
 
 export function createLife(ctx: LifeCtx) {
-  const { scene, level, hud, audio, dog, human } = ctx;
+  const { scene, level, hud, audio, dog } = ctx;
   const floorAt = (x: number, z: number, y = 0.5) => level.floor(x, z, y);
   const bubbles: { id: string; x: number; y: number; z: number }[] = [];
   const person = (look: Parameters<typeof makePerson>[0]) => {
