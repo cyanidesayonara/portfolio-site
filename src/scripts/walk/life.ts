@@ -149,10 +149,8 @@ export function createLife(ctx: LifeCtx) {
     });
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), M(0xffe08a, 0.4));
     scene.add(ball);
-    level.circles.push(
-      { x: a.x, z: a.z, r: 0.3, top: 2, kind: 'person', canPee: false, canWhirl: false, marked: false },
-      { x: b.x, z: b.z, r: 0.3, top: 2, kind: 'person', canPee: false, canWhirl: false, marked: false },
-    );
+    level.addRuntimeCircle({ x: a.x, z: a.z, r: 0.3, top: 2, kind: 'person', canPee: false, canWhirl: false, marked: false });
+    level.addRuntimeCircle({ x: b.x, z: b.z, r: 0.3, top: 2, kind: 'person', canPee: false, canWhirl: false, marked: false });
     return { a, b, players, ball, t: 0, from: 0, hits: 0, paused: 0, saidT: 0 };
   })();
 
@@ -208,7 +206,7 @@ export function createLife(ctx: LifeCtx) {
       chair.add(leg);
     }
     p.group.add(chair);
-    level.circles.push({ x: s.x, z: s.z, r: 0.4, top: 1.6, kind: 'chair', canPee: false, canWhirl: false, marked: false });
+    level.addRuntimeCircle({ x: s.x, z: s.z, r: 0.4, top: 1.6, kind: 'chair', canPee: false, canWhirl: false, marked: false });
     return { p, s, id: `sn${k}`, saidT: rand(0, 4), look: 0 };
   });
 

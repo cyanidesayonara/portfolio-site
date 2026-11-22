@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import type { Obstacle } from './leash';
 import { bakeStatic } from './bake';
+import { ColliderGrid, inBounds, type District } from './world';
 import {
   M, box, cyl, rod, shadowed,
   makeBench, makeBollard, makeBin, makeContainers, makeKiosk, makeBeachUmbrella, makeTowel,
@@ -32,10 +33,10 @@ import {
   slabTexture, flagstoneTexture, concreteTexture, wallPanelTexture, tileFloorTexture, muralTexture, paintTexture,
 } from './textures';
 
-export interface BoxCollider { x0: number; x1: number; z0: number; z1: number; top: number; minY?: number; kind: string; face?: [number, number] }
+export interface BoxCollider { x0: number; x1: number; z0: number; z1: number; top: number; minY?: number; kind: string; face?: [number, number]; district?: string }
 export interface CircleCollider {
   x: number; z: number; r: number; top: number; minY?: number; maxY?: number;
-  kind: string; canPee: boolean; canWhirl: boolean; marked: boolean; obstacle?: Obstacle;
+  kind: string; canPee: boolean; canWhirl: boolean; marked: boolean; obstacle?: Obstacle; district?: string;
 }
 export interface Stop { id: string; label: string; kind: string; href: string; color: string; x: number; z: number; r: number }
 export interface Mound { x: number; z: number; name: string; dug: boolean; mesh: THREE.Object3D; loot: THREE.Object3D }
@@ -63,13 +64,26 @@ class Instancer {
     if (!s) { s = { geo, mat, mats: [], cast }; this.sets.set(key, s); }
     s.mats.push(m.clone());
   }
-  build(root: THREE.Object3D) {
+  /** One InstancedMesh per key and per target (district) that `assign` picks by position. */
+  build(assign: (x: number, z: number) => THREE.Object3D) {
+    const p = new THREE.Vector3();
     this.sets.forEach((s) => {
-      const im = new THREE.InstancedMesh(s.geo, s.mat, s.mats.length);
-      s.mats.forEach((m, i) => im.setMatrixAt(i, m));
-      im.castShadow = s.cast;
-      im.receiveShadow = true;
-      root.add(im);
+      const byTarget = new Map<THREE.Object3D, THREE.Matrix4[]>();
+      for (const m of s.mats) {
+        p.setFromMatrixPosition(m);
+        const t = assign(p.x, p.z);
+        let list = byTarget.get(t);
+        if (!list) { list = []; byTarget.set(t, list); }
+        list.push(m);
+      }
+      byTarget.forEach((mats, target) => {
+        const im = new THREE.InstancedMesh(s.geo, s.mat, mats.length);
+        mats.forEach((m, i) => im.setMatrixAt(i, m));
+        im.computeBoundingSphere();
+        im.castShadow = s.cast;
+        im.receiveShadow = true;
+        target.add(im);
+      });
     });
   }
 }
@@ -121,6 +135,7 @@ const SHUTTERS = [0x5f7a5a, 0x6b5a48, 0x4f6f7a, 0x8a5a3c, 0x7a8a6a];
 export interface LevelOpts { coriolisTex: THREE.Texture }
 
 export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
+  const T0 = performance.now();
   const root = new THREE.Group();
   scene.add(root);
   const inst = new Instancer();
@@ -217,11 +232,13 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1000), waterMat);
   sea.rotation.x = -Math.PI / 2;
   sea.position.set(0, WATER_Y, -540);
+  sea.userData.always = true;
   root.add(sea);
   const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
   const foam = new THREE.Mesh(new THREE.PlaneGeometry(320, 1.4), foamMat);
   foam.rotation.x = -Math.PI / 2;
   foam.position.set(0, WATER_Y + 0.03, -57.4);
+  foam.userData.always = true;
   root.add(foam);
 
   // ---- Buildings ----------------------------------------------------------------------
@@ -1084,16 +1101,16 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   xem.position.set(-760, WATER_Y, -120);
   xem.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m) m.fog = false; });
   xem.scale.setScalar(0.9);
+  xem.userData.always = true;
   root.add(xem);
   const hills = new THREE.Mesh(
     new THREE.CylinderGeometry(900, 1000, 120, 48, 1, true, Math.PI * 0.15, Math.PI * 0.7),
     new THREE.MeshBasicMaterial({ color: 0x6f8f6a, side: THREE.BackSide, fog: false }),
   );
   hills.position.set(0, 20, 300);
+  hills.userData.always = true;
   root.add(hills);
 
-  inst.build(root);
-  bakeStatic(root);
   const poles: Obstacle[] = circles.filter((c) => c.obstacle).map((c) => c.obstacle!);
 
   // ---- Stops (doors of the pavilions) --------------------------------------------------
@@ -1112,7 +1129,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
 
   // ---- Floor, surfaces, bounds ---------------------------------------------------------
   const onPier = (x: number, z: number) => x >= PIER.x0 && x <= PIER.x1 && z <= PIER.root && z >= PIER.end;
-  const floor = (x: number, z: number, y: number): number => {
+  const seafrontFloor = (x: number, z: number, y: number): number => {
     if (onPier(x, z)) {
       const d = pierDeckY(z);
       if (z > PIER.rise + 2 || y > d - 0.9) return d;
@@ -1122,11 +1139,57 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     for (const rx of RAMPS) if (Math.abs(x - rx) <= 1.5 && z > -23.2) return GROUND_Y + ((z + 20) / 3.2) * (GROUND_Y - SAND_Y);
     return sandFloor(z);
   };
-  const surface = (x: number, z: number, y: number): Surface => {
+  const seafrontSurface = (x: number, z: number, y: number): Surface => {
     if (onPier(x, z) && y > pierDeckY(z) - 0.9) return 'deck';
     if (z >= -20 || (Math.abs(x) <= CUT.x && z < CUT.rambla0 && z > CUT.sea1)) return z < -10 && z >= -20 ? 'deck' : 'paving';
     return sandFloor(z) < WATER_Y ? 'water' : 'sand';
   };
+  // ---- Districts ---------------------------------------------------------------------
+  // Each owns a slice of the map (scene graph, ground, surfaces, colliders). For
+  // now all three are always live; Phase 1 streams them in and out.
+  const inCut = (x: number, z: number) => Math.abs(x) <= CUT.x && z < CUT.rambla0 && z > CUT.sea1;
+  const BIG = 1e5;
+  // Just south of the town's front facades (z ≈ 33.9), so each facade stays with its building.
+  const TOWN_Z0 = 33.5;
+  const districts: District[] = [
+    { id: 'seafront', label: 'The seafront', bounds: { x0: -BIG, x1: BIG, z0: -BIG, z1: CUT.sea0 }, root: new THREE.Group(), floor: seafrontFloor, surface: seafrontSurface },
+    {
+      id: 'rambla', label: 'The Rambla', bounds: { x0: -BIG, x1: BIG, z0: CUT.sea0, z1: TOWN_Z0 }, root: new THREE.Group(),
+      floor: (x, z) => (inCut(x, z) ? cutY(z) : GROUND_Y), surface: () => 'paving',
+    },
+    { id: 'town', label: 'Carrer del Mar', bounds: { x0: -BIG, x1: BIG, z0: TOWN_Z0, z1: BIG }, root: new THREE.Group(), floor: () => GROUND_Y, surface: () => 'paving' },
+  ];
+  const districtAt = (x: number, z: number) => districts.find((d) => inBounds(d.bounds, x, z)) ?? districts[0];
+  const floor = (x: number, z: number, y: number) => districtAt(x, z).floor(x, z, y);
+  const surface = (x: number, z: number, y: number) => districtAt(x, z).surface(x, z, y);
+
+  // Hand every built object to the district it sits in (by its bounding-box center);
+  // the sea, foam and horizon stay in an always-on group.
+  const tBuilt = performance.now();
+  const horizon = new THREE.Group();
+  horizon.name = 'horizon';
+  const bb = new THREE.Box3(), bc = new THREE.Vector3();
+  for (const o of [...root.children]) {
+    if (o.userData.always) { horizon.add(o); continue; }
+    bb.setFromObject(o);
+    if (bb.isEmpty()) bc.copy(o.position); else bb.getCenter(bc);
+    districtAt(bc.x, bc.z).root.add(o);
+  }
+  for (const d of districts) { d.root.name = d.id; root.add(d.root); }
+  root.add(horizon);
+  const tSplit = performance.now();
+  inst.build((x, z) => districtAt(x, z).root);
+  for (const d of districts) bakeStatic(d.root, Math.abs(d.bounds.z0) < BIG ? d.bounds.z0 : d.bounds.z1);
+  bakeStatic(horizon);
+  const tBaked = performance.now();
+
+  // Colliders into the grid, tagged with their district.
+  const grid = new ColliderGrid(8);
+  for (const b of boxes) { b.district = districtAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2).id; grid.addBox(b); }
+  for (const c of circles) { c.district = districtAt(c.x, c.z).id; grid.addCircle(c); }
+  /** Add a collider after the build (props placed by the game's systems). */
+  const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
+
   const inPipica = (x: number, z: number) => x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1;
   const clampBounds = (p: { x: number; z: number; y: number }) => {
     if (p.z > 34) { p.z = Math.min(p.z, 99); p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
@@ -1154,7 +1217,9 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
 
   return {
     root, boxes, circles, poles, stops, mounds, lampSpots, lampGlass, litWindowMat, wetMats,
-    floor, surface, inPipica, clampBounds, ramps: RAMPS,
+    floor, surface, inPipica, clampBounds, ramps: RAMPS, grid, districts, districtAt, addRuntimeCircle,
+    /** Where the build time goes (ms): building props, splitting into districts, instancing + baking. */
+    timings: { build: tBuilt - T0, split: tSplit - tBuilt, bake: tBaked - tSplit },
     waterMat, foamMat, sea, sunbathers, fishers, hurdles, bowls, fountains, humanBench, terraceSeats,
     dimoni: { ...dimoni, x: 24, z: -38, glow: dimoniGlow },
     pierEnd: { x: (PIER.x0 + PIER.x1) / 2, z: PIER.end + 4 },
