@@ -29,6 +29,8 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 | --- | --- |
 | `game3d.ts` | Everything at runtime: renderer, loading bar, input (focus-gated), physics at 120 Hz, the human's AI, leash, goals, quests, chases (La Neteja, correfoc, Dimoni), NPC walkers and cyclists, train, cameras (street, follow and overhead; wheel and `-`/`=` zoom; drag and `[`/`]` orbit), HUD wiring, minimap, theme and sky, fullscreen, the `?walktest` hooks. |
 | `level.ts` | `buildLevelSteps()`: the level as a generator that yields between sections, so it builds behind a loading bar. It produces geometry, colliders, floor and surface functions, quest and NPC data, and the three districts. Exports layout constants (`GROUND_Y`, `WATER_Y`, `PIPICA`, `SWIM`, …). |
+| `data/seafront.json`, `layout.ts` | Portable town layout data (bounds, zones, tracks, streets, blocks, pavilions, landmarks, POIs) plus `buildDistrictBlocksSteps()` and colored `buildDistrictStandin()`. |
+| `meshbuilder.ts` | `DirectBuilder`: accumulates non-indexed triangles straight into chunked, vertex-colored material buckets so static blocks and stand-ins need no intermediate `Mesh`/`BoxGeometry` allocations. |
 | `world.ts` | `District`, `ColliderGrid` (8 m cells; colliders tagged by district) and `Streamer`: live within 80 m, stand-in beyond 100 m, unload beyond 170 m for streamable districts, with build and bake jobs under a 4 ms per-frame budget. |
 | `bake.ts` | `bakeSteps()` merges static meshes into chunked, vertex-colored meshes as a generator, swapping in one step at the end. `collapseRig()` merges the rigid parts of animated models. |
 | `life.ts` | Ambient NPCs: dog walkers whose dogs sniff and bark back, joggers, a coconut seller, palas players, swimmers, a paddle boarder, neighbors on chairs, kids playing tag. Reacts to rain and night, hidden beyond 48 m. |
@@ -54,22 +56,22 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 | --- | --- | --- |
 | 0 | done (`e96692d`) | Districts, collider grid, floor and surface dispatch, perf readout. |
 | 1 | done (`cab9081`) | Streamer, sliced build behind a loading bar, sliced baking, stand-ins, unloading (tested with the synthetic district). |
-| 2 | next | Layout as data: districts described in JSON (street lines, block outlines with heights and facade style, landmarks, points of interest), with procedural facades. The minimap and colliders come from the same data. Build merged geometry directly instead of meshes-then-bake, which also cuts the garbage-collection pauses seen while streaming. |
-| 3 | | The first new district: the center north of Carrer del Mar (a square, a shopping street, a second pipicà, a new chase, 2–3 quests). |
+| 2 | done | Layout as data: districts described in `data/seafront.json` (zones, street lines, block outlines with heights and facade style, pavilions, landmarks, POIs), with procedural facades (`layout.ts`). The minimap and colliders come from the same data, stand-ins carry block/pavilion/landmark colors, and `DirectBuilder` builds merged geometry directly instead of meshes-then-bake. |
+| 3 | next | The first new district: the center north of Carrer del Mar (a square, a shopping street, a second pipicà, a new chase, 2–3 quests). |
 | 4 | | Terrain (height grid, sloped streets, stairs) and the hill district, with the church as a landmark that's always visible. |
 | 5 | | Goals per district, progress saved in the browser, more life. |
 
-**Measured costs:**
-- **Build:** about 0.8 s of total work. The longest step is about 70–120 ms (the sea texture and building rows).
-- **Baking:** the three districts bake during the loading bar.
-- **Draw calls:** about 550–850 depending on the view, and 133 on the pier with stand-ins.
+**Measured costs (headless SwiftShader `?walktest`):**
+- **Build:** ~1.5 s total build time (`LEVEL_STEPS = 53`), longest single step ~54 ms (`Districts`). Streaming slices stay ~0.2 ms at rest and ~1.5 ms max step when streaming `addTestDistrict()`.
+- **Baking:** the three districts bake during the loading bar; town blocks and `addTestDistrict()` build chunked merged geometry directly via `DirectBuilder`.
+- **Draw calls:** ~589–761 depending on the view (642 at start, 761 in Carrer del Mar, 172 facing sea from the pier end with stand-ins, 634–671 looking back toward land from the pier end).
 - **Godot:** if the town outgrows the web, the plan is to move PoLR 2 there; keep layout data portable for that.
 
 ## Polish backlog (from Santtu's playtesting)
 
-- Many models and animations still look rough. Santtu called out the human's walk earlier; the gait-phase fix and pulled pose helped, but more work is welcome.
-- Not verified on real hardware: true browser fullscreen, touch on phones, audio by ear, pinch-to-zoom (not implemented).
-- Stand-ins are plain blocks. The town hasn't been visually checked from the pier.
+- Articulated human knees, hip/shoulder counter-rotation, `selfie` pose, and multi-segment dog tail wag are in; other models and animations can still use refinement.
+- Touch pinch-to-zoom and 1-finger canvas orbit are implemented; not yet verified on real phone hardware (along with true browser fullscreen and audio by ear).
+- Stand-ins now use layout facade, roof, pavilion accent, and landmark colors/silhouettes (visually verified from the pier in headless Chrome).
 - The home page still runs the 2D map. Santtu wants the 3D walk there once it's solid (`<Walk3D lazy />`, ideally loading only the seafront district).
 
 ## Release checklist (first merge of PR #1)
