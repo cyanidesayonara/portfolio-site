@@ -277,7 +277,7 @@ export function createLife(ctx: LifeCtx) {
       if (dw.barkT >= 0) {
         dw.barkT -= dt;
         if (dw.barkT < 0) {
-          if (vis) audio.smallBark(dw.look.scale);
+          if (vis) audio.smallBark(dw.look.scale, { x: dw.dx, z: dw.dz });
           say(`${dw.id}d`, pickOne(['Guau!', 'Bup bup!', 'Arf!']), 1, 'loud');
         }
       }

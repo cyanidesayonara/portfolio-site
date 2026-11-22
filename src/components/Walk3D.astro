@@ -30,6 +30,7 @@ const KEYS = [
   { keys: ['Wheel', '-', '='], label: 'Zoom' },
   { keys: ['Tab'], label: 'Goals' },
   { keys: ['M'], label: 'Map' },
+  { keys: ['N'], label: 'Next song' },
   { keys: ['R'], label: 'Restart' },
 ];
 ---
@@ -41,12 +42,13 @@ const KEYS = [
     tabindex="0"
     role="application"
     aria-roledescription="game"
-    aria-label="Path of Leash Resistance in 3D, in a Catalan seafront town. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, Tab shows the goals. Shift+Tab or Escape leaves the game."
+    aria-label="Path of Leash Resistance in 3D, in a Catalan seafront town. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, N skips to the next song, Tab shows the goals. Shift+Tab or Escape leaves the game."
   >
     <div class="focus-hint" aria-hidden="true"><span>Click to play</span></div>
 
     <div class="toolbar" role="group" aria-label="Game settings">
       <button type="button" class="tb" data-sound aria-pressed="false">Sound off</button>
+      <button type="button" class="tb" data-next-song>Next song</button>
       <span class="seg" role="group" aria-label="Time and weather">
         <button type="button" class="tb" data-sky="day" aria-pressed="false">Day</button>
         <button type="button" class="tb" data-sky="rain" aria-pressed="false">Rain</button>
@@ -139,9 +141,13 @@ const KEYS = [
     border: 1px solid var(--line);
   }
   .walk3d:global(.immersive) {
+    /* Sized to the visible viewport (--vv-*, set by trackVisibleViewport) so the
+       touch controls at the bottom are never pushed off-screen. */
     position: fixed;
-    inset: 0;
-    height: 100dvh;
+    top: var(--vv-top, 0px);
+    left: 0;
+    right: 0;
+    height: var(--vv-h, 100dvh);
     padding-bottom: env(safe-area-inset-bottom);
     z-index: 1000;
     border-radius: 0;
@@ -480,16 +486,42 @@ const KEYS = [
   .stage :global(.loading) {
     position: absolute;
     inset: 0;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
     background: var(--navy-deep, #0b1430);
     color: #f4f1ea;
     font: 800 15px var(--font-display);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     z-index: 7;
+    overflow: hidden;
+  }
+  .stage :global(.loading.depart) {
+    background: transparent;
+  }
+  .stage :global(.loading.depart .transit-msg) {
+    position: relative;
+    z-index: 2;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(11, 20, 48, 0.92);
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.2s ease 0.14s;
+  }
+  .stage :global(.loading.depart.closing .transit-msg) {
+    opacity: 1;
+  }
+  .stage :global(.transit-cv) {
+    width: min(520px, 100%);
+    height: auto;
+    aspect-ratio: 560 / 290;
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   }
   .stage :global(.loading i) {
     display: block;
@@ -500,6 +532,68 @@ const KEYS = [
     overflow: hidden;
   }
   .stage :global(.loading b) { display: block; width: 0; height: 100%; background: var(--saffron, #ffb020); transition: width 0.15s; }
+  .stage :global(.loading .skip) {
+    padding: 6px 14px;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f4f1ea;
+    font: 700 11px var(--font-display);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .stage :global(.loading .skip:hover) {
+    background: var(--saffron, #ffb020);
+    border-color: var(--saffron, #ffb020);
+    color: #0b1430;
+  }
+  .stage :global(.loading .door) {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    background: linear-gradient(180deg, #d7dce4 0%, #c4cad4 48%, #e5302a 48%, #e5302a 56%, #c4cad4 56%, #b2b9c4 100%);
+    pointer-events: none;
+    transition: transform 0.36s cubic-bezier(0.22, 0.85, 0.32, 1);
+  }
+  .stage :global(.loading .door.l) {
+    left: 0;
+    border-right: 5px solid #2a2f3d;
+    transform: translateX(-100%);
+  }
+  .stage :global(.loading .door.r) {
+    right: 0;
+    border-left: 5px solid #2a2f3d;
+    transform: translateX(100%);
+  }
+  .stage :global(.loading.via-train .door) {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  .stage :global(.loading.via-train.doors-open) {
+    background: transparent;
+  }
+  .stage :global(.loading.via-train.doors-open .transit-cv),
+  .stage :global(.loading.via-train.doors-open .transit-msg),
+  .stage :global(.loading.via-train.doors-open i),
+  .stage :global(.loading.via-train.doors-open .skip) {
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .stage :global(.loading.via-train.doors-open .door) {
+    opacity: 1;
+  }
+  .stage :global(.loading.via-train.doors-open .door.l) {
+    transform: translateX(-102%);
+  }
+  .stage :global(.loading.via-train.doors-open .door.r) {
+    transform: translateX(102%);
+  }
+  .stage :global(.loading.depart.closing .door.l),
+  .stage :global(.loading.depart.closing .door.r) {
+    transform: translateX(0);
+  }
   .stage :global(.perf) {
     position: absolute;
     left: 50%;
@@ -875,7 +969,10 @@ const KEYS = [
     .stage :global(.goals .gh) { font-size: 11px; }
     .stage :global(.goals .gh kbd) { display: none; }
     .stage :global(.goals.open) { width: calc(100% - 16px); z-index: 2; }
-    .stage :global(.toasts) { top: 50px; }
+    .stage :global(.toasts) { left: 8px; right: auto; top: 184px; width: calc(100% - 116px); justify-items: start; }
+    .stage :global(.toast) { min-width: 0; max-width: 100%; padding: 6px 10px 7px 11px; }
+    .stage :global(.toast b) { font-size: 12.5px; }
+    .stage :global(.toast span) { font-size: 11.5px; }
     .stage :global(.banner) {
       left: 8px;
       top: 152px;
@@ -901,5 +998,15 @@ const KEYS = [
     .stick { width: 88px; height: 88px; }
     .acts { grid-template-columns: repeat(2, 48px); gap: 6px; }
     .acts button { height: 42px; font-size: 10px; }
+  }
+  /* Phones held sideways (and other short screens): there's no room for the map
+     between the goals and the touch buttons, so shrink it and tuck it up top. */
+  @media (max-height: 520px) and (pointer: coarse), (max-height: 520px) and (hover: none) {
+    .stage :global(.minimap:not(.big)) { width: 92px; height: 92px; top: 48px; bottom: auto; }
+    .stage :global(.minimap:not(.big) .mm-key kbd) { display: none; }
+  }
+  @media (max-height: 520px) {
+    .walk3d:global(.has-touch) .stage :global(.minimap:not(.big)) { width: 92px; height: 92px; top: 48px; bottom: auto; }
+    .walk3d:global(.has-touch) .stage :global(.minimap:not(.big) .mm-key kbd) { display: none; }
   }
 </style>

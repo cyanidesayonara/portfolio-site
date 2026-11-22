@@ -15,6 +15,7 @@ import {
   type Stop, type StopLot, type Circle,
 } from './world';
 import { StreetSound } from './audio';
+import { trackVisibleViewport } from '../viewport';
 
 type P = { x: number; y: number };
 type Bubble = { text: string; ttl: number; who: P; lift: number; loud: boolean };
@@ -26,6 +27,7 @@ type Ped = {
 type Pigeon = { x: number; y: number; hx: number; hy: number; flying: boolean; vx: number; vy: number; t: number; hop: number };
 type Vehicle = { kind: 'bike' | 'car'; x: number; y: number; dir: 1 | -1; speed: number; max: number; color: string; alerted: number; wobble: number };
 type Stain = { x: number; y: number; r: number };
+type Fx = { kind: 'ring' | 'dust' | 'splash' | 'heart'; x: number; y: number; vx: number; vy: number; t: number; max: number };
 
 const ROPE_N = 18;
 const ROPE_BASE = 130;
@@ -58,6 +60,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   fig.classList.add('live');
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const streetTest = new URLSearchParams(location.search).has('streettest');
   let coarse = matchMedia('(pointer: coarse)').matches || matchMedia('(any-pointer: coarse)').matches;
   const darkMq = matchMedia('(prefers-color-scheme: dark)');
   const isNight = () => {
@@ -90,6 +93,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const bones = world.bones.map((b) => ({ ...b, got: false }));
   let bonesGot = 0;
   let toast: { text: string; t: number } | null = null;
+  let allDone = false;
   let goalsOpen: boolean | null = null;
   let goalsRect = { x: 0, y: 0, w: 0, h: 0 };
   const sound = new StreetSound();
@@ -97,7 +101,12 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   try { wantSound = localStorage.getItem('street-sound') === 'on'; } catch { /* storage blocked */ }
   const stains: Stain[] = [];
   const bubbles: Bubble[] = [];
+  const fx: Fx[] = [];
   const peds: Ped[] = [];
+  const spawnFx = (kind: Fx['kind'], x: number, y: number, vx = 0, vy = 0, max = 0.45) => {
+    if (fx.length >= 40) fx.shift();
+    fx.push({ kind, x, y, vx, vy, t: 0, max });
+  };
   const vehicles: Vehicle[] = [];
   const pigeons: Pigeon[] = [];
   world.benches.slice(0, 3).forEach((b, bi) => {
@@ -114,6 +123,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   let near: StopLot | null = null;
   let wander = { lot: 0, wait: 1.2 };
   let camX = 0;
+  let boarding: { href: string; t: number; sent: boolean } | null = null;
+  // Coming back with the browser's Back button can restore this page mid-boarding.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) boarding = null; });
+  let arriving = 0;
 
   // ---- Sizing and the static layer ---------------------------------------------------
   let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0, offY = 0;
@@ -169,6 +182,22 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     goals[key] = true;
     toast = { text: `Goal done: ${label}`, t: 2.6 };
     sound.goal();
+    if (Object.values(goals).every(Boolean)) finale();
+  }
+
+  // Every goal done: a little celebration, then point her at the train to the 3D walk.
+  function finale() {
+    allDone = true;
+    say(human, 'Best walk ever!', 24, true, 2.4);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      spawnFx('heart', dog.x + Math.cos(a) * 10, dog.y - 12 + Math.sin(a) * 6, Math.cos(a) * 34, -26 + Math.sin(a) * 14, 1.3);
+    }
+    window.setTimeout(() => {
+      if (!playing) return;
+      sound.stationChime();
+      toast = { text: 'Best walk ever! Every goal done', t: 4 };
+    }, 1600);
   }
 
   // ---- Talking -----------------------------------------------------------------------
@@ -249,9 +278,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     leash = ROPE_BASE; heyT = 0; pee = 0.6; zoom = 1; marked = 0; bonesGot = 0;
     offLeash = false; clippedInPark = false; nature = 35; natureCalls = false;
     for (const k of Object.keys(goals) as (keyof typeof goals)[]) goals[k] = false;
+    allDone = false;
     for (const sp of world.peeSpots) sp.marked = false;
     for (const b of bones) b.got = false;
-    stains.length = 0; poops.length = 0; bubbles.length = 0; target = null;
+    stains.length = 0; poops.length = 0; bubbles.length = 0; fx.length = 0; target = null;
+    boarding = null; arriving = 0;
     Object.assign(ball, { x: world.park.x + 210, y: 110, vx: 0, vy: 0 });
     camX = 0;
     toast = { text: 'New walk', t: 1.5 };
@@ -352,6 +383,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       dog.y += dir.y * speed * dt;
       dog.heading = Math.atan2(dir.y, dir.x);
       dog.step += dt * (dog.sprint ? 24 : 15);
+      if (dog.sprint && Math.random() < dt * 22) {
+        spawnFx('dust', dog.x - dir.x * 8 + (Math.random() - 0.5) * 6, dog.y + 3, -dir.x * 18, -6 - Math.random() * 8, 0.36);
+      }
+    } else if (dog.dig && Math.random() < dt * 16) {
+      spawnFx('dust', dog.x - Math.cos(dog.heading) * 9 + (Math.random() - 0.5) * 6, dog.y + 2, -Math.cos(dog.heading) * 20, -10 - Math.random() * 8, 0.32);
     }
     pushOut(dog, DOG_R);
     nearBone = null;
@@ -362,6 +398,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (drink && playing && pee < 1) {
       if (pee < 0.97 && !bubbles.some((b) => b.who === dog)) { say(dog, 'slurp', 16, false, 0.7); sound.slurp(); }
       pee = Math.min(1, pee + dt * 0.45);
+      if (Math.random() < dt * 14) spawnFx('splash', drink.x + (Math.random() - 0.5) * 8, drink.y - 2, (Math.random() - 0.5) * 18, -22, 0.35);
     }
     nearDrink = !!drink;
     updateBall(dt);
@@ -497,6 +534,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
           pet.greeted = true;
           p.pause = 2.4;
           say(pet, 'Woof!', 16, true, 1);
+          spawnFx('heart', (dog.x + pet.x) / 2, Math.min(dog.y, pet.y) - 10, 0, -18, 1.0);
           complete('dog', 'say hi to another dog');
         }
         const tx = p.x - p.dir * 22, ty = p.y + 12;
@@ -599,10 +637,24 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
 
   function update(dt: number) {
+    if (boarding) {
+      boarding.t += dt;
+      if (boarding.t >= 0.45 && !boarding.sent) {
+        boarding.sent = true;
+        location.href = boarding.href;
+      }
+      return;
+    }
+    if (arriving > 0) arriving = Math.max(0, arriving - dt);
     updatePlayer(dt);
     updatePeds(dt);
     updatePigeons(dt);
     updateTraffic(dt);
+    for (let i = fx.length - 1; i >= 0; i--) {
+      const f = fx[i];
+      f.x += f.vx * dt; f.y += f.vy * dt;
+      if ((f.t += dt) >= f.max) fx.splice(i, 1);
+    }
     for (let i = bubbles.length - 1; i >= 0; i--) if ((bubbles[i].ttl -= dt) <= 0) bubbles.splice(i, 1);
     if (toast && (toast.t -= dt) <= 0) toast = null;
     for (let i = poops.length - 1; i >= 0; i--) if ((poops[i].t += dt) > 3) poops.splice(i, 1);
@@ -625,8 +677,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   function sayCaption() {
     let text: string;
-    if (near && playing) text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
-    else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'Walk Millie up to a shop door to go in. Arrow keys work too.';
+    if (near && playing) {
+      if (near.stop.id === 'station') text = coarse ? 'Tap GO IN or Estació again to board the train to 3D.' : 'Press Enter at Estació to board the train to the 3D walk.';
+      else text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
+    } else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'Walk Millie up to a shop door to go in. Arrow keys work too.';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
     if (caption!.textContent !== text) caption!.textContent = text;
   }
@@ -945,12 +999,16 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   function bannerText(): string | null {
     if (toast) return toast.text;
-    if (near) return coarse ? `Tap GO IN or sign: ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
+    if (near) {
+      if (near.stop.id === 'station') return coarse ? 'Tap GO IN: Board train to 3D' : 'Enter: ride train to 3D seafront';
+      return coarse ? `Tap GO IN or sign: ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
+    }
     if (nearBone) return coarse ? 'GRAB: pick up the bone' : 'G: pick up the bone';
     if (natureCalls) return coarse ? 'Nature calls! Hold POOP' : 'Nature calls! Hold F';
     if (pee < 0.25 && !nearDrink) return 'Thirsty! Find a water bowl';
     if (offLeash) return 'Off the leash! Go back to your human to clip on';
     if (pee > 0.97 && !goals.mark) return 'Bursting! Go mark a spot';
+    if (allDone) return 'All done! Next: train to 3D at Estació';
     return null;
   }
 
@@ -1129,6 +1187,81 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
   }
 
+  function drawFx(x0: number, x1: number) {
+    for (const f of fx) {
+      if (f.x < x0 - 20 || f.x > x1 + 20) continue;
+      const p = clamp(f.t / f.max, 0, 1);
+      const a = 1 - p;
+      c.save();
+      c.globalAlpha = a;
+      if (f.kind === 'ring') {
+        c.strokeStyle = 'rgba(255, 176, 32, 0.95)';
+        c.lineWidth = 1.6;
+        c.beginPath();
+        c.ellipse(f.x, f.y, 4 + p * 12, (4 + p * 12) * 0.55, 0, 0, Math.PI * 2);
+        c.stroke();
+      } else if (f.kind === 'dust') {
+        c.fillStyle = 'rgba(210, 194, 165, 0.7)';
+        c.beginPath();
+        c.arc(f.x, f.y, 2 + p * 3, 0, Math.PI * 2);
+        c.fill();
+      } else if (f.kind === 'splash') {
+        c.fillStyle = '#6ec6e8';
+        c.beginPath();
+        c.arc(f.x, f.y, 1.8 * (1 - p * 0.4), 0, Math.PI * 2);
+        c.fill();
+      } else {
+        c.fillStyle = '#e5487a';
+        c.beginPath();
+        c.arc(f.x - 2.2, f.y, 2.2, 0, Math.PI * 2);
+        c.arc(f.x + 2.2, f.y, 2.2, 0, Math.PI * 2);
+        c.moveTo(f.x - 4.3, f.y + 0.8);
+        c.lineTo(f.x, f.y + 5.2);
+        c.lineTo(f.x + 4.3, f.y + 0.8);
+        c.fill();
+      }
+      c.restore();
+    }
+  }
+
+  function drawTransitDoors() {
+    if (!boarding && arriving <= 0) return;
+    const raw = boarding ? clamp(boarding.t / 0.45, 0, 1) : clamp(arriving / 0.45, 0, 1);
+    const closed = 1 - Math.pow(1 - raw, 2);
+    const halfW = (cssW / 2) * closed;
+    c.save();
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const side of [-1, 1] as const) {
+      const x = side < 0 ? 0 : cssW - halfW;
+      c.fillStyle = '#cfd4dc';
+      c.fillRect(x, 0, halfW + 1, cssH);
+      c.fillStyle = '#e5302a';
+      c.fillRect(x, cssH * 0.48, halfW + 1, Math.max(12, cssH * 0.08));
+      c.fillStyle = '#14203d';
+      const winW = Math.min(84, halfW * 0.55);
+      if (winW > 12) {
+        const wx = side < 0 ? Math.max(8, halfW - winW - 22) : Math.min(cssW - winW - 8, x + 22);
+        c.beginPath();
+        c.roundRect(wx, cssH * 0.16, winW, cssH * 0.28, 10);
+        c.fill();
+      }
+      c.fillStyle = '#2a2f3d';
+      c.fillRect(side < 0 ? halfW - 6 : x, 0, 6, cssH);
+    }
+    if (boarding && closed > 0.35) {
+      c.fillStyle = 'rgba(20, 27, 44, 0.92)';
+      c.beginPath();
+      c.roundRect(cssW / 2 - 140, cssH / 2 - 20, 280, 40, 20);
+      c.fill();
+      c.fillStyle = '#f4f1ea';
+      c.font = `800 12px ${FONT}`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('BOARDING R1 · HEADING TO 3D SEAFRONT…', cssW / 2, cssH / 2 + 0.5);
+    }
+    c.restore();
+  }
+
   function draw() {
     if (!cssW) return;
     const night = isNight();
@@ -1152,13 +1285,14 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.ellipse(s.x, s.y, s.r, s.r * 0.6, 0, 0, Math.PI * 2);
       c.fill();
     }
-    if (near && playing && near.type === 'shop') {
+    if (near && playing && (near.type === 'shop' || near.type === 'station')) {
       c.fillStyle = 'rgba(255, 176, 32, 0.9)';
       c.fillRect(doorX(near) - 11, 88, 22, FACADE - 88);
       c.fillStyle = 'rgba(255, 176, 32, 0.5)';
       c.fillRect(doorX(near) - 18, FACADE, 36, 9);
     }
 
+    drawFx(x0, x1);
     drawBones(x0, x1);
     drawParkThings(x0, x1);
     for (const v of vehicles) if (v.x > x0 - 60 && v.x < x1 + 60) drawVehicle(v, night);
@@ -1226,6 +1360,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     for (const b of bubbles) drawBubble(b);
     drawHud();
+    drawTransitDoors();
   }
 
   // ---- Loop and events ---------------------------------------------------------------
@@ -1263,8 +1398,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     fsBtn.textContent = isFull() ? 'Exit fullscreen' : 'Fullscreen';
     fsBtn.setAttribute('aria-pressed', String(isFull()));
   };
+  let untrackViewport: (() => void) | null = null;
   function immersive(on: boolean) {
     fig.classList.toggle('immersive', on);
+    if (on && !untrackViewport) untrackViewport = trackVisibleViewport(fig);
+    else if (!on && untrackViewport) { untrackViewport(); untrackViewport = null; }
     document.documentElement.style.overflow = on ? 'hidden' : '';
     syncFs();
   }
@@ -1292,7 +1430,20 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
   fig.querySelector<HTMLButtonElement>('[data-restart]')?.addEventListener('click', () => { takeLeash(); restart(); });
   function goIn() {
-    if (near) links.get(near.stop.id)?.click();
+    if (!near || boarding) return;
+    const a = links.get(near.stop.id);
+    if (near.stop.id === 'station') {
+      const url = new URL(a?.getAttribute('href') || near.stop.href, location.origin);
+      if (wantSound) url.searchParams.set('sound', '1');
+      if (!reduced && !streetTest) {
+        sound.stationChime();
+        boarding = { href: url.pathname + url.search + url.hash, t: 0, sent: false };
+        return;
+      }
+      location.href = url.pathname + url.search + url.hash;
+      return;
+    }
+    a?.click();
   }
 
   // The real game's default bindings (autoload/game.gd, the default layout).
@@ -1331,6 +1482,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   fig.addEventListener('keyup', (e) => held.delete(e.code));
   fig.addEventListener('blur', () => held.clear());
   let steerId: number | null = null;
+  // How far up a tap can send her: the shopfronts stop her at the pavement, but the park is open lawn.
+  const topAt = (wx: number) => (wx > world.park.x + 12 ? 36 : WALK_TOP);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('touchstart', (e) => {
     coarse = true;
@@ -1372,21 +1525,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       }
     }
     const wx = camX + sx / scale, wy = (sy - offY) / scale;
-    const lot = world.stops.find((l) => wx >= l.x && wx < l.x + l.w && (wy < FACADE || l.type === 'park'));
-    if (lot && wy < FACADE + 10) {
+    // Shops: tap the facade. The park is open ground (the bone and the ball are in
+    // it), so only its sign counts as "going in"; anywhere else there just walks.
+    const onParkSign = (l: (typeof world.stops)[number]) => wx >= l.x + 14 && wx < l.x + 146 && wy >= 86 && wy < 134;
+    const lot = world.stops.find((l) => (l.type === 'park' ? onParkSign(l) : wx >= l.x && wx < l.x + l.w && wy < FACADE));
+    if (lot) {
       if (wasPlaying && near === lot) { goIn(); return; }
       target = { x: doorX(lot), y: doorY(lot) };
       return;
     }
     steerId = e.pointerId;
-    target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
+    target = { x: wx, y: clamp(wy, topAt(wx), WH - 8) };
+    spawnFx('ring', target.x, target.y, 0, 0, 0.45);
   });
   canvas.addEventListener('pointermove', (e) => {
     if (e.pointerId !== steerId) return;
     const r = canvas.getBoundingClientRect();
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const wx = camX + sx / scale, wy = (sy - offY) / scale;
-    target = { x: wx, y: clamp(wy, WALK_TOP, WH - 8) };
+    target = { x: wx, y: clamp(wy, topAt(wx), WH - 8) };
   });
   const endTouch = (e: PointerEvent) => {
     if (e.pointerId === steerId) steerId = null;
@@ -1412,6 +1569,28 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   document.fonts?.ready.then(rebuild);
 
   resize();
+  const params = new URLSearchParams(location.search);
+  const viaTrain = params.get('via') === 'train';
+  if (params.get('sound') === '1' && !wantSound) setSound(true);
+  if (viaTrain) {
+    const st = world.stops.find((l) => l.stop.id === 'station');
+    if (st) {
+      dog.x = doorX(st); dog.y = 152; dog.heading = Math.PI * 0.5;
+      human.x = doorX(st) - 24; human.y = 150; human.heading = 0;
+      resetRope();
+      camX = clamp(dog.x - viewW * 0.45, 0, Math.max(0, W - viewW));
+    }
+    playing = true;
+    if (!reduced && !streetTest) arriving = 0.45;
+    toast = { text: 'Arrived from 3D Estació!', t: 3 };
+    fig.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    if (!streetTest) {
+      params.delete('via');
+      params.delete('sound');
+      const qs = params.toString();
+      history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
+    }
+  }
   sayCaption();
   start();
 
@@ -1432,6 +1611,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       ball, world,
       bones,
       get near() { return near?.stop.id ?? null; },
+      get view() { return { camX, scale, offY }; },
+      get target() { return target; },
       buttons: () => buttons(),
       restart: () => restart(),
       key(code: string, down: boolean) { fig.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code === 'Space' ? ' ' : code, bubbles: true })); },

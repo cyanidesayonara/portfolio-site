@@ -43,6 +43,9 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export class Leash {
   readonly N = 24;
   pts: Pt[] = [];
+  // Last frame's resting positions (endpoints included), for which side of a pole each segment was on.
+  private prevX = new Float64Array(this.N);
+  private prevZ = new Float64Array(this.N);
   rest = 5; // current reel length (m)
   length = 0;
   stretch = 1;
@@ -58,6 +61,44 @@ export class Leash {
 
   constructor(dog: { x: number; z: number }, hand: { x: number; z: number }) {
     this.reset(dog, hand);
+  }
+
+  private pushSegment(i: number, obstacles: Obstacle[]) {
+    const { N, pts, prevX, prevZ } = this;
+    const a = pts[i], b = pts[i + 1];
+    const ex = b.x - a.x, ez = b.z - a.z;
+    const len = Math.hypot(ex, ez);
+    if (len < 1e-5) return;
+    const nx = -ez / len, nz = ex / len; // unit normal of the segment
+    const pex = prevX[i + 1] - prevX[i], pez = prevZ[i + 1] - prevZ[i];
+    const plen2 = pex * pex + pez * pez;
+    for (const o of obstacles) {
+      if (o.kind !== 'pole') continue;
+      const min = o.r + 0.035;
+      // Where along the segment the pole is (0..1), now and last frame.
+      const t = ((o.x - a.x) * ex + (o.z - a.z) * ez) / (len * len);
+      if (t <= 0 || t >= 1) continue; // the vertex pass handles the ends
+      const s = (o.x - a.x) * nx + (o.z - a.z) * nz; // signed distance of the pole from the line
+      if (Math.abs(s) > min + len) continue;
+      let side: number;
+      if (plen2 > 1e-10) {
+        const pt = ((o.x - prevX[i]) * pex + (o.z - prevZ[i]) * pez) / plen2;
+        const ps = (pex * (o.z - prevZ[i]) - pez * (o.x - prevX[i])) / Math.sqrt(plen2);
+        // Only trust last frame's side if the pole was alongside that segment too.
+        side = pt > -0.25 && pt < 1.25 && Math.abs(ps) > 1e-4 ? Math.sign(ps) : Math.sign(s) || 1;
+      } else side = Math.sign(s) || 1;
+      if (s * side >= min) continue; // clear, on the right side
+      // Move the line so the pole sits `min` away on `side`.
+      const delta = s - side * min;
+      const wa = i === 0 ? 0 : 1 - t, wb = i + 1 === N - 1 ? 0 : t;
+      const den = wa * (1 - t) + wb * t;
+      if (den < 0.05) continue; // both ends pinned (or nearly): nothing to move
+      // Movable ends share the push so the point at t moves by delta (capped, so a
+      // segment pinned at one end doesn't fling its free end).
+      const k = Math.sign(delta) * Math.min(Math.abs(delta / den), 3 * Math.abs(delta) + 0.05);
+      if (wa) { a.x += nx * k * wa; a.z += nz * k * wa; a.c = o; }
+      if (wb) { b.x += nx * k * wb; b.z += nz * k * wb; b.c = o; }
+    }
   }
 
   /** Straight line from dog to hand (start, re-clip, reset). */
@@ -76,6 +117,8 @@ export class Leash {
     const { N, pts } = this;
     const seg = this.rest / (N - 1);
     if (this.freeSlip > 0) this.freeSlip -= dt;
+    const { prevX, prevZ } = this;
+    for (let i = 0; i < N; i++) { prevX[i] = pts[i].x; prevZ[i] = pts[i].z; }
 
     // 1. Integrate interior points.
     for (let i = 1; i < N - 1; i++) {
@@ -144,6 +187,11 @@ export class Leash {
           }
         }
       }
+
+      // Segments vs poles: vertices are 0.2 m apart and poles can be 0.06 m thick,
+      // so a fast pull can carry a whole segment across a pole between frames.
+      // Push each segment back out to the side of the pole it was on last frame.
+      for (let i = 0; i < N - 1; i++) this.pushSegment(i, obstacles);
     }
 
     this.measure();

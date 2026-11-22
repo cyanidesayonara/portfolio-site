@@ -14,7 +14,8 @@ const STOPS = [
   { id: 'blog', label: 'Blog', short: 'Blog', kind: '', href: '/blog', color: '#e5487a', ink: '#0b1430' },
   { id: 'how', label: 'How I build', short: 'How I build', kind: '', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
   { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
-  { id: 'park', label: 'The park', short: 'Park', kind: '3D street', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
+  { id: 'station', label: 'Estació', short: 'Estació (3D)', kind: 'Train to 3D', href: '/walk?via=train', color: '#e5302a', ink: '#f4f1ea' },
+  { id: 'park', label: 'The park', short: 'Park', kind: 'Off-leash', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
 ];
 // The same keys as Path of Leash Resistance's default layout.
 const KEYS = [
@@ -118,9 +119,13 @@ const KEYS = [
     background: var(--bg);
   }
   .street:global(.immersive) {
+    /* Sized to the visible viewport (--vv-*, set by trackVisibleViewport) so the
+       touch controls at the bottom are never pushed off-screen. */
     position: fixed;
-    inset: 0;
-    height: 100dvh;
+    top: var(--vv-top, 0px);
+    left: 0;
+    right: 0;
+    height: var(--vv-h, 100dvh);
     padding-bottom: env(safe-area-inset-bottom);
     z-index: 1000;
   }

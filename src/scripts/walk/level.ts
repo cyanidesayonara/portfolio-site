@@ -18,12 +18,14 @@ import * as THREE from 'three';
 import type { Obstacle } from './leash';
 import { bakeStatic, bakeSteps, drain } from './bake';
 import { DirectBuilder } from './meshbuilder';
+import { makeCitySkyline, makeInlandHills } from './horizon';
+import { PLAZA, inPlazaPipica, makePlazaDistrict } from './plaza';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
   M, box, cyl, rod, shadowed,
   makeBench, makeBollard, makeBin, makeContainers, makeKiosk, makeBeachUmbrella, makeTowel,
-  makeLifeguardTower, makeHeras, makeCone, makeBarrier, makeSkip, makeExcavator, makeFountain,
+  makeLifeguardTower, makeHeras, makeCone, makeSkip, makeExcavator, makeFountain,
   makeWaterBowl, makeHurdle, makeSandMound, makeMonkeyStatue, makeDimoni, makeCafeSet,
 } from './models';
 import {
@@ -377,14 +379,13 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       place(makeCone(), x0 + (x1 - x0) * t - Math.sin(ang) * 0.9, y, z0 + (z1 - z0) * t + Math.cos(ang) * 0.9);
     }
   };
-  obresLine(-3.5, 99.5, 3.5, 99.5);
+  // (The top of Carrer del Mar is open now: it leads on to Plaça del Mercat, plaza.ts.)
   for (const z of [53, 71, 89]) {
     obresLine(-34, z - 3, -34, z + 3, false);
     obresLine(34, z - 3, 34, z + 3, false);
   }
   place(makeSkip(), 37, GROUND_Y, 71, Math.PI / 2);
   place(makeExcavator(), -38, GROUND_Y, 89, 1.2);
-  place(makeBarrier(), 0, GROUND_Y, 98.3);
   obresLine(-92, 14.6, -92, 33.4);
   obresLine(92, 14.6, 92, 33.4);
   obresLine(-92, -19.6, -92, 3.6);
@@ -577,7 +578,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   shadowed(station);
   place(station, STATION_X, GROUND_Y, 14.2 + stD / 2);
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
-  stops0.push({ id: 'station', label: 'Estació', kind: 'Rodalies R1', href: '', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 1, r: 0 });
+  stops0.push({ id: 'station', label: 'Estació', kind: 'Train to 2D street', href: '/?via=train', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 2.2, r: 5.5 });
 
   yield 'The underpass';
   // ---- The underpass ----------------------------------------------------------------------
@@ -1051,28 +1052,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   xem.scale.setScalar(0.9);
   xem.userData.always = true;
   root.add(xem);
-  const hills = new THREE.Mesh(
-    new THREE.CylinderGeometry(900, 1000, 120, 48, 1, true, Math.PI * 0.15, Math.PI * 0.7),
-    new THREE.MeshBasicMaterial({ color: 0x6f8f6a, side: THREE.BackSide, fog: false }),
-  );
-  hills.position.set(0, 20, 300);
-  hills.userData.always = true;
-  root.add(hills);
+  // Hills inland (+Z), the city's skyline far down the coast behind the chimneys (-X).
+  root.add(makeInlandHills(WATER_Y - 12));
+  root.add(makeCitySkyline(WATER_Y - 2));
 
   const poles: Obstacle[] = circles.filter((c) => c.obstacle).map((c) => c.obstacle!);
 
   yield 'Stops (doors of the pavilions)';
   // ---- Stops (doors of the pavilions) --------------------------------------------------
-  const stops: Stop[] = pavilions.map((p) => ({
-    id: p.id,
-    label: p.title,
-    kind: p.sub,
-    href: p.href,
-    color: p.color,
-    x: p.id === 'coriolis' ? p.x + p.w / 2 - 0.6 : p.id === 'blog' ? 40 : p.x + p.w * 0.34,
-    z: p.id === 'blog' ? -9.0 : PZ1 + 1.2,
-    r: p.id === 'blog' ? 2.6 : 2.4,
-  }));
+  const stops: Stop[] = [
+    ...pavilions.map((p) => ({
+      id: p.id,
+      label: p.title,
+      kind: p.sub,
+      href: p.href,
+      color: p.color,
+      x: p.id === 'coriolis' ? p.x + p.w / 2 - 0.6 : p.id === 'blog' ? 40 : p.x + p.w * 0.34,
+      z: p.id === 'blog' ? -9.0 : PZ1 + 1.2,
+      r: p.id === 'blog' ? 2.6 : 2.4,
+    })),
+    ...stops0,
+  ];
 
   yield 'Floor, surfaces, bounds';
   // ---- Floor, surfaces, bounds ---------------------------------------------------------
@@ -1143,6 +1143,21 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const grid = new ColliderGrid(8);
   for (const b of boxes) { b.district = b.district ?? districtAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2).id; grid.addBox(b); }
   for (const c of circles) { c.district = districtAt(c.x, c.z).id; grid.addCircle(c); }
+  // Plaça del Mercat (plaza.ts): streams in when Millie heads up Carrer del Mar.
+  const plazaGlass = makeLanternPost().glass;
+  lampGlass.push(plazaGlass);
+  for (const [x, z] of PLAZA.lamps) lampSpots.push(new THREE.Vector3(x, GROUND_Y + 4.4, z));
+  const plaza = makePlazaDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('plaza')!, ground, newInstancer: () => new Instancer(), r,
+    mats: {
+      flag: flagMat, flagTile: flag.tileMeters, panot: panotMat, panotTile: panot.tileMeters, sand: sandMat,
+      wall: wallPlasterMat, litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM, lampGlass: plazaGlass,
+    },
+  });
+  districts.push(plaza);
+  root.add(plaza.root);
+  bowls.push({ ...PLAZA.bowl });
+  fountains.push({ ...PLAZA.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
@@ -1157,9 +1172,16 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  const inPipica = (x: number, z: number) => x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1;
+  /** Which pipicà (x, z) is in: 0 by the beach, 1 on Plaça del Mercat, -1 for neither. */
+  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : -1);
+  const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
+  /** Where Millie's human waits while she's off the leash in each pipicà. */
+  const pipicaBenches = [humanBench, PLAZA.pipicaBench];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
-    if (p.z > 34) { p.z = Math.min(p.z, 99); p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
+    // Carrer del Mar and its side streets; beyond it the plaza, the market alleys and Carrer Major
+    // (the buildings' colliders do the rest).
+    if (p.z > 34 && p.z < PLAZA.z0) { p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
+    if (p.z >= PLAZA.z0) { p.z = Math.min(p.z, PLAZA.street.z1 - 0.4); p.x = Math.max(PLAZA.street.x0 + 0.4, Math.min(PLAZA.street.x1 - 0.4, p.x)); return; }
     p.x = Math.max(-91.5, Math.min(91.5, p.x));
     // Out to the buoy line inside the swim zone; to the shallows elsewhere.
     if (!onPier(p.x, p.z)) p.z = Math.max(p.z, p.x > SWIM.x0 && p.x < SWIM.x1 ? SWIM.z + 0.3 : -64);
@@ -1182,11 +1204,12 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     [[-44, -10.9], [-32, -11], [-20.5, -10.9]],
     [[-80, -54], [0, -55], [80, -54]],
     [[-48, -12], [-48, -60], [-48, -126]],
+    ...PLAZA.pedPaths,
   ];
 
   return {
     root, layout: SEAFRONT_LAYOUT, boxes, circles, poles, stops, mounds, lampSpots, lampGlass, litWindowMat, wetMats,
-    floor, surface, inPipica, clampBounds, ramps: RAMPS, grid, districts, districtAt, addRuntimeCircle,
+    floor, surface, inPipica, pipicaAt, pipicaBenches, clampBounds, ramps: RAMPS, grid, districts, districtAt, addRuntimeCircle,
     /** Where the build time goes (ms): building props, splitting into districts, instancing + baking. */
     timings: { build: tBuilt - T0, split: tSplit - tBuilt, bake: tBaked - tSplit },
     waterMat, foamMat, sea, sunbathers, fishers, hurdles, bowls, fountains, humanBench, terraceSeats,
