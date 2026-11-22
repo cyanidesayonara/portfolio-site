@@ -10,8 +10,8 @@
   screens a tap walks there and on-screen buttons run, dig, pee and bark.
 */
 import {
-  WH, FACADE, WALK_TOP, LANE, CAR_LANES,
-  buildWorld, drawStatic, drawTops, drawNightLights, doorX, doorY,
+  WH, FACADE, WALK_TOP, LANE, CAR_LANES, FAR_EDGE,
+  buildWorld, drawStatic, drawTops, drawMetroTop, drawNightLights, doorX, doorY,
   type Stop, type StopLot, type Circle,
 } from './world';
 import { StreetSound } from './audio';
@@ -123,10 +123,15 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   let near: StopLot | null = null;
   let wander = { lot: 0, wait: 1.2 };
   let camX = 0;
-  let boarding: { href: string; t: number; sent: boolean } | null = null;
+  // The train and the metro both link to the 3D walk: a short cutscene, then a page change.
+  type Ride = 'train' | 'metro';
+  const BOARD_S: Record<Ride, number> = { train: 0.45, metro: 1.25 };
+  const ARRIVE_S: Record<Ride, number> = { train: 0.45, metro: 1.1 };
+  let boarding: { href: string; t: number; sent: boolean; ride: Ride } | null = null;
   // Coming back with the browser's Back button can restore this page mid-boarding.
   window.addEventListener('pageshow', (e) => { if (e.persisted) boarding = null; });
   let arriving = 0;
+  let arrivedBy: Ride = 'train';
 
   // ---- Sizing and the static layer ---------------------------------------------------
   let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0, offY = 0;
@@ -174,7 +179,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     const inPark = p.x > world.park.x + 12;
     p.x = clamp(p.x, r, W - r);
-    p.y = clamp(p.y, (inPark ? 30 : WALK_TOP) + r * 0.6, WH - r - 2);
+    p.y = clamp(p.y, (inPark ? 30 : WALK_TOP) + r * 0.6, FAR_EDGE - r * 0.6);
   }
 
   function complete(key: keyof typeof goals, label: string) {
@@ -219,13 +224,15 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     return null;
   }
 
-  // Before anyone takes the leash, Millie visits the shops on her own.
+  // Before anyone takes the leash, Millie visits the shops on her own (not the
+  // park, and not across the road to the metro).
+  const tour = world.stops.filter((l) => l.type !== 'park' && l.type !== 'metro');
   function autopilot(dt: number): P | null {
     if (wander.wait > 0) { wander.wait -= dt; return null; }
-    const l = world.stops[wander.lot];
+    const l = tour[wander.lot % tour.length];
     const dx = doorX(l) - dog.x, dy = doorY(l) - dog.y, d = Math.hypot(dx, dy);
     if (d < 6) {
-      wander = { lot: (wander.lot + 1) % (world.stops.length - 1), wait: 1.8 };
+      wander = { lot: (wander.lot + 1) % tour.length, wait: 1.8 };
       return null;
     }
     return { x: dx / d, y: dy / d };
@@ -636,10 +643,26 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
   }
 
+  // Boarding the metro: Millie leads her human down the stairs while the cutscene plays.
+  function walkDownStairs(dt: number) {
+    const m = world.metro;
+    if (!m) return;
+    const midY = m.y + m.h / 2;
+    const end = m.x + m.w - 12;
+    dog.x = Math.min(end, dog.x + 70 * dt);
+    dog.y += (midY - 4 - dog.y) * Math.min(1, dt * 6);
+    dog.heading = 0; dog.moving = dog.x < end; dog.step += dt * 15;
+    human.x = Math.min(end - 22, Math.max(human.x, dog.x - 34) + 40 * dt);
+    human.y += (midY + 5 - human.y) * Math.min(1, dt * 5);
+    human.heading = 0; human.walking = true; human.step += dt * 9;
+    resetRope();
+  }
+
   function update(dt: number) {
     if (boarding) {
       boarding.t += dt;
-      if (boarding.t >= 0.45 && !boarding.sent) {
+      if (boarding.ride === 'metro') walkDownStairs(dt);
+      if (boarding.t >= BOARD_S[boarding.ride] && !boarding.sent) {
         boarding.sent = true;
         location.href = boarding.href;
       }
@@ -664,7 +687,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
     let best: StopLot | null = null;
     for (const l of world.stops) {
-      const ok = l.type === 'park' ? dog.x > l.x + 8 && dog.x < l.x + 160 && dog.y < 148 : Math.abs(dog.x - doorX(l)) < 40 && dog.y < WALK_TOP + 32;
+      const ok = l.type === 'park' ? dog.x > l.x + 8 && dog.x < l.x + 160 && dog.y < 148
+        : l.type === 'metro' ? Math.abs(dog.x - doorX(l)) < 26 && Math.abs(dog.y - doorY(l)) < 30
+        : Math.abs(dog.x - doorX(l)) < 40 && dog.y < WALK_TOP + 32;
       if (ok) best = l;
     }
     if (best !== near) {
@@ -679,6 +704,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     let text: string;
     if (near && playing) {
       if (near.stop.id === 'station') text = coarse ? 'Tap GO IN or Estació again to board the train to 3D.' : 'Press Enter at Estació to board the train to the 3D walk.';
+      else if (near.stop.id === 'metro') text = coarse ? 'Tap GO IN or the stairs again to take the metro to 3D.' : 'Press Enter at the stairs to take the metro to the 3D walk.';
       else text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
     } else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'Walk Millie up to a shop door to go in. Arrow keys work too.';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
@@ -1001,6 +1027,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (toast) return toast.text;
     if (near) {
       if (near.stop.id === 'station') return coarse ? 'Tap GO IN: Board train to 3D' : 'Enter: ride train to 3D seafront';
+      if (near.stop.id === 'metro') return coarse ? 'Tap GO IN: Metro down to 3D' : 'Enter: take the metro to 3D';
       return coarse ? `Tap GO IN or sign: ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
     }
     if (nearBone) return coarse ? 'GRAB: pick up the bone' : 'G: pick up the bone';
@@ -1224,40 +1251,81 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
   }
 
-  function drawTransitDoors() {
-    if (!boarding && arriving <= 0) return;
-    const raw = boarding ? clamp(boarding.t / 0.45, 0, 1) : clamp(arriving / 0.45, 0, 1);
-    const closed = 1 - Math.pow(1 - raw, 2);
+  // The train's doors (red stripe) or the metro's (stainless, purple stripe),
+  // sliding shut over the street when boarding and open again on arrival.
+  function drawDoors(closed: number, ride: Ride) {
     const halfW = (cssW / 2) * closed;
-    c.save();
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const metro = ride === 'metro';
     for (const side of [-1, 1] as const) {
       const x = side < 0 ? 0 : cssW - halfW;
-      c.fillStyle = '#cfd4dc';
+      c.fillStyle = metro ? '#c3c8d0' : '#cfd4dc';
       c.fillRect(x, 0, halfW + 1, cssH);
-      c.fillStyle = '#e5302a';
-      c.fillRect(x, cssH * 0.48, halfW + 1, Math.max(12, cssH * 0.08));
+      c.fillStyle = metro ? '#9b2d8f' : '#e5302a';
+      c.fillRect(x, cssH * (metro ? 0.62 : 0.48), halfW + 1, Math.max(metro ? 8 : 12, cssH * (metro ? 0.045 : 0.08)));
       c.fillStyle = '#14203d';
-      const winW = Math.min(84, halfW * 0.55);
+      const winW = Math.min(metro ? 64 : 84, halfW * 0.55);
       if (winW > 12) {
         const wx = side < 0 ? Math.max(8, halfW - winW - 22) : Math.min(cssW - winW - 8, x + 22);
         c.beginPath();
-        c.roundRect(wx, cssH * 0.16, winW, cssH * 0.28, 10);
+        c.roundRect(wx, cssH * (metro ? 0.12 : 0.16), winW, cssH * (metro ? 0.4 : 0.28), metro ? 6 : 10);
         c.fill();
       }
-      c.fillStyle = '#2a2f3d';
+      c.fillStyle = metro ? '#1d1f26' : '#2a2f3d';
       c.fillRect(side < 0 ? halfW - 6 : x, 0, 6, cssH);
     }
-    if (boarding && closed > 0.35) {
-      c.fillStyle = 'rgba(20, 27, 44, 0.92)';
-      c.beginPath();
-      c.roundRect(cssW / 2 - 140, cssH / 2 - 20, 280, 40, 20);
-      c.fill();
-      c.fillStyle = '#f4f1ea';
-      c.font = `800 12px ${FONT}`;
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.fillText('BOARDING R1 · HEADING TO 3D SEAFRONT…', cssW / 2, cssH / 2 + 0.5);
+  }
+  // Going down the metro stairs: the steps rise over the view from the bottom
+  // (cover 0..1), scrolling as if walking down them.
+  function drawStairCover(cover: number, scroll: number) {
+    const h = cssH * cover;
+    if (h <= 0) return;
+    const top = cssH - h;
+    const g = c.createLinearGradient(0, top, 0, cssH);
+    g.addColorStop(0, '#5b5e68');
+    g.addColorStop(1, '#16171c');
+    c.fillStyle = g;
+    c.fillRect(0, top, cssW, h);
+    const step = Math.max(16, cssH / 14);
+    c.fillStyle = 'rgba(205, 210, 218, 0.5)';
+    for (let y = top + (((scroll * step * 4) % step) + step) % step; y < cssH; y += step) c.fillRect(0, y, cssW, 2);
+    c.fillStyle = '#e6c23a';
+    c.fillRect(0, top, cssW, 3);
+  }
+  function drawRidePill(text: string) {
+    c.font = `800 12px ${FONT}`;
+    const w = Math.min(cssW - 24, c.measureText(text).width + 40);
+    c.fillStyle = 'rgba(20, 27, 44, 0.92)';
+    c.beginPath();
+    c.roundRect(cssW / 2 - w / 2, cssH / 2 - 20, w, 40, 20);
+    c.fill();
+    c.fillStyle = '#f4f1ea';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(text, cssW / 2, cssH / 2 + 0.5, w - 24);
+  }
+  function drawTransitDoors() {
+    if (!boarding && arriving <= 0) return;
+    const ride: Ride = boarding ? boarding.ride : arrivedBy;
+    c.save();
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (ride === 'train') {
+      const raw = boarding ? clamp(boarding.t / BOARD_S.train, 0, 1) : clamp(arriving / ARRIVE_S.train, 0, 1);
+      const closed = 1 - Math.pow(1 - raw, 2);
+      drawDoors(closed, 'train');
+      if (boarding && closed > 0.35) drawRidePill('BOARDING R1 · HEADING TO 3D SEAFRONT…');
+    } else if (boarding) {
+      // Down the stairs (0..0.7 s), then the metro's doors close (0.7..1.2 s).
+      const down = clamp(boarding.t / 0.7, 0, 1);
+      drawStairCover(1 - Math.pow(1 - down, 2), boarding.t);
+      const closed = 1 - Math.pow(1 - clamp((boarding.t - 0.7) / 0.45, 0, 1), 2);
+      if (closed > 0) drawDoors(closed, 'metro');
+      if (down > 0.5) drawRidePill(closed > 0.35 ? 'METRO L2 · HEADING TO 3D SEAFRONT…' : 'DOWN TO THE METRO…');
+    } else {
+      // Arriving: the doors open (1.1..0.6 s left), then up the stairs into daylight.
+      const closed = 1 - Math.pow(1 - clamp((arriving - 0.6) / 0.5, 0, 1), 2);
+      const up = clamp(arriving / 0.6, 0, 1);
+      drawStairCover(up * up, -arriving);
+      if (closed > 0) drawDoors(closed, 'metro');
     }
     c.restore();
   }
@@ -1268,10 +1336,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, canvas!.width, canvas!.height);
     if (offY > 0) {
-      // Letterbox: rooftops above the street, more road below it.
+      // Letterbox: rooftops above the street and below the far side.
       c.fillStyle = '#b8a888';
       c.fillRect(0, 0, canvas!.width, Math.ceil(offY * dpr));
-      c.fillStyle = '#4a4f5c';
+      c.fillStyle = '#a87561';
       c.fillRect(0, Math.floor((offY + WH * scale) * dpr), canvas!.width, Math.ceil(offY * dpr) + 2);
     }
     c.drawImage(bg, camX * bgScale, 0, viewW * bgScale, WH * bgScale, 0, Math.round(offY * dpr), canvas!.width, Math.round(WH * scale * dpr));
@@ -1290,6 +1358,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.fillRect(doorX(near) - 11, 88, 22, FACADE - 88);
       c.fillStyle = 'rgba(255, 176, 32, 0.5)';
       c.fillRect(doorX(near) - 18, FACADE, 36, 9);
+    } else if (near && playing && near.type === 'metro') {
+      c.fillStyle = 'rgba(255, 176, 32, 0.9)';
+      c.fillRect(near.x - 8, near.y, 8, near.h);
+      c.fillStyle = 'rgba(255, 176, 32, 0.4)';
+      c.fillRect(near.x - 22, near.y - 2, 14, near.h + 4);
     }
 
     drawFx(x0, x1);
@@ -1331,7 +1404,17 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.arc(dog.x - Math.cos(dog.heading) * 6 + Math.sin(dog.heading) * 10, dog.y - Math.sin(dog.heading) * 6 - Math.cos(dog.heading) * 10 + 2, 1.6, 0, Math.PI * 2);
       c.fill();
     }
+    const m = world.metro;
+    if (m && boarding?.ride === 'metro') {
+      // Walking down: the deeper they go, the darker they get.
+      const g = c.createLinearGradient(m.x, 0, m.x + m.w, 0);
+      g.addColorStop(0, 'rgba(22, 23, 28, 0)');
+      g.addColorStop(1, 'rgba(22, 23, 28, 0.85)');
+      c.fillStyle = g;
+      c.fillRect(m.x, m.y - 14, m.w, m.h + 22);
+    }
     drawTops(c, world, x0, x1, night);
+    if (m && m.x + m.w > x0 - 40 && m.x - 40 < x1) drawMetroTop(c, m);
     for (const g of pigeons) if (g.flying && g.y > -20) drawPigeon(g);
 
     if (night) {
@@ -1462,13 +1545,13 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   function goIn() {
     if (!near || boarding) return;
     const a = links.get(near.stop.id);
-    if (near.stop.id === 'station') {
+    if (near.stop.id === 'station' || near.stop.id === 'metro') {
       const url = new URL(a?.getAttribute('href') || near.stop.href, location.origin);
       if (wantSound) url.searchParams.set('sound', '1');
       if (fsMode !== 'off') url.searchParams.set('fs', fsMode);
       if (!reduced && !streetTest) {
         sound.stationChime();
-        boarding = { href: url.pathname + url.search + url.hash, t: 0, sent: false };
+        boarding = { href: url.pathname + url.search + url.hash, t: 0, sent: false, ride: near.stop.id === 'metro' ? 'metro' : 'train' };
         return;
       }
       location.href = url.pathname + url.search + url.hash;
@@ -1559,14 +1642,15 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     // Shops: tap the facade. The park is open ground (the bone and the ball are in
     // it), so only its sign counts as "going in"; anywhere else there just walks.
     const onParkSign = (l: (typeof world.stops)[number]) => wx >= l.x + 14 && wx < l.x + 146 && wy >= 86 && wy < 134;
-    const lot = world.stops.find((l) => (l.type === 'park' ? onParkSign(l) : wx >= l.x && wx < l.x + l.w && wy < FACADE));
+    const onMetro = (l: (typeof world.stops)[number]) => wx >= l.x - 32 && wx < l.x + l.w + 4 && wy >= 350 && wy < 404;
+    const lot = world.stops.find((l) => (l.type === 'park' ? onParkSign(l) : l.type === 'metro' ? onMetro(l) : wx >= l.x && wx < l.x + l.w && wy < FACADE));
     if (lot) {
       if (wasPlaying && near === lot) { goIn(); return; }
       target = { x: doorX(lot), y: doorY(lot) };
       return;
     }
     steerId = e.pointerId;
-    target = { x: wx, y: clamp(wy, topAt(wx), WH - 8) };
+    target = { x: wx, y: clamp(wy, topAt(wx), FAR_EDGE - 8) };
     spawnFx('ring', target.x, target.y, 0, 0, 0.45);
   });
   canvas.addEventListener('pointermove', (e) => {
@@ -1574,7 +1658,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     const r = canvas.getBoundingClientRect();
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const wx = camX + sx / scale, wy = (sy - offY) / scale;
-    target = { x: wx, y: clamp(wy, topAt(wx), WH - 8) };
+    target = { x: wx, y: clamp(wy, topAt(wx), FAR_EDGE - 8) };
   });
   const endTouch = (e: PointerEvent) => {
     if (e.pointerId === steerId) steerId = null;
@@ -1601,20 +1685,30 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   resize();
   const params = new URLSearchParams(location.search);
-  const viaTrain = params.get('via') === 'train';
+  const via = params.get('via');
+  const viaRide: Ride | null = via === 'train' || (via === 'metro' && world.metro) ? via : null;
   if (params.get('sound') === '1' && !wantSound) setSound(true);
-  if (viaTrain) {
+  if (viaRide) {
     const st = world.stops.find((l) => l.stop.id === 'station');
-    if (st) {
+    if (viaRide === 'metro' && world.metro) {
+      // Up the stairs from the metro, heading west along the far sidewalk.
+      const m = world.metro;
+      dog.x = m.x - 40; dog.y = m.y + m.h / 2; dog.heading = Math.PI;
+      human.x = m.x - 16; human.y = m.y + m.h / 2 + 4; human.heading = Math.PI;
+      resetRope();
+      camX = clamp(dog.x - viewW * 0.45, 0, Math.max(0, W - viewW));
+    } else if (st) {
       dog.x = doorX(st); dog.y = 152; dog.heading = Math.PI * 0.5;
       human.x = doorX(st) - 24; human.y = 150; human.heading = 0;
       resetRope();
       camX = clamp(dog.x - viewW * 0.45, 0, Math.max(0, W - viewW));
     }
     playing = true;
-    if (!reduced && !streetTest) arriving = 0.45;
+    arrivedBy = viaRide;
+    if (!reduced && !streetTest) arriving = ARRIVE_S[viaRide];
     const fsWanted = params.get('fs');
-    toast = { text: fsWanted === 'screen' && canRealFs ? 'Arrived from 3D! Press any key for fullscreen' : 'Arrived from 3D Estació!', t: 3 };
+    const from = viaRide === 'metro' ? 'Up from the metro!' : 'Arrived from 3D Estació!';
+    toast = { text: fsWanted === 'screen' && canRealFs ? 'Arrived from 3D! Press any key for fullscreen' : from, t: 3 };
     if (fsWanted === 'window' || fsWanted === 'screen') restoreFs(fsWanted);
     else fig.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
     // Arriving by train continues the walk: take the keys without another click.
@@ -1651,6 +1745,20 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       get target() { return target; },
       buttons: () => buttons(),
       restart: () => restart(),
+      // Move Millie (and her human, just behind) and straighten the leash.
+      teleport(x: number, y: number) {
+        Object.assign(dog, { x, y });
+        Object.assign(human, { x: x - 30, y });
+        resetRope();
+        camX = clamp(dog.x - viewW * 0.45, 0, Math.max(0, W - viewW));
+      },
+      get boarding() { return boarding; },
+      get arriving() { return arriving; },
+      // Play a ride's cutscene without leaving the page (tests skip it otherwise).
+      rehearse(ride: Ride, phase: 'board' | 'arrive') {
+        if (phase === 'board') boarding = { href: '', t: 0, sent: true, ride };
+        else { boarding = null; arrivedBy = ride; arriving = ARRIVE_S[ride]; }
+      },
       key(code: string, down: boolean) { fig.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code === 'Space' ? ' ' : code, bubbles: true })); },
       tick(n: number) { for (let i = 0; i < n; i++) update(1 / 60); draw(); },
     };

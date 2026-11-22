@@ -22,6 +22,7 @@ import { makeCitySkyline, makeInlandHills } from './horizon';
 import { PLAZA, inPlazaPipica, makePlazaDistrict } from './plaza';
 import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } from './hill';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
+import { groundAroundMetro, makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
   M, box, cyl, rod, shadowed,
@@ -209,7 +210,10 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(drain);
   // The Rambla's slabs, the promenade's concrete, the boardwalk's planks.
   // Leave holes where the underpass cuts down below street level.
-  root.add(ground(-140, 140, CUT.rambla0, 34, GROUND_Y, slabMat, slab.tileMeters));
+  // The metro entrance's stairwell is a hole in the Rambla's slabs too.
+  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(-140, 140, CUT.rambla0, 34, SEAFRONT_LAYOUT.metro)) {
+    root.add(ground(gx0, gx1, gz0, gz1, GROUND_Y, slabMat, slab.tileMeters));
+  }
   root.add(ground(-140, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, 140, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(-140, 140, -10, CUT.sea1, GROUND_Y, concMat, conc.tileMeters));
@@ -580,6 +584,14 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(station, STATION_X, GROUND_Y, 14.2 + stD / 2);
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
   stops0.push({ id: 'station', label: 'Estació', kind: 'Train to 2D street', href: '/?via=train', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 2.2, r: 5.5 });
+
+  // ---- The metro entrance, at the west end of the Rambla (metro.ts) ----
+  const metroDef = SEAFRONT_LAYOUT.metro;
+  const metro = makeMetroEntrance(metroDef, GROUND_Y);
+  root.add(metro.group);
+  boxes.push({ ...metro.rail, kind: 'rail' });
+  addCircle(metro.totem.x, metro.totem.z, metro.totem.r, metro.totem.top, 'pole', true, true);
+  stops0.push({ id: 'metro', label: 'Metro', kind: 'Metro to 2D street', href: '/?via=metro', color: metroDef.lineColor, x: metro.head.x, z: metro.head.z, r: 2.2 });
 
   yield 'The underpass';
   // ---- The underpass ----------------------------------------------------------------------
@@ -1272,6 +1284,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     },
     correfoc: { x0: 80, x1: -2, z: 24 },
     station: { x: STATION_X },
+    // Arriving by metro: up the stairs, heading west along the Rambla.
+    metro: { dog: { x: metro.head.x - 1.3, z: metro.head.z }, human: { x: metro.head.x + 0.2, z: metro.head.z + 0.5 }, heading: Math.PI },
   };
 }
 

@@ -3,10 +3,17 @@
   and the 3D seafront walk. Driven by actual build/streaming progress, with a
   minimum scenic ride when arriving via Estació and an immediate Skip button once
   the 3D world is ready.
+
+  The metro (`?via=metro`) gets its own: a ride through the tunnel in an L2-style
+  car into an underground platform on the way in, and a walk down the stairs
+  before the doors close on the way out (`playDepartureDoors(..., 'metro')`).
 */
+
+export type Ride = 'train' | 'metro';
 
 export interface TransitOpts {
   viaTrain: boolean;
+  viaMetro?: boolean;
   night: boolean;
   reduced: boolean;
   walktest: boolean;
@@ -24,7 +31,11 @@ const DOOR_MS = 380;
 
 export function createTransitOverlay(host: HTMLElement, opts: TransitOpts): TransitOverlay {
   const el = document.createElement('div');
-  el.className = opts.viaTrain ? 'loading via-train' : 'loading';
+  const metro = !!opts.viaMetro && !opts.viaTrain;
+  // Either ride plays the scenic version and opens doors at the end.
+  const riding = opts.viaTrain || metro;
+  const scene = metro ? drawMetroCutscene : drawCutscene;
+  el.className = riding ? `loading via-train${metro ? ' metro' : ''}` : 'loading';
 
   const cv = document.createElement('canvas');
   cv.className = 'transit-cv';
@@ -32,7 +43,7 @@ export function createTransitOverlay(host: HTMLElement, opts: TransitOpts): Tran
 
   const labelEl = document.createElement('span');
   labelEl.className = 'transit-msg';
-  labelEl.textContent = opts.viaTrain ? 'R1 · Heading to the seafront…' : 'Building the seafront…';
+  labelEl.textContent = metro ? 'Metro L2 · Heading to the seafront…' : opts.viaTrain ? 'R1 · Heading to the seafront…' : 'Building the seafront…';
 
   const track = document.createElement('i');
   const bar = document.createElement('b');
@@ -74,25 +85,25 @@ export function createTransitOverlay(host: HTMLElement, opts: TransitOpts): Tran
   const drawFrame = (now: number) => {
     if (!ctx) return;
     const elapsed = now - t0;
-    if (opts.viaTrain && !opts.reduced && !opts.walktest) {
+    if (riding && !opts.reduced && !opts.walktest) {
       const targetP = worldReady ? Math.min(1, Math.max(loadPct / 100, elapsed / DWELL_MS)) : (loadPct / 100) * 0.86;
       visP += (targetP - visP) * 0.16;
       if (elapsed > DWELL_MS * 0.56 && visP > 0.55) {
-        labelEl.textContent = 'Approaching Estació…';
+        labelEl.textContent = metro ? 'Arriving at the metro…' : 'Approaching Estació…';
       }
     } else {
       visP = Math.max(visP, loadPct / 100);
       if (customLabel) labelEl.textContent = customLabel;
     }
 
-    drawCutscene(ctx, dpr, visP, elapsed / 1000, opts.night, opts.reduced);
-    if (!worldReady || (opts.viaTrain && !skipped && elapsed < DWELL_MS + 40 && visP < 0.99)) {
+    scene(ctx, dpr, visP, elapsed / 1000, opts.night, opts.reduced);
+    if (!worldReady || (riding && !skipped && elapsed < DWELL_MS + 40 && visP < 0.99)) {
       raf = requestAnimationFrame(drawFrame);
     }
   };
 
   if (ctx) {
-    drawCutscene(ctx, dpr, 0, 0, opts.night, opts.reduced);
+    scene(ctx, dpr, 0, 0, opts.night, opts.reduced);
     if (!opts.reduced && !opts.walktest) {
       raf = requestAnimationFrame(drawFrame);
     }
@@ -109,7 +120,7 @@ export function createTransitOverlay(host: HTMLElement, opts: TransitOpts): Tran
       loadPct = 100;
       bar.style.width = '100%';
 
-      if (opts.viaTrain && !opts.reduced && !opts.walktest) {
+      if (riding && !opts.reduced && !opts.walktest) {
         const remain = DWELL_MS - (performance.now() - t0);
         if (remain > 80) {
           skipBtn.hidden = false;
@@ -122,7 +133,7 @@ export function createTransitOverlay(host: HTMLElement, opts: TransitOpts): Tran
         skipBtn.hidden = true;
         cancelAnimationFrame(raf);
         visP = 1;
-        if (ctx) drawCutscene(ctx, dpr, 1, (performance.now() - t0) / 1000, opts.night, false);
+        if (ctx) scene(ctx, dpr, 1, (performance.now() - t0) / 1000, opts.night, false);
         el.classList.add('doors-open');
         await new Promise<void>((resolve) => window.setTimeout(resolve, DOOR_MS));
       } else {
@@ -134,16 +145,20 @@ export function createTransitOverlay(host: HTMLElement, opts: TransitOpts): Tran
   };
 }
 
-export function playDepartureDoors(host: HTMLElement, label: string, reduced: boolean): Promise<void> {
+/** How long the metro's walk down the stairs takes before its doors close (matches the CSS). */
+const STAIRS_MS = 640;
+
+export function playDepartureDoors(host: HTMLElement, label: string, reduced: boolean, ride: Ride = 'train'): Promise<void> {
   const el = document.createElement('div');
-  el.className = 'loading depart';
-  el.innerHTML = `<div class="door l"></div><div class="door r"></div><span class="transit-msg"></span>`;
+  el.className = ride === 'metro' ? 'loading depart metro' : 'loading depart';
+  // The metro: steps rise over the view from the bottom (walking down), then the doors close.
+  el.innerHTML = `${ride === 'metro' ? '<div class="stairs"></div>' : ''}<div class="door l"></div><div class="door r"></div><span class="transit-msg"></span>`;
   el.querySelector('.transit-msg')!.textContent = label;
   host.appendChild(el);
   if (reduced) return Promise.resolve();
   void el.offsetWidth;
   el.classList.add('closing');
-  return new Promise<void>((resolve) => window.setTimeout(resolve, DOOR_MS + 40));
+  return new Promise<void>((resolve) => window.setTimeout(resolve, DOOR_MS + 40 + (ride === 'metro' ? STAIRS_MS : 0)));
 }
 
 function drawCutscene(
@@ -379,6 +394,14 @@ function drawCutscene(
   c.fillStyle = '#273457';
   c.fillRect(14, 232, LOGICAL_W - 28, 56);
 
+  drawRiders(c, t, speed, reduced);
+
+  c.restore();
+  c.restore();
+}
+
+/** Millie and her human on the seat: shared by the train and the metro rides. */
+function drawRiders(c: CanvasRenderingContext2D, t: number, speed: number, reduced: boolean) {
   // Human sitting on the bench, looking at their phone
   const hx = 192;
   const hy = 208;
@@ -450,6 +473,172 @@ function drawCutscene(
   c.moveTo(mx + 14, my - 6);
   c.quadraticCurveTo((hx + mx) / 2, my + 24, hx + 11, hy - 22);
   c.stroke();
+}
+
+/**
+ * The metro ride: an L2-style car (stainless, a purple stripe, a vertical grab
+ * pole) running through the tunnel, its lights streaking past the window, and
+ * pulling into an underground platform as `p` nears 1. The platform's sign
+ * just says Metro: the real station stays unnamed.
+ */
+function drawMetroCutscene(
+  c: CanvasRenderingContext2D,
+  dpr: number,
+  p: number,
+  t: number,
+  night: boolean,
+  reduced: boolean,
+) {
+  c.save();
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+  const speed = p < 0.7 ? 1 : Math.max(0, 1 - (p - 0.7) / 0.3);
+  const bump = reduced ? 0 : Math.sin(t * 34) * 0.9 * speed;
+  const wx = 26;
+  const wy = 22;
+  const ww = LOGICAL_W - 52;
+  const wh = 172;
+  const scroll = p < 0.85 ? p * 1400 : 0.85 * 1400 + (p - 0.85) * 260;
+
+  // 1. Through the window: the tunnel, then the platform sliding in.
+  c.save();
+  c.beginPath();
+  c.roundRect(wx, wy, ww, wh, 18);
+  c.clip();
+  c.fillStyle = '#101219';
+  c.fillRect(wx, wy, ww, wh);
+  // Tunnel wall: ribs and cable runs, scrolling fast.
+  c.fillStyle = '#1b1e28';
+  for (let i = -1; i < 12; i++) {
+    const rx = wx + ((((i * 60 - scroll * 1.6) % (ww + 60)) + ww + 60) % (ww + 60)) - 30;
+    c.fillRect(rx, wy, 10, wh);
+  }
+  c.strokeStyle = '#2c3140';
+  c.lineWidth = 3;
+  for (const cy of [wy + 46, wy + 58, wy + 130]) {
+    c.beginPath();
+    c.moveTo(wx, cy);
+    c.lineTo(wx + ww, cy);
+    c.stroke();
+  }
+  // Tunnel lights streaking past (longer the faster she goes).
+  c.fillStyle = '#ffe6a8';
+  const streak = 8 + 70 * speed;
+  for (let i = -1; i < 4; i++) {
+    const lx = wx + ((((i * 170 - scroll * 2.2) % (ww + 170)) + ww + 170) % (ww + 170)) - 85;
+    c.globalAlpha = 0.85;
+    c.fillRect(lx, wy + 30, streak, 5);
+    c.globalAlpha = 0.18;
+    c.fillRect(lx - 10, wy + 22, streak + 20, 22);
+  }
+  c.globalAlpha = 1;
+
+  // The platform: white tiles with a band of the line's color, lights, a sign.
+  if (p > 0.62) {
+    const arrive = Math.min(1, (p - 0.62) / 0.38);
+    const px = wx + ww - arrive * ww * 1.05;
+    c.fillStyle = night ? '#d8dbe2' : '#eceef1';
+    c.fillRect(px, wy, ww * 1.4, wh);
+    c.strokeStyle = 'rgba(120, 130, 145, 0.25)';
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let gx = 0; gx < ww * 1.4; gx += 14) {
+      c.moveTo(px + gx, wy);
+      c.lineTo(px + gx, wy + wh);
+    }
+    for (let gy = wy; gy < wy + wh; gy += 10) {
+      c.moveTo(px, gy);
+      c.lineTo(px + ww * 1.4, gy);
+    }
+    c.stroke();
+    c.fillStyle = '#9b2d8f';
+    c.fillRect(px, wy + 96, ww * 1.4, 14);
+    c.fillStyle = '#fff6dc';
+    for (let lx = 30; lx < ww * 1.4; lx += 120) c.fillRect(px + lx, wy + 8, 70, 6);
+    // Sign: the red diamond, "Metro" and the line badge.
+    const sx = px + 140;
+    c.fillStyle = '#14203d';
+    c.beginPath();
+    c.roundRect(sx, wy + 52, 180, 32, 5);
+    c.fill();
+    c.save();
+    c.translate(sx + 22, wy + 68);
+    c.rotate(Math.PI / 4);
+    c.fillStyle = '#d52b1e';
+    c.fillRect(-9, -9, 18, 18);
+    c.restore();
+    c.fillStyle = '#f4f1ea';
+    c.font = '900 13px system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('M', sx + 22, wy + 68.5);
+    c.textAlign = 'left';
+    c.font = '800 15px system-ui, sans-serif';
+    c.fillText('Metro', sx + 42, wy + 68.5);
+    c.fillStyle = '#9b2d8f';
+    c.beginPath();
+    c.roundRect(sx + 100, wy + 58, 30, 20, 4);
+    c.fill();
+    c.fillStyle = '#f4f1ea';
+    c.textAlign = 'center';
+    c.font = '800 12px system-ui, sans-serif';
+    c.fillText('L2', sx + 115, wy + 68.5);
+    c.textAlign = 'left';
+    c.font = '700 9px system-ui, sans-serif';
+    c.fillText('SORTIDA', sx + 138, wy + 68.5);
+    // The platform edge
+    c.fillStyle = '#f2c230';
+    c.fillRect(px, wy + wh - 18, ww * 1.4, 5);
+    c.fillStyle = '#8a8c90';
+    c.fillRect(px, wy + wh - 13, ww * 1.4, 13);
+  }
+  c.restore();
+
+  // 2. The car: stainless walls, a purple stripe, a vertical pole, the seat.
+  c.save();
+  c.translate(0, bump);
+  c.fillStyle = night ? '#3a4152' : '#c9ced6';
+  c.beginPath();
+  c.rect(0, -4, LOGICAL_W, LOGICAL_H + 8);
+  c.roundRect(wx, wy, ww, wh, 18);
+  c.fill('evenodd');
+  c.strokeStyle = night ? '#596173' : '#9aa1ab';
+  c.lineWidth = 4;
+  c.beginPath();
+  c.roundRect(wx, wy, ww, wh, 18);
+  c.stroke();
+  c.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  c.lineWidth = 6;
+  c.beginPath();
+  c.moveTo(wx + 30, wy + wh - 12);
+  c.lineTo(wx + 92, wy + 14);
+  c.stroke();
+  c.fillStyle = '#9b2d8f';
+  c.fillRect(0, wy + wh + 2, LOGICAL_W, 8);
+  // Line map strip above the window: dots along a purple line.
+  c.fillStyle = '#9b2d8f';
+  c.fillRect(150, 7, 260, 3);
+  c.fillStyle = '#f4f1ea';
+  for (let k = 0; k < 9; k++) {
+    c.beginPath();
+    c.arc(150 + k * 32.5, 8.5, 3, 0, Math.PI * 2);
+    c.fill();
+  }
+  // Vertical grab pole by the door.
+  c.fillStyle = '#e2e6ea';
+  c.fillRect(LOGICAL_W - 92, 0, 6, LOGICAL_H);
+  c.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  c.fillRect(LOGICAL_W - 87, 0, 1.5, LOGICAL_H);
+  // Seat (the metro's moulded seats, in the line's color).
+  c.fillStyle = '#7a2370';
+  c.beginPath();
+  c.roundRect(14, 198, LOGICAL_W - 120, 84, [12, 12, 0, 0]);
+  c.fill();
+  c.fillStyle = '#5e1b57';
+  c.fillRect(14, 232, LOGICAL_W - 120, 56);
+
+  drawRiders(c, t, speed, reduced);
 
   c.restore();
   c.restore();

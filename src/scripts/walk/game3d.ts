@@ -147,9 +147,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // near the start. The rest bakes in the background while you play (the Streamer).
   const searchParams = new URLSearchParams(location.search);
   const viaTrain = searchParams.get('via') === 'train';
+  const viaMetro = searchParams.get('via') === 'metro';
   const walktest = searchParams.has('walktest');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const transit = createTransitOverlay(host, { viaTrain, night: isNightTheme(), reduced: reducedMotion, walktest });
+  const transit = createTransitOverlay(host, { viaTrain, viaMetro, night: isNightTheme(), reduced: reducedMotion, walktest });
   const buildT0 = performance.now();
   let stepsDone = 0;
   // Longest single step (the page can't respond during one): what to split next.
@@ -171,9 +172,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex })), () => {
     transit.setProgress(Math.min(70, (stepsDone / LEVEL_STEPS) * 70));
   }, 14);
-  const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : level.start.dog;
-  const startHuman = viaTrain ? { x: level.station.x - 1.8, z: 22.0 } : level.start.human;
-  const startHeading = viaTrain ? Math.PI : -Math.PI / 2;
+  const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : viaMetro ? level.metro.dog : level.start.dog;
+  const startHuman = viaTrain ? { x: level.station.x - 1.8, z: 22.0 } : viaMetro ? level.metro.human : level.start.human;
+  const startHeading = viaTrain ? Math.PI : viaMetro ? level.metro.heading : -Math.PI / 2;
   const streamer = new Streamer(level.districts, level.grid);
   await runSliced(streamer.warm(startDog.x, startDog.z), (f) => {
     transit.setProgress(70 + (f ?? 0) * 30);
@@ -1138,6 +1139,19 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (audio.on) dest.searchParams.set('sound', '1');
       if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
       void playDepartureDoors(host, 'Boarding R1 · Back to 2D street…', reducedMotion).then(() => {
+        location.href = dest.pathname + dest.search + dest.hash;
+      });
+      return;
+    }
+    if (stop.id === 'metro') {
+      // Down the stairs and onto the metro, to the 2D street's own metro entrance.
+      departing = true;
+      releaseAll();
+      audio.chime();
+      const dest = new URL(stop.href || '/?via=metro', location.origin);
+      if (audio.on) dest.searchParams.set('sound', '1');
+      if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
+      void playDepartureDoors(host, 'Metro L2 · Back to 2D street…', reducedMotion, 'metro').then(() => {
         location.href = dest.pathname + dest.search + dest.hash;
       });
       return;
@@ -2187,7 +2201,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     else if (nearCoriolis()) { prompts.push({ key: 'X', label: 'Play the LED wall' }); }
     else if (nearStemma()) { prompts.push({ key: 'X', label: stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
     if (found && !coriolisFocus) {
-      prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : `Visit ${found.label}` });
+      prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro to 2D street' : `Visit ${found.label}` });
       banner = banner ?? `${found.label} · ${found.kind}`;
     }
     if (!coriolisFocus && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
@@ -2519,10 +2533,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   update(1 / 60);
   renderer.render(scene, camera);
   await transit.finish();
-  if (viaTrain) {
+  if (viaTrain || viaMetro) {
     const fsWanted = searchParams.get('fs');
     restoreFs(fsWanted);
-    hud.toast('Arrived at Estació', fsWanted === 'screen' && canRealFs ? 'Welcome to the 3D seafront! Press any key for fullscreen.' : 'Welcome to the 3D seafront!');
+    hud.toast(viaMetro ? 'Up from the metro' : 'Arrived at Estació', fsWanted === 'screen' && canRealFs ? 'Welcome to the 3D seafront! Press any key for fullscreen.' : 'Welcome to the 3D seafront!');
     host.focus({ preventScroll: true });
     if (!walktest) {
       searchParams.delete('via');
