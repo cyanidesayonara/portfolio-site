@@ -25,7 +25,7 @@ import {
 } from './models';
 import {
   makeLanternPost, makeSpotMast, makeTerrace, makeTamarisk, makeDatePalm, makeChimney, makeXemeneies,
-  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry,
+  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost,
 } from './props';
 import {
   panotTextures, sandTexture, deckTexture, plasterTexture, waterNormalTexture, signTexture, rng,
@@ -661,9 +661,25 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     const rampLen = Math.hypot(za - zb, GROUND_Y - CUT.floor);
     const ramp = box(1.5, 0.1, rampLen, M(0xc4b29a, 0.9));
     ramp.position.set(CUT.x - 0.8, (GROUND_Y + CUT.floor) / 2, (za + zb) / 2);
-    ramp.rotation.x = Math.atan2(GROUND_Y - CUT.floor, za - zb) * (za > zb ? 1 : -1);
+    // Tilt so the street-level end is up (that's za on the town side, zb on the sea side).
+    const highZ = cutY(za) > cutY(zb) ? za : zb;
+    ramp.rotation.x = Math.atan2(GROUND_Y - CUT.floor, Math.abs(za - zb)) * (highZ > (za + zb) / 2 ? -1 : 1);
     root.add(ramp);
   }
+  // Fingerposts at both ends of the underpass: the way to the projects, the beach and town.
+  const W_ = Math.PI, E_ = 0, SEA = -Math.PI / 2, LAND = Math.PI / 2;
+  place(makeFingerpost([
+    { title: 'Projects', sub: 'Leash game · stemma', color: '#ffb020', angle: W_ },
+    { title: 'Projects', sub: 'Coriolis · About · Blog', color: '#1fc9b7', angle: E_ },
+    { title: 'Platja', sub: 'Beach · old pier', color: '#3d73c7', angle: SEA - 0.75 },
+  ]), -4.3, GROUND_Y, -3.4);
+  addCircle(-4.3, -3.4, 0.12, GROUND_Y + 3.5, 'pole', true, true);
+  place(makeFingerpost([
+    { title: 'Platja', sub: 'Projects · beach', color: '#ffb020', angle: SEA + 0.75 }, // into the underpass
+    { title: 'Estació', sub: 'Rodalies', color: '#e5302a', angle: E_ },
+    { title: 'Carrer del Mar', sub: 'Centre', color: '#2a5aa8', angle: LAND - 0.7 },
+  ]), -4.4, GROUND_Y, 22.6);
+  addCircle(-4.4, 22.6, 0.12, GROUND_Y + 3.5, 'pole', true, true);
   // Grey concrete retaining walls with a timber-topped parapet.
   const wallM = M(0xa9a7a1, 0.9);
   for (const [za, zb] of [[CUT.rambla1, CUT.rambla0], [CUT.sea1, CUT.sea0]] as const) {

@@ -220,22 +220,29 @@ export function makeDog(look: DogLook = MILLIE): DogModel {
   group.scale.setScalar(look.scale);
   shadowed(group);
 
+  // Gait and wag phases are accumulated, so speed/wag changes never make them jump.
+  let lastT = Number.NaN, gait = Math.random() * 6, wagP = 0;
   const animate: DogModel['animate'] = (t, s) => {
+    const dtA = Number.isFinite(lastT) ? Math.max(0, Math.min(0.1, t - lastT)) : 0;
+    lastT = t;
     const moving = s.speed > 0.15;
-    const gait = t * (4 + s.speed * 2.6);
+    gait += dtA * (4 + Math.min(s.speed, 6) * 2.4);
+    wagP += dtA * (6 + s.wag * 12);
     const amp = Math.min(0.75, s.speed * 0.16);
+    // A trot (diagonal pairs) that turns into a gallop (front pair, back pair) at speed.
+    const gallop = s.speed > 4.3;
     legs.forEach((leg, i) => {
-      const phase = i === 0 || i === 3 ? 0 : Math.PI;
-      leg.rotation.z = moving ? Math.sin(gait + phase) * amp : 0;
+      const phase = gallop ? (i < 2 ? i * 0.35 : Math.PI + (i - 2) * 0.35) : i === 0 || i === 3 ? 0 : Math.PI;
+      leg.rotation.z = moving ? Math.sin(gait + phase) * amp * (gallop ? 1.25 : 1) : 0;
       if (s.air) leg.rotation.z = i < 2 ? -0.6 : 0.7;
     });
     if (s.peeing) legs[3].rotation.x = -1.0;
     else legs[3].rotation.x = 0;
     body.position.y = moving ? Math.abs(Math.sin(gait)) * 0.03 * Math.min(1, s.speed / 3) : 0;
-    body.rotation.z = s.dig ? -0.22 : moving ? Math.sin(gait * 2) * 0.02 : 0;
+    body.rotation.z = s.dig ? -0.22 : moving ? (gallop ? Math.sin(gait) * 0.09 : Math.sin(gait * 2) * 0.02) : 0;
     head.rotation.z = s.dig ? -0.35 : Math.sin(t * 1.3) * 0.05;
     head.rotation.y = Math.sin(t * 0.7) * 0.12;
-    tail.rotation.y = Math.sin(t * (6 + s.wag * 12)) * (0.35 + s.wag * 0.4);
+    tail.rotation.y = Math.sin(wagP) * (0.35 + s.wag * 0.4);
     tail.rotation.z = s.dig ? -0.2 : 0.1 + s.wag * 0.2;
     ears.forEach((e, i) => {
       e.rotation.z = moving ? Math.sin(gait + i) * 0.12 : 0;
@@ -275,7 +282,8 @@ export interface PersonModel {
   phone: THREE.Mesh | null;
   phoneScreen: THREE.MeshStandardMaterial | null;
   ponytail: THREE.Object3D | null;
-  animate: (t: number, s: { speed: number; pose: Pose; look?: number }) => void;
+  /** `pull` 0–1: how hard the leash drags them forward (lean back, leash arm out). */
+  animate: (t: number, s: { speed: number; pose: Pose; look?: number; pull?: number }) => void;
 }
 
 export function makePerson(look: PersonLook): PersonModel {
@@ -412,9 +420,15 @@ export function makePerson(look: PersonLook): PersonModel {
   group.scale.setScalar(look.height ?? 1);
   shadowed(group);
 
+  // Gait phase is accumulated, so speed changes never make the legs jump.
+  let lastT = Number.NaN, walkF = Math.random() * 6;
   const animate: PersonModel['animate'] = (t, s) => {
-    const walkF = t * (3 + s.speed * 2.4);
-    const amp = Math.min(0.6, s.speed * 0.42);
+    const dtA = Number.isFinite(lastT) ? Math.max(0, Math.min(0.1, t - lastT)) : 0;
+    lastT = t;
+    walkF += dtA * (3 + Math.min(s.speed, 4.5) * 2.2);
+    const run = Math.max(0, Math.min(1, (s.speed - 2.1) / 0.8));
+    const amp = Math.min(0.6 + run * 0.2, s.speed * 0.42);
+    const pull = s.pull ?? 0;
     const lf = arms[0].getObjectByName('fore') as THREE.Group;
     const rf = arms[1].getObjectByName('fore') as THREE.Group;
     hips.position.y = 0.92;
@@ -462,17 +476,22 @@ export function makePerson(look: PersonLook): PersonModel {
         break;
       default: {
         // Walking or standing, phone in the right hand, leash in the left.
-        legs.forEach((l, i) => { l.rotation.z = Math.sin(walkF + i * Math.PI) * amp; });
-        hips.position.y = 0.92 + Math.abs(Math.cos(walkF)) * 0.025 * Math.min(1, s.speed);
-        arms[0].rotation.set(0, 0, 0.55 + Math.sin(walkF) * amp * 0.25);
-        lf.rotation.z = 0.5;
+        legs.forEach((l, i) => { l.rotation.z = Math.sin(walkF + i * Math.PI) * amp * (1 - pull * 0.35); });
+        hips.position.y = 0.92 + Math.abs(Math.cos(walkF)) * (0.025 + run * 0.05) * Math.min(1, s.speed) - run * 0.03 - pull * 0.05;
+        // Running leans in; being dragged leans back against the leash.
+        torso.rotation.z = -run * 0.18 * (1 - pull) + pull * 0.32 + Math.sin(walkF * 2) * 0.02 * Math.min(1, s.speed);
+        hips.rotation.z = pull * 0.12;
+        head.rotation.z = -pull * 0.12;
+        // Leash arm: swings while walking, reaches out toward the dog when pulled.
+        arms[0].rotation.set(0, 0, 0.55 + Math.sin(walkF) * amp * 0.25 * (1 - pull) + pull * 0.85);
+        lf.rotation.z = 0.5 * (1 - pull) + 0.1;
         if (look.prop === 'phone' && (s.pose === 'phone' || s.pose === 'walk' || s.pose === 'stand')) {
           arms[1].rotation.set(0.25, 0, 0.45);
           rf.rotation.set(0, 0, 1.6);
           head.rotation.z = s.pose === 'phone' ? -0.45 : -0.25;
         } else {
-          arms[1].rotation.set(0, 0, -Math.sin(walkF) * amp * 0.6);
-          rf.rotation.z = 0.25;
+          arms[1].rotation.set(0, 0, -Math.sin(walkF) * amp * (0.6 + run * 0.5) * (1 - pull * 0.6) - pull * 0.5);
+          rf.rotation.z = 0.25 + run * 1.1 + pull * 0.6;
         }
       }
     }

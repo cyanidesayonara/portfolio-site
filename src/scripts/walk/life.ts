@@ -221,9 +221,12 @@ export function createLife(ctx: LifeCtx) {
 
   const say = (id: string, text: string, ttl = 1.6, tone: 'paper' | 'win' | 'loud' = 'paper') => hud.say(id, text, ttl, tone);
 
-  function update(dt: number, time: number) {
+  function update(dt: number, time: number, sky: 'day' | 'rain' | 'night' = 'day') {
     clock = time;
     bubbles.length = 0;
+    // Who's out depends on the weather: the beach crowd goes home in rain and at night,
+    // neighbors and joggers stay out on a warm night, dog walkers go out whatever happens.
+    const beachOut = sky === 'day', streetOut = sky !== 'rain';
 
     // Dog walkers.
     for (const dw of walkers) {
@@ -309,12 +312,12 @@ export function createLife(ctx: LifeCtx) {
 
     // Joggers.
     for (const j of joggers) {
-      const vis = near(j.w.x, j.w.z);
+      const vis = streetOut && near(j.w.x, j.w.z);
       j.p.group.visible = vis;
       if (j.saidT > 0) j.saidT -= dt;
       const sp = walkPath(j.w, dt, j.w.speed);
       giveWay(j.w, ctx, dt * 1.5, 1.2);
-      if (j.saidT <= 0 && Math.hypot(j.w.x - dog.x, j.w.z - dog.z) < 2) { say(j.id, pickOne(['Perdó!', 'Bon dia!', 'Compte, guapa!']), 1.2); j.saidT = 8; }
+      if (vis && j.saidT <= 0 && Math.hypot(j.w.x - dog.x, j.w.z - dog.z) < 2) { say(j.id, pickOne(['Perdó!', 'Bon dia!', 'Compte, guapa!']), 1.2); j.saidT = 8; }
       if (!vis) continue;
       const fy = floorAt(j.w.x, j.w.z);
       j.p.group.position.set(j.w.x, fy, j.w.z);
@@ -326,7 +329,7 @@ export function createLife(ctx: LifeCtx) {
     // The coconut seller.
     {
       const s = seller;
-      const vis = near(s.w.x, s.w.z);
+      const vis = beachOut && near(s.w.x, s.w.z);
       s.p.group.visible = vis;
       const sp = walkPath(s.w, dt, s.w.speed);
       giveWay(s.w, ctx, dt);
@@ -334,7 +337,7 @@ export function createLife(ctx: LifeCtx) {
       s.callT -= dt;
       if (s.callT <= 0) {
         s.callT = rand(7, 11);
-        if (Math.hypot(s.w.x - dog.x, s.w.z - dog.z) < 30) say(s.id, pickOne(['Coco! Coco fresco!', 'Cocoooo!', 'Coco, aigua, cervesa!']), 2.2, 'loud');
+        if (vis && Math.hypot(s.w.x - dog.x, s.w.z - dog.z) < 30) say(s.id, pickOne(['Coco! Coco fresco!', 'Cocoooo!', 'Coco, aigua, cervesa!']), 2.2, 'loud');
       }
       if (vis) {
         const fy = floorAt(s.w.x, s.w.z);
@@ -349,11 +352,11 @@ export function createLife(ctx: LifeCtx) {
     {
       const pl = palas;
       const mid = { x: (pl.a.x + pl.b.x) / 2, z: pl.a.z };
-      const vis = near(mid.x, mid.z);
+      const vis = beachOut && near(mid.x, mid.z);
       pl.players.forEach((p) => { p.group.visible = vis; });
       pl.ball.visible = vis;
       if (pl.saidT > 0) pl.saidT -= dt;
-      const millieClose = Math.hypot(dog.x - mid.x, dog.z - mid.z) < 4;
+      const millieClose = vis && Math.hypot(dog.x - mid.x, dog.z - mid.z) < 4;
       if (millieClose && pl.paused <= 0) {
         pl.paused = 3;
         if (pl.saidT <= 0) { say('pal0', pickOne(['Ei, gosseta!', 'Atenta, que va la pilota!']), 1.6); pl.saidT = 8; }
@@ -388,7 +391,7 @@ export function createLife(ctx: LifeCtx) {
       s.x += s.dir * s.speed * dt;
       if (s.x > 75) s.dir = -1;
       if (s.x < -75) s.dir = 1;
-      const vis = near(s.x, s.z) || Math.abs(dog.z - s.z) < 60;
+      const vis = beachOut && (near(s.x, s.z) || Math.abs(dog.z - s.z) < 60);
       s.g.visible = vis;
       if (!vis) continue;
       s.g.position.set(s.x, WATER_Y + 0.04 + Math.sin(time * 1.6 + s.seed) * 0.04, s.z);
@@ -401,7 +404,7 @@ export function createLife(ctx: LifeCtx) {
       sup.x += sup.dir * 0.6 * dt;
       if (sup.x > 60) sup.dir = -1;
       if (sup.x < -60) sup.dir = 1;
-      sup.p.group.visible = Math.abs(dog.z - sup.z) < 70;
+      sup.p.group.visible = beachOut && Math.abs(dog.z - sup.z) < 70;
       if (sup.p.group.visible) {
         sup.p.group.position.set(sup.x, WATER_Y + 0.1 + Math.sin(time * 1.1) * 0.05, sup.z);
         sup.p.group.rotation.y = sup.dir > 0 ? 0 : Math.PI;
@@ -414,7 +417,7 @@ export function createLife(ctx: LifeCtx) {
 
     // Neighbors.
     for (const sn of seniors) {
-      const vis = near(sn.s.x, sn.s.z);
+      const vis = streetOut && near(sn.s.x, sn.s.z);
       sn.p.group.visible = vis;
       if (!vis) continue;
       if (sn.saidT > 0) sn.saidT -= dt;
@@ -434,11 +437,11 @@ export function createLife(ctx: LifeCtx) {
     // Tag.
     {
       const tg = tag;
-      const vis = near(tg.c.x, tg.c.z);
+      const vis = beachOut && near(tg.c.x, tg.c.z);
       tg.kids.forEach((k) => { k.group.visible = vis; });
       if (tg.saidT > 0) tg.saidT -= dt;
       const md = Math.hypot(dog.x - tg.c.x, dog.z - tg.c.z);
-      if (md < 4.5) {
+      if (vis && md < 4.5) {
         if (tg.stop <= 0 && tg.saidT <= 0) { say('kid0', pickOne(['Un gos! Un gos!', 'Mira, un gosset!']), 1.6, 'loud'); tg.saidT = 10; }
         tg.stop = 1.5;
       }
@@ -448,7 +451,7 @@ export function createLife(ctx: LifeCtx) {
         tg.flipT -= dt;
         if (tg.flipT <= 0) {
           tg.flipT = rand(4, 8); tg.w = -tg.w;
-          if (md < 25) say(Math.random() < 0.5 ? 'kid0' : 'kid1', pickOne(["T'he pillat!", 'Para, para!', 'Tu pagues!']), 1.2);
+          if (vis && md < 25) say(Math.random() < 0.5 ? 'kid0' : 'kid1', pickOne(["T'he pillat!", 'Para, para!', 'Tu pagues!']), 1.2);
         }
       }
       if (vis) {
