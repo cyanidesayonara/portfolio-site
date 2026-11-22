@@ -16,7 +16,7 @@ export interface MapMarker {
 }
 
 // World window drawn on the plan (meters). The pier runs on past the top edge.
-const X0 = -96, X1 = 96, Z0 = -74, Z1 = 103;
+const X0 = -96, X1 = 96, Z0 = -134, Z1 = 103;
 const PPM = 4; // plan pixels per meter
 
 const C = {

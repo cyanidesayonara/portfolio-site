@@ -478,6 +478,29 @@ const KEYS = [
   }
   .stage :global(.goals.open ~ .toasts) { top: auto; bottom: 64px; }
 
+  .stage :global(.loading) {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 12px;
+    background: var(--navy-deep, #0b1430);
+    color: #f4f1ea;
+    font: 800 15px var(--font-display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    z-index: 7;
+  }
+  .stage :global(.loading i) {
+    display: block;
+    width: min(260px, 60vw);
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    overflow: hidden;
+  }
+  .stage :global(.loading b) { display: block; width: 0; height: 100%; background: var(--saffron, #ffb020); transition: width 0.15s; }
   .stage :global(.perf) {
     position: absolute;
     left: 50%;
