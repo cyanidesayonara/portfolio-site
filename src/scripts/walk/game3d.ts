@@ -16,6 +16,7 @@ import {
   type DogModel, type PersonModel, type Pose, type BikeStyle,
 } from './models';
 import { makeTofu, makeDevil } from './props';
+import { Minimap, type MapMarker } from './minimap';
 import { bakeStatic, collapseRig } from './bake';
 import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
@@ -131,6 +132,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const level: Level = buildLevel(scene, { coriolisTex });
   const audio = new WalkAudio();
   const hud = new Hud(host);
+  let mapFrame = 0;
+  const minimap = new Minimap(host, level);
   // Sunbathers, anglers and terrace regulars hold still, so they get baked into the scenery.
   const statics = new THREE.Group();
   scene.add(statics);
@@ -212,7 +215,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false },
     { id: 'stemma', label: 'Change the music at stemma (X)', done: false },
     { id: 'pier', label: 'Walk to the end of the pier', done: false },
-    { id: 'dimoni', label: 'Wake the Dimoni on the beach (E)', done: false },
+    { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false },
   ];
   const goal = (id: string) => goals.find((g) => g.id === id)!;
   const completeGoal = (id: string) => {
@@ -360,6 +363,13 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     scene.add(collapseRig(d.person.group));
     return { ...d, id: `dv${i}`, x: level.correfoc.x0 + (i % 3) * 1.4, z: level.correfoc.z - 2 + Math.floor(i / 3) * 3 + (i % 2) * 0.8, ox: (i % 3) * 1.4, oz: -2 + Math.floor(i / 3) * 3 + (i % 2) * 0.8 };
   });
+  // The Dimoni's own devils: hidden until it burns, then they come for Millie.
+  const beachDevils = Array.from({ length: 3 }, (_, i) => {
+    const d = makeDevil();
+    scene.add(collapseRig(d.person.group));
+    d.person.group.visible = false;
+    return { ...d, id: `bd${i}`, x: level.dimoni.x, z: level.dimoni.z, heading: 0, flank: (i - 1) * 1.6 };
+  });
   const drummers = [0, 1].map((i) => {
     const p = makePerson({ top: 0x8a2f2c, trousers: 0x2a1a1a, hair: 0x1a1010, hairStyle: 'short', prop: 'none' });
     const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), M(0xc9a26b, 0.6));
@@ -382,16 +392,28 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
 
   // Chases (the real game's threat grid): La Neteja is slow and scares only
   // you, so your human dawdles; the correfoc is fast and scares you both.
-  type ChaseKind = 'neteja' | 'correfoc';
+  type ChaseKind = 'neteja' | 'correfoc' | 'dimoni';
   let chase: null | { kind: ChaseKind; t: number; speed: number } = null;
   let chaseCooldown = 0;
   const startChase = (kind: ChaseKind) => {
     if (chase || chaseCooldown > 0 || offLeash) return;
-    chase = { kind, t: 0, speed: kind === 'neteja' ? 1.6 : 2.5 };
+    chase = { kind, t: 0, speed: kind === 'neteja' ? 1.6 : kind === 'dimoni' ? 2.0 : 2.5 };
     if (kind === 'neteja') {
       hud.shout('LA NETEJA!', 'bad');
       hud.say('sweeper', 'Fora, gos!', 1.6, 'loud');
       hud.toast('Chase', 'Drag your human to the Rambla or into a side street', '#ff6b5a');
+    } else if (kind === 'dimoni') {
+      hud.shout('CREMADA!', 'loud');
+      humanSay('They\'re coming for us!', 1.8, 'loud');
+      hud.toast('Chase', 'The Dimoni\'s devils are out: get into the sea or get well away', '#ff4a3d');
+      beachDevils.forEach((bd, i) => {
+        // They burst out from behind the fence on the far side of the fire.
+        const away = Math.atan2(level.dimoni.z - dog.z, level.dimoni.x - dog.x);
+        const a = away + (i - 1) * 0.9;
+        bd.x = level.dimoni.x + Math.cos(a) * 6.4; bd.z = level.dimoni.z + Math.sin(a) * 6.4;
+        bd.person.group.visible = true;
+        hud.say(bd.id, pickOne(['Foc!', 'Visca!', 'Corre!']), 1.4, 'loud');
+      });
     } else {
       hud.shout('CORREFOC!', 'loud');
       humanSay('Fire! Run!', 1.6, 'loud');
@@ -405,8 +427,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     chase = null;
     chaseCooldown = 10;
     if (won) {
-      hud.shout(kind === 'neteja' ? 'ESCAPED!' : 'SAFE!', 'good');
-      addBones(kind === 'neteja' ? 5 : 6);
+      hud.shout(kind === 'neteja' ? 'ESCAPED!' : kind === 'dimoni' ? 'COOLED OFF!' : 'SAFE!', 'good');
+      addBones(kind === 'neteja' ? 5 : kind === 'dimoni' ? 7 : 6);
       completeGoal(kind);
     } else if (kind === 'neteja') {
       hud.shout('SOAKED!', 'bad');
@@ -641,9 +663,10 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       completeGoal('birds');
     }
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) {
-      fireworksT = 7;
-      hud.shout('CREMADA!', 'loud');
-      completeGoal('dimoni');
+      fireworksT = 14;
+      audio.firework();
+      if (!chase && chaseCooldown <= 0 && !offLeash) startChase('dimoni');
+      else hud.shout('CREMADA!', 'loud');
     }
     if (!chase && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) startChase('neteja');
     if (!chase && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) startChase('correfoc');
@@ -855,6 +878,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       case 'KeyG': case 'PageDown': doPickup(); break;
       case 'KeyC': cycleCam(); break;
       case 'Tab': hud.toggleGoals(); break;
+      case 'KeyM': minimap.toggle(); break;
       case 'Digit1': skyOverride = true; applySky('day'); break;
       case 'Digit2': skyOverride = true; applySky('rain'); break;
       case 'Digit3': skyOverride = true; applySky('night'); break;
@@ -864,7 +888,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         else if (nearStemma() || stemmaOpen) setStemma(!stemmaOpen);
         break;
       case 'Escape':
-        if (stemmaOpen) setStemma(false);
+        if (minimap.enlarged) minimap.toggle(false);
+        else if (stemmaOpen) setStemma(false);
         else if (full) setFull(false);
         else host.blur();
         break;
@@ -1019,6 +1044,10 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       if (human.seated && tension < 15) { human.vx = 0; human.vz = 0; return; }
       if (holdStill) speed = 0;
       if (chase?.kind === 'neteja') { wantX = 0; wantZ = 0; speed = 0; human.state = 'phone'; human.stateT = 0.5; }
+      if (chase?.kind === 'dimoni' && d > 1.6) {
+        // Scared too: they keep right up with Millie.
+        wantX = dx / d; wantZ = dz / d; speed = 3.1;
+      }
       if (chase?.kind === 'correfoc') {
         // Scared too: they bolt for the underpass.
         const tx = 0, tz = 19;
@@ -1247,7 +1276,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       human.state = 'walk';
       hud.shout('OFF LEASH!', 'good');
       audio.pickup();
-    } else if (!inP && wasInPipica && offLeash) {
+    } else if (!inP && offLeash) {
       offLeash = false;
       if (Math.hypot(dog.x - human.x, dog.z - human.z) > leash.rest * 1.1) {
         human.x = dog.x - 1.5; human.z = dog.z; human.y = level.floor(human.x, human.z, dog.y + 0.3);
@@ -1262,7 +1291,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
 
   // ---- Per-frame world update ---------------------------------------------------------
   const wallTarget = new THREE.Vector3();
-  const camPos = new THREE.Vector3(0, 12, 50);
+  const camPos = new THREE.Vector3(level.start.dog.x, 12, level.start.dog.z + 7);
   const camLook = new THREE.Vector3(0, 1, 30);
   const tmpV = new THREE.Vector3();
   let lightPoolT = 0;
@@ -1590,6 +1619,62 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     } else if (cf.x < level.correfoc.x0) {
       cf.x = Math.min(level.correfoc.x0, cf.x + dt * 3);
     }
+    // The Dimoni's devils hunt Millie across the beach; the sea puts them off.
+    const hunting = chase?.kind === 'dimoni';
+    if (hunting && chase) {
+      chase.t += dt;
+      chase.speed = Math.min(3.6, chase.speed + dt * 0.18);
+      const wet = level.surface(dog.x, dog.z, dog.y) === 'water';
+      const far = Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) > 34;
+      const caught = beachDevils.some((bd) => [dog, human].some((p) => Math.hypot(p.x - bd.x, p.z - bd.z) < 1.0));
+      if (caught) endChase(false);
+      else if (wet || far || chase.t > 26) endChase(true);
+    }
+    for (const bd of beachDevils) {
+      if (!bd.person.group.visible) continue;
+      let tx: number, tz: number, sp: number;
+      if (hunting && chase) {
+        // Aim a little ahead of Millie, fanned out so they close in from the sides.
+        const px = -Math.sin(dog.heading) * bd.flank, pz = Math.cos(dog.heading) * bd.flank;
+        tx = dog.x + dog.vx * 0.4 + px; tz = dog.z + dog.vz * 0.4 + pz; sp = chase.speed;
+      } else {
+        // Back to the bonfire, dancing around it while it burns.
+        const a = time * 0.8 + bd.flank;
+        tx = level.dimoni.x + Math.cos(a) * 6.6; tz = level.dimoni.z + Math.sin(a) * 6.6; sp = 2.2;
+      }
+      const dd = Math.hypot(tx - bd.x, tz - bd.z);
+      let ux = (tx - bd.x) / (dd || 1), uz = (tz - bd.z) / (dd || 1);
+      {
+        // Heading into the bonfire fence: run around it instead.
+        const rx = bd.x - level.dimoni.x, rz = bd.z - level.dimoni.z, rd = Math.hypot(rx, rz) || 1;
+        const inward = -(ux * rx + uz * rz) / rd;
+        if (rd < 7.5 && inward > 0) {
+          let sx = -rz / rd, sz = rx / rd;
+          if (sx * (tx - bd.x) + sz * (tz - bd.z) < 0 || (Math.abs(sx * ux + sz * uz) < 0.05 && bd.flank < 0)) { sx = -sx; sz = -sz; }
+          ux = sx; uz = sz;
+        }
+      }
+      const step = Math.min(dd, sp * dt);
+      if (dd > 0.05) { bd.x += ux * step; bd.z += uz * step; bd.heading = angLerp(bd.heading, Math.atan2(uz, ux), Math.min(1, dt * 8)); }
+      // Devils stay on the dry sand and off the boardwalk.
+      bd.z = clamp(bd.z, -56.5, -20.5);
+      // Around the bonfire fence, not through it.
+      const fx = bd.x - level.dimoni.x, fz = bd.z - level.dimoni.z, fd = Math.hypot(fx, fz);
+      if (fd < 6 && fd > 1e-3) { bd.x = level.dimoni.x + (fx / fd) * 6; bd.z = level.dimoni.z + (fz / fd) * 6; }
+      for (const ob of beachDevils) {
+        if (ob === bd) continue;
+        const ox = bd.x - ob.x, oz = bd.z - ob.z, od = Math.hypot(ox, oz);
+        if (od < 0.9 && od > 1e-3) { bd.x += (ox / od) * (0.9 - od) * 0.5; bd.z += (oz / od) * (0.9 - od) * 0.5; }
+      }
+      bd.person.group.position.set(bd.x, level.floor(bd.x, bd.z, 0), bd.z);
+      bd.person.group.rotation.y = -bd.heading;
+      bd.person.animate(time + bd.flank, { speed: dd > 0.3 ? (hunting ? 4 : 2) : 0.4, pose: 'walk' });
+      if (Math.random() < dt * (hunting ? 26 : 10)) {
+        const sp2 = bd.spark.getWorldPosition(tmpV);
+        burst(sp2.x, sp2.y, sp2.z, pickOne([0xffe08a, 0xffb020, 0xff7a2a, 0xffffff]), 2, 2.2, 2, 0.5, 6);
+      }
+      if (!hunting && fireworksT <= 0) bd.person.group.visible = false;
+    }
     const running = chase?.kind === 'correfoc';
     for (const dv of devils) {
       const tx = cf.x + dv.ox, tz = level.correfoc.z + dv.oz;
@@ -1652,11 +1737,24 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       fireworksT -= dt;
       level.dimoni.glow.intensity = 8 + Math.sin(time * 20) * 3;
       level.dimoni.figure.rotation.y = Math.sin(time * 6) * 0.15;
+      // Flames licking up the figure, then it slumps into the fire.
+      const burnt = clamp((14 - fireworksT) / 12, 0, 1);
+      level.dimoni.figure.position.y = 1.3 - burnt * 1.6;
+      level.dimoni.figure.rotation.z = burnt * 0.25;
+      if (Math.random() < dt * 40) {
+        const fx = level.dimoni.x + rand(-1.6, 1.6), fz = level.dimoni.z + rand(-1.6, 1.6);
+        burst(fx, level.floor(fx, fz, 0) + rand(0.5, 3 + 3 * (1 - burnt)), fz, pickOne([0xff4a1a, 0xff7a2a, 0xffb020, 0xffe08a]), 2, 0.6, 3.5, 0.7, -1);
+      }
+      if (Math.random() < dt * 6) burst(level.dimoni.x + rand(-1, 1), 5 + rand(0, 3), level.dimoni.z + rand(-1, 1), 0x3a3a40, 1, 0.4, 1.4, 1.6, -0.3);
       if (Math.random() < dt * 2.2) {
         fireworks.push({ x: level.dimoni.x + rand(-8, 8), y: 0, z: level.dimoni.z + rand(-6, 2), t: 0, color: pickOne([0xff4a3d, 0xffb020, 0x5eea8c, 0x1fc9b7, 0xe5487a, 0xffffff]) });
         audio.firework();
       }
-    } else level.dimoni.glow.intensity = skyMode === 'night' ? 2 : 0;
+    } else {
+      level.dimoni.glow.intensity = skyMode === 'night' ? 2 : 0;
+      // Rebuilt for next year (instantly; it's a game).
+      level.dimoni.figure.position.y = 1.3; level.dimoni.figure.rotation.z = 0;
+    }
     for (let i = fireworks.length - 1; i >= 0; i--) {
       const f = fireworks[i];
       f.t += dt;
@@ -1693,13 +1791,35 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) prompts.push({ key: 'E', label: 'Bark at the Dimoni' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) prompts.push({ key: 'E', label: 'Bark at La Neteja' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) prompts.push({ key: 'E', label: 'Bark at the devils' });
-    if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : 'Correfoc! Run for the underpass!';
+    if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'dimoni' ? 'The devils are out! Into the sea!' : 'Correfoc! Run for the underpass!';
     if (inTunnel && !banner) banner = 'Carrer del Mar ↔ the beach';
     if (offLeash && !banner) banner = 'Off the leash — run!';
     hud.banner(banner, 'prompt');
     hud.prompts(prompts);
     hud.setVitals({ phones: human.phones, bones, pee, marked: Math.min(5, marked), streak, zoomies: dog.zoom, zoomMode: offLeash ? 'free' : 'normal', time });
     hud.update(rawDt);
+    // Minimap (every other frame when small; it's a cheap 2D blit either way).
+    mapFrame++;
+    if (minimap.enlarged || mapFrame % 2 === 0) {
+      const marks: MapMarker[] = level.stops.map((s) => ({ x: s.x, z: s.z - 4, color: s.color, label: s.label, kind: 'stop' as const }));
+      marks.push(
+        { x: level.station.x, z: 17, color: '#e5302a', label: 'Estació', kind: 'place' },
+        { x: 70, z: -28, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
+        { x: -48, z: -66, color: '#c9a26b', label: 'Old pier', kind: 'place' },
+        { x: 0, z: 9, color: '#f4f1ea', label: 'Underpass', kind: 'place' },
+        { x: 0, z: 62, color: '#f4f1ea', label: 'Carrer del Mar', kind: 'place' },
+      );
+      if (!quest.ball) marks.push({ x: Q.kid.x, z: Q.kid.z - 1, color: '#ffc93c', label: 'Lost ball', kind: 'quest' });
+      if (!quest.tofu) marks.push({ x: tofu.x, z: tofu.z, color: '#ffc93c', label: 'Tofu', kind: 'quest' });
+      if (!quest.crate) marks.push({ x: Q.grocer.x, z: Q.grocer.z, color: '#ffc93c', label: 'Fruiteria', kind: 'quest' });
+      if (!quest.bakery) marks.push({ x: Q.baker.x, z: Q.baker.z, color: '#ffc93c', label: 'Bakery', kind: 'quest' });
+      if (!quest.selfie) marks.push({ x: Q.mural.x, z: Q.mural.z, color: '#ffc93c', label: 'Mural', kind: 'quest' });
+      marks.push({ x: sw.x, z: sw.z, color: '#5ab4ff', label: 'La Neteja', kind: 'threat' });
+      marks.push({ x: cf.x, z: level.correfoc.z, color: '#ff8a2a', label: 'Correfoc', kind: 'threat' });
+      marks.push({ x: level.dimoni.x, z: level.dimoni.z, color: '#ff4a3d', label: 'Dimoni', kind: 'threat' });
+      if (Math.abs(tr.x) < 220) marks.push({ x: tr.x, z: tr.z, color: '#e8e4dc', kind: 'train' });
+      minimap.draw(dog, human, marks);
+    }
 
     // ---- Visuals ----
     dogM.group.position.set(dog.x, dog.y, dog.z);
@@ -1796,6 +1916,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     place('kid', Q.kid.x, Q.kid.y + 1.4, Q.kid.z);
     place('tofu', tofu.x, GROUND_Y + 0.7, tofu.z);
     for (const dv of devils) place(dv.id, dv.x, GROUND_Y + 2.3, dv.z);
+    for (const bd of beachDevils) place(bd.id, bd.x, level.floor(bd.x, bd.z, 0) + 2.3, bd.z);
     place('grocer', Q.grocer.x, RAMBLA_Y + 2.1, Q.grocer.z);
     place('baker', Q.baker.x, RAMBLA_Y + 2.1, Q.baker.z);
     place('sweeper', sw.x, RAMBLA_Y + 2.8, sw.z);
@@ -1884,6 +2005,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     camera.lookAt(camLook);
     fadeUniforms.uFadeA.value.copy(camera.position);
     fadeUniforms.uFadeB.value.set(dog.x, dog.y + 0.5, dog.z);
+    fadeUniforms.uFadeC.value.set(human.x, human.y, human.z);
     // Fade the embankment a little when the camera dips into the underpass.
     sky.position.copy(camera.position);
   };
@@ -1949,6 +2071,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },
+      beachDevils,
       get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
       tick: (frames = 1) => { for (let i = 0; i < frames; i++) update(1 / 60); renderer.render(scene, camera); },

@@ -9,6 +9,7 @@ import * as THREE from 'three';
 export const fadeUniforms = {
   uFadeA: { value: new THREE.Vector3() }, // camera
   uFadeB: { value: new THREE.Vector3() }, // the thing to keep visible
+  uFadeC: { value: new THREE.Vector3(0, -999, 0) }, // feet of someone who never fades (the human)
 };
 
 const patched = new WeakSet<THREE.Material>();
@@ -26,6 +27,7 @@ export function applyNearFade(root: THREE.Object3D) {
         prev?.call(m, shader, renderer);
         shader.uniforms.uFadeA = fadeUniforms.uFadeA;
         shader.uniforms.uFadeB = fadeUniforms.uFadeB;
+        shader.uniforms.uFadeC = fadeUniforms.uFadeC;
         shader.vertexShader = shader.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vFadeW;')
           .replace(
@@ -38,7 +40,7 @@ export function applyNearFade(root: THREE.Object3D) {
             #endif`,
           );
         shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nvarying vec3 vFadeW;\nuniform vec3 uFadeA;\nuniform vec3 uFadeB;')
+          .replace('#include <common>', '#include <common>\nvarying vec3 vFadeW;\nuniform vec3 uFadeA;\nuniform vec3 uFadeB;\nuniform vec3 uFadeC;')
           .replace(
             '#include <clipping_planes_fragment>',
             `#include <clipping_planes_fragment>
@@ -52,7 +54,9 @@ export function applyNearFade(root: THREE.Object3D) {
               float len2 = max(dot(ab, ab), 0.0001);
               float t = clamp(dot(vFadeW - uFadeA, ab) / len2, 0.0, 1.0);
               float tMax = 1.0 - 1.6 / sqrt(len2);
-              if (t < tMax) {
+              vec3 hc = vFadeW - uFadeC;
+              bool isHuman = length(hc.xz) < 0.55 && hc.y > -0.05 && hc.y < 2.0;
+              if (t < tMax && !isHuman) {
                 float ds = distance(vFadeW, uFadeA + ab * t);
                 float radius = 0.7 + t * 0.7;
                 keep = min(keep, clamp((ds - radius * 0.55) / (radius * 0.45), 0.0, 1.0));
@@ -65,7 +69,7 @@ export function applyNearFade(root: THREE.Object3D) {
             }`,
           );
       };
-      m.customProgramCacheKey = () => 'seethrough2';
+      m.customProgramCacheKey = () => 'seethrough3';
       m.needsUpdate = true;
     }
   });
