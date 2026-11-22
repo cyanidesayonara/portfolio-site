@@ -1,5 +1,5 @@
 /*
-  Badalona seafront level, laid out from photos of the real place.
+  The seafront level, laid out from photos of a real Catalan coastal town.
   Meters; +Y up; the sea lies toward −Z so the default camera looks out to it.
 
     z 100 .. 34   town: Carrer del Mar (narrow, dark flagstones, steel arches)
@@ -9,13 +9,14 @@
     z  14 ..  4   the R1 railway at grade, fenced, crossed by a sunken underpass
     z   4 .. −10  the seafront promenade (light concrete, spotlight masts)
     z −10 .. −20  a wooden boardwalk with the project pavilions
-    z −20 .. −60  the beach, then the sea; the Pont del Petroli runs out at x −48
+    z −20 .. −60  the beach, then the sea; the old oil pier runs out at x −48
 
   Borders: works at the street ends, rock breakwaters, the railway fences and
   deep water.
 */
 import * as THREE from 'three';
 import type { Obstacle } from './leash';
+import { bakeStatic } from './bake';
 import {
   M, box, cyl, rod, shadowed,
   makeBench, makeBollard, makeBin, makeContainers, makeKiosk, makeBeachUmbrella, makeTowel,
@@ -372,7 +373,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   building(-42, -41, 34, 60, 3, fc(), []);
 
   // Steel arches and bunting over Carrer del Mar.
-  const archSign = signTexture('Carrer del Mar', 'Badalona', '#f4f1ea', { bg: '#2a5aa8', fg: '#f4f1ea', aspect: 1 });
+  const archSign = signTexture('Carrer del Mar', 'Eix comercial', '#f4f1ea', { bg: '#2a5aa8', fg: '#f4f1ea', aspect: 1 });
   for (const z of [37, 62, 80, 97]) place(makeArch(7, archSign), 0, GROUND_Y, z);
   for (let z = 40; z < 98; z += 7) {
     root.add(makeBunting(new THREE.Vector3(-3.5, GROUND_Y + 6.2, z), new THREE.Vector3(3.5, GROUND_Y + 6.4, z + 2.5)));
@@ -569,7 +570,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   boxes.push({ x0: -148, x1: -CUT.x, z0: 4, z1: 14, top: 9, kind: 'tracks' });
   boxes.push({ x0: CUT.x, x1: 148, z0: 4, z1: 14, top: 9, kind: 'tracks' });
 
-  // ---- Badalona station: platforms under steel canopies, an oxblood building on the Rambla ----
+  // ---- The station: platforms under steel canopies, an oxblood building on the Rambla ----
   const STATION_X = 47;
   for (const [pz0, pz1] of [[11.3, 13.6], [4.4, 6.7]] as const) {
     const plat = box(48, 0.7, pz1 - pz0, M(0xbcb8ae, 0.9));
@@ -590,7 +591,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     canopy.position.set(STATION_X, GROUND_Y + 4.05, (pz0 + pz1) / 2);
     canopy.castShadow = true;
     root.add(canopy);
-    const nameSign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.6, 0.08), new THREE.MeshStandardMaterial({ map: signTexture('Badalona', 'R1', '#e5302a', { aspect: 3.2 / 0.6 }) }));
+    const nameSign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.6, 0.08), new THREE.MeshStandardMaterial({ map: signTexture('Estació', 'R1', '#e5302a', { aspect: 3.2 / 0.6 }) }));
     nameSign.position.set(STATION_X + 6, GROUND_Y + 3.3, (pz0 + pz1) / 2);
     root.add(nameSign);
   }
@@ -625,13 +626,13 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   ped.scale.set(1, 0.2, 1);
   ped.position.set(0, stH + 1.0, stD / 2 - 0.1);
   station.add(ped);
-  const stSign = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.6, 0.08), new THREE.MeshStandardMaterial({ map: signTexture('Estació de Badalona', '', '#e5302a', { aspect: 4.6 / 0.6 }) }));
+  const stSign = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.6, 0.08), new THREE.MeshStandardMaterial({ map: signTexture('Estació', '', '#e5302a', { aspect: 4.6 / 0.6 }) }));
   stSign.position.set(0, 3.6, stD / 2 + 0.16);
   station.add(stSign);
   shadowed(station);
   place(station, STATION_X, GROUND_Y, 14.2 + stD / 2);
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
-  stops0.push({ id: 'station', label: 'Estació de Badalona', kind: 'Rodalies R1', href: '', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 1, r: 0 });
+  stops0.push({ id: 'station', label: 'Estació', kind: 'Rodalies R1', href: '', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 1, r: 0 });
 
   // ---- The underpass ----------------------------------------------------------------------
   const cutY = (z: number) => {
@@ -733,7 +734,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   const underpassLight = new THREE.PointLight(0xeaf4ff, 0, 12, 1.4);
   underpassLight.position.set(0, CUT.floor + tH - 0.4, tMid);
   root.add(underpassLight);
-  const passSign = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.55, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('Platja · Pont del Petroli', '', '#1fc9b7', { aspect: 4.2 / 0.55 }) }));
+  const passSign = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.55, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('Platja · Pont', '', '#1fc9b7', { aspect: 4.2 / 0.55 }) }));
   passSign.position.set(0, GROUND_Y + 0.62, CUT.rambla1 + 0.31);
   root.add(passSign);
   const passSign2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.55, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('Centre · Carrer del Mar', '', '#ffb020', { aspect: 4.2 / 0.55 }) }));
@@ -849,6 +850,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.08), new THREE.MeshStandardMaterial({ color: barCols[i], emissive: barCols[i], emissiveIntensity: 1 }));
     m.position.set(stem.x - 3.6 + i * 0.75, GROUND_Y + 0.6, PZ1 + 0.1);
     m.scale.y = 0.2;
+    m.userData.dynamic = true;
     root.add(m);
     stemmaBars.push(m);
   }
@@ -921,6 +923,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   }
   // El Dimoni on its woodpile, behind a crowd-control fence.
   const dimoni = makeDimoni();
+  dimoni.figure.userData.dynamic = true;
   dimoni.group.scale.setScalar(1.6);
   place(dimoni.group, 24, sandFloor(-38), -38, -0.3);
   addCircle(24, -38, 3.6, SAND_Y + 8, 'dimoni', false, false);
@@ -937,6 +940,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   const mounds: Mound[] = [];
   for (const [mx, mz, name] of [[-16, -27, 'an old one-peseta coin'], [44, -46, 'a pair of sunglasses'], [-68, -36, 'a message in a bottle']] as const) {
     const m = makeSandMound();
+    m.userData.dynamic = true;
     m.position.set(mx, sandFloor(mz), mz);
     root.add(m);
     const loot = new THREE.Group();
@@ -949,6 +953,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     loot.add(gem);
     loot.position.set(mx, sandFloor(mz) + 0.9, mz);
     loot.visible = false;
+    loot.userData.dynamic = true;
     root.add(loot);
     mounds.push({ x: mx, z: mz, name, dug: false, mesh: m, loot });
   }
@@ -993,7 +998,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   const humanBench = { x: P.x0 - 2.6, z: -28 };
   place(makeBench(), humanBench.x - 0.35, SAND_Y, humanBench.z, Math.PI / 2);
 
-  // ---- Pont del Petroli -----------------------------------------------------------------
+  // ---- The old oil pier -----------------------------------------------------------------
   const deckTex2 = deckTexture();
   deckTex2.rotation = Math.PI / 2; // planks laid crosswise
   const pierDeckMat = new THREE.MeshStandardMaterial({ map: deckTex2, roughness: 0.85, color: 0xb0a89c });
@@ -1067,6 +1072,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   root.add(hills);
 
   inst.build(root);
+  bakeStatic(root);
   const poles: Obstacle[] = circles.filter((c) => c.obstacle).map((c) => c.obstacle!);
 
   // ---- Stops (doors of the pavilions) --------------------------------------------------

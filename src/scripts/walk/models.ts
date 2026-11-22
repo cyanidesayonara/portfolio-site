@@ -495,6 +495,7 @@ export function makeBike(style: BikeStyle, rider: PersonModel) {
     for (const x of [-0.42, 0.42]) {
       const w = new THREE.Mesh(G('scw', () => new THREE.TorusGeometry(0.11, 0.035, 6, 14)), tyre);
       w.position.set(x, 0.12, 0);
+      w.userData.dynamic = true;
       group.add(w);
       wheels.push(w);
     }
@@ -509,6 +510,7 @@ export function makeBike(style: BikeStyle, rider: PersonModel) {
     for (const x of [-0.52, 0.52]) {
       const w = new THREE.Mesh(G('bw', () => new THREE.TorusGeometry(0.33, 0.03, 6, 20)), tyre);
       w.position.set(x, 0.34, 0);
+      w.userData.dynamic = true;
       group.add(w);
       const hub = cyl(0.04, 0.04, 0.06, M(0x9aa0a8, 0.3, 0.8));
       hub.rotation.x = Math.PI / 2;
@@ -586,6 +588,7 @@ export function makeSweeper() {
   for (const z of [-0.7, 0.7]) {
     const b = cyl(0.35, 0.35, 0.08, M(0x3a7bd5, 0.9), 16);
     b.position.set(2.0, 0.1, z);
+    b.userData.dynamic = true;
     group.add(b);
     brushes.push(b);
   }
@@ -610,6 +613,7 @@ export function makeTrain(cars = 3) {
         const door = box(1.3, 2.3, 0.06, red);
         door.position.set(x + dx, 1.75, side * 1.47);
         door.userData.z0 = side * 1.47;
+        door.userData.dynamic = true;
         group.add(door);
         doors.push(door);
       }
@@ -1286,6 +1290,7 @@ export function makeFruitCrate() {
   for (let i = 0; i < 9; i++) {
     const o = sphere(0.075, M(0xf28a1e, 0.6), 10, 8);
     o.position.set(-0.26 + (i % 3) * 0.26, 0.84, -0.15 + Math.floor(i / 3) * 0.15);
+    o.userData.dynamic = true;
     g.add(o);
     oranges.push(o);
   }
