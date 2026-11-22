@@ -1,0 +1,277 @@
+---
+/*
+  The home page's playable street, a nod to Path of Leash Resistance.
+  The game lives in src/scripts/street/ (world.ts: layout and the static
+  layer; game.ts: simulation, NPCs, input and drawing).
+
+  The row of links under the street is the real navigation: it works
+  without JavaScript, and it lights up when Millie reaches a shop.
+*/
+const STOPS = [
+  { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Game', href: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
+  { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'Music app', href: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
+  { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'LED wall', href: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
+  { id: 'blog', label: 'Blog', short: 'Blog', kind: '', href: '/blog', color: '#e5487a', ink: '#0b1430' },
+  { id: 'how', label: 'How I build', short: 'How I build', kind: '', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
+  { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
+  { id: 'park', label: 'The park', short: 'Park', kind: '3D street', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
+];
+// The same keys as Path of Leash Resistance's default layout.
+const KEYS = [
+  { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
+  { keys: ['Shift'], label: 'Run' },
+  { keys: ['Space'], label: 'Dig in' },
+  { keys: ['Q'], label: 'Mark' },
+  { keys: ['F'], label: 'Squat' },
+  { keys: ['G'], label: 'Pick up' },
+  { keys: ['E'], label: 'Bark' },
+  { keys: ['Enter'], label: 'Go in' },
+  { keys: ['Tab'], label: 'Goals' },
+  { keys: ['R'], label: 'Restart' },
+  { keys: ['Esc'], label: 'Leave' },
+];
+---
+
+<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street, with the same controls as Path of Leash Resistance: WASD or arrows move, Shift runs, Space digs in, Q marks a spot, F squats, G picks up, E barks, Tab shows the goals and Enter goes into a shop." aria-describedby="street-caption">
+  <div class="stage">
+    <canvas aria-hidden="true"></canvas>
+  </div>
+  <figcaption>
+    <div class="bar">
+      <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
+      <div class="tools">
+        <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
+        <button class="sound" type="button" data-fullscreen aria-pressed="false">Fullscreen</button>
+      </div>
+    </div>
+    <ul class="keys" aria-label="Controls">
+      {
+        KEYS.map((k) => (
+          <li>
+            <span class="caps">
+              {k.keys.map((key) => (
+                <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+              ))}
+            </span>
+            <span class="what">{k.label}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <ul class="stops" aria-label="Stops on the street">
+      {
+        STOPS.map((s) => (
+          <li>
+            <a href={s.href} data-stop={s.id} style={`--c:${s.color};--i:${s.ink}`}>
+              {s.short}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </figcaption>
+</figure>
+
+<script>
+  import { startStreet } from '../scripts/street/game';
+
+  const fig = document.querySelector<HTMLElement>('[data-street]');
+  if (fig) startStreet(fig, JSON.parse(fig.dataset.stops ?? '[]'));
+</script>
+
+<style>
+  .street {
+    margin: 0;
+    border-radius: var(--radius-l);
+    background: var(--bg-sunk);
+    overflow: hidden;
+  }
+  .street:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 4px;
+  }
+  .stage {
+    position: relative;
+    display: none;
+  }
+  .street:global(.live) .stage {
+    display: block;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: clamp(300px, 34vw, 420px);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  /* Fullscreen: the real thing where the browser allows it, otherwise
+     the street fills the window (iPhone Safari). */
+  .street:fullscreen,
+  .street:global(.immersive) {
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+    background: var(--bg);
+  }
+  .street:global(.immersive) {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+  }
+  .street:fullscreen .stage,
+  .street:global(.immersive) .stage {
+    flex: 1;
+    min-height: 0;
+  }
+  .street:fullscreen canvas,
+  .street:global(.immersive) canvas {
+    height: 100%;
+  }
+  .street:fullscreen figcaption,
+  .street:global(.immersive) figcaption {
+    padding-block: 10px 12px;
+  }
+  /* Once the game runs, the stops are for discovering on the street (or in
+     the site's own nav). The links stay in the page for screen readers and
+     for the game, which follows them; without JavaScript they show. */
+  .street:global(.live) .stops {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .tools {
+    display: flex;
+    gap: 8px;
+  }
+  /* Keycaps for the controls: shown once the game runs, on keyboards only. */
+  .keys {
+    display: none;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 0;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+  }
+  .street:global(.live) .keys {
+    display: flex;
+  }
+  @media (pointer: coarse) {
+    .street:global(.live) .keys {
+      display: none;
+    }
+  }
+  .keys li {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .caps {
+    display: inline-flex;
+    gap: 3px;
+  }
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--line);
+    border-bottom-width: 3px;
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  kbd.wide {
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .what {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .street:fullscreen .keys,
+  .street:global(.immersive) .keys {
+    padding-top: 8px;
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+  .sound {
+    display: none;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .street:global(.live) .sound {
+    display: inline-flex;
+    align-items: center;
+  }
+  .sound[aria-pressed='true'] {
+    background: var(--saffron);
+    border-color: var(--saffron);
+    color: var(--navy-deep);
+  }
+  figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px clamp(16px, 3vw, 24px) 20px;
+  }
+  .caption {
+    min-height: 1.6em;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  .stops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .stops a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+  .stops a:hover,
+  .stops a:global(.near) {
+    background: var(--c);
+    border-color: var(--c);
+    color: var(--i);
+  }
+  .stops a:global(.near) {
+    transform: translateY(-2px);
+  }
+</style>

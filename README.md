@@ -1,83 +1,29 @@
-# Portfolio Site
+# santtu.fyi
 
-My personal portfolio website built with Jekyll and the Chirpy theme. Visit at [santtu.fyi](https://santtu.fyi/).
+My personal site, built with [Astro](https://astro.build) and deployed to GitHub Pages at [santtu.fyi](https://santtu.fyi/).
 
-## Features
+The look borrows Path of Leash Resistance's Trencadís palette and its fonts, Bricolage Grotesque and Inter. All colours are tokens in `src/styles/global.css`, with a dark theme that follows the system or the header toggle.
 
-- Responsive design optimized for desktop and mobile browsing
-- Project showcase with detailed descriptions and images
-- Blog section with technical articles and project updates
-- Dark/light mode toggle
-- Clean, minimalist design focused on readability
-- Fast loading times and optimized performance
+## Develop
 
-## Technologies
+Needs Node 22.23.4 or newer (see `.nvmrc`).
 
-- **Framework**: Jekyll static site generator
-- **Theme**: [Chirpy](https://github.com/cotes2020/jekyll-theme-chirpy) with custom modifications
-- **Hosting**: GitHub Pages with custom domain
-- **Languages**: HTML, CSS, JavaScript, Markdown
-- **Build Tools**: Ruby, Bundler
-
-## Site Structure
-
-- `_posts/` - Blog posts and project descriptions
-- `_tabs/` - Main navigation pages (About, Categories, Tags, Archives)
-- `assets/` - Images, JavaScript, and CSS files
-- `_config.yml` - Site configuration
-- `_layouts/` and `_includes/` - Templates and reusable components
-
-## Local Development
-
-1. Install Ruby and Bundler:
-   ```bash
-   # On Windows with Chocolatey
-   choco install ruby
-   gem install bundler
-   ```
-
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/cyanidesayonara/portfolio-site.git
-   cd portfolio-site
-   ```
-
-3. Install dependencies:
-   ```bash
-   bundle install
-   ```
-
-4. Start the local server with live reload:
-   ```bash
-   bundle exec jekyll serve --livereload
-   ```
-
-5. Visit `http://localhost:4000/` in your browser
-
-## Adding Content
-
-### New Blog Post
-
-Create a new Markdown file in the `_posts` directory with the format `YYYY-MM-DD-title.md`:
-
-```markdown
----
-title: "Your Post Title"
-date: YYYY-MM-DD
-categories: [Category]
-tags: [tag1, tag2]
-image:
-  path: /assets/img/posts/image-name.png
-  alt: Description of the image
----
-
-Your content here...
+```sh
+npm install
+npm run dev      # http://localhost:4321
+npm run build    # type-checks, then builds to dist/
 ```
 
-## Deployment
+## Where things live
 
-The site is automatically deployed to GitHub Pages when changes are pushed to the main branch.
+- `src/content/projects/*.md`: one file per project. The frontmatter schema is in `src/content.config.ts`; `featured: true` puts a project on the home page, and `order` sorts them.
+- `src/content/blog/*.md`: blog posts. `draft: true` hides one.
+- `src/pages/`: home, projects, blog, about, how-i-build, walk (the teaser for the walkable version), 404 and the RSS feed.
+- `src/components/StreetMap.astro`: the playable street on the home page and its row of stop links. The game itself is in `src/scripts/street/`: `world.ts` (layout and the pre-rendered static layer), `game.ts` (physics, NPCs, traffic, input, HUD) and `audio.ts` (synthesized music and sound effects, off until the visitor turns them on). Add `?streettest` to the URL to get a frame-stepping test hook on `window.__street`.
+- `public/`: images, favicon, `CNAME` and the social share image (`img/og.png`).
 
-## License
+Old Jekyll URLs (`/posts/...`, `/about-me`) redirect to their new homes; the list is in `astro.config.mjs`.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Deploy
+
+`.github/workflows/pages-deploy.yml` builds every pull request and deploys `main` to GitHub Pages.
