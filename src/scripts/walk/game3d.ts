@@ -17,6 +17,7 @@ import {
 } from './models';
 import { makeTofu, makeDevil } from './props';
 import { bakeStatic, collapseRig } from './bake';
+import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
 
 type CamMode = 'street' | 'follow' | 'overhead';
@@ -161,7 +162,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     x: level.start.human.x, y: RAMBLA_Y, z: level.start.human.z, vx: 0, vz: 0, heading: -Math.PI / 2,
     state: 'walk' as 'walk' | 'phone' | 'selfie' | 'sit' | 'bench' | 'whirl' | 'stumble' | 'haul',
     stateT: 0, eventT: rand(3.5, 6.5), reelT: rand(4, 8), pendingReel: 0, patience: 1, giveIn: 0, grace: 0,
-    ughSaid: false, phones: 3, stuck: 0, heyT: 0, stumbleT: 0, haulT: 0, restBase: 5,
+    ughSaid: false, phones: 3, stuck: 0, seat: null as null | { x: number; z: number; heading: number }, seated: false, heyT: 0, stumbleT: 0, haulT: 0, restBase: 5,
   };
   let whirl: null | { pole: Obstacle; theta: number; omega: number; swept: number; budget: number; dir: number; r: number; t: number; extra: number } = null;
   const whirlDet = new WhirlDetector();
@@ -341,7 +342,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     rider.animate(0, { speed: 2, pose: st === 'scooter' ? 'stand' : 'ride' });
     scene.add(collapseRig(b.group));
     const dir = i % 2 ? 1 : -1;
-    riders.push({ g: b.group, wheels: b.wheels, rider, x: rand(-70, 70), z: dir > 0 ? 0.65 : 1.45, dir, speed: 0, max: st === 'road' ? 7.5 : st === 'scooter' ? 5 : 5.5, rang: 0, light: b.light });
+    riders.push({ g: b.group, wheels: b.wheels, rider, x: rand(-70, 70), z: dir > 0 ? -5.2 : -6.2, dir, speed: 0, max: st === 'road' ? 7.5 : st === 'scooter' ? 5 : 5.5, rang: 0, light: b.light });
   });
   // La Neteja, the street sweeper.
   const sweeper = makeSweeper();
@@ -515,7 +516,14 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const activeCircle = (c: Level['circles'][number], y: number) => (c.minY === undefined || y >= c.minY) && (c.maxY === undefined || y < c.maxY);
 
   /** Push a body out of colliders. feetY lets jumps clear low things. */
+  const dynBoxes: Level['boxes'] = [];
   const collide = (p: { x: number; z: number }, r: number, feetY: number) => {
+    for (const b of dynBoxes) {
+      const cx = clamp(p.x, b.x0, b.x1), cz = clamp(p.z, b.z0, b.z1);
+      const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+      if (d < r && d > 1e-4) { p.x = cx + (dx / d) * r; p.z = cz + (dz / d) * r; }
+      else if (d <= 1e-4) p.x = p.x < (b.x0 + b.x1) / 2 ? b.x0 - r : b.x1 + r;
+    }
     for (const c of level.circles) {
       if (!activeCircle(c, feetY) || feetY > c.top - 0.02) continue;
       const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz), min = c.r + r;
@@ -550,6 +558,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const nearbyPoles = (x: number, z: number, rad: number, y: number) =>
     level.circles.filter((c) => c.obstacle && activeCircle(c, y) && Math.abs(c.x - x) < rad && Math.abs(c.z - z) < rad).map((c) => c.obstacle!);
 
+  const debug = { hops: 0 };
   const handPos = new THREE.Vector3();
   const collarPos = new THREE.Vector3();
   // The leash hand, computed from the body (the model's matrices lag a frame,
@@ -725,7 +734,9 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     const cols: Record<StemGroup, string> = { vocals: '#e5487a', drums: '#ffb020', bass: '#1fc9b7', other: '#8bcb3c' };
     const ph = audio.playhead();
     STEM_GROUPS.forEach((grp, li) => {
-      const peaks = s.peaks[grp] ?? [];
+      // Peaks are 0–100; guitar and piano fold into "other".
+      const src = grp === 'other' ? ['other', 'guitar', 'piano'].map((k) => s.peaks[k]).filter(Boolean) : [s.peaks[grp] ?? []];
+      const peaks = (src[0] ?? []).map((_, i) => Math.min(1, Math.max(...src.map((p) => p[i] ?? 0)) / 100));
       const muted = audio.muted[grp];
       g.fillStyle = muted ? 'rgba(255,255,255,0.12)' : cols[grp];
       const n = peaks.length;
@@ -771,7 +782,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const camBtn = q<HTMLButtonElement>('[data-camera]');
   const cycleCam = () => {
     camMode = camMode === 'street' ? 'follow' : camMode === 'follow' ? 'overhead' : 'street';
-    if (camBtn) camBtn.textContent = `Camera: ${camMode === 'street' ? 'Street' : camMode === 'follow' ? 'Follow' : 'Overhead'}`;
+    if (camBtn) camBtn.textContent = `Cam: ${camMode === 'street' ? 'Street' : camMode === 'follow' ? 'Follow' : 'Overhead'}`;
   };
   camBtn?.addEventListener('click', cycleCam);
   root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => { skyOverride = true; applySky(b.dataset.sky as SkyMode); }));
@@ -869,12 +880,19 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   };
   const releaseAll = () => { held.clear(); coriolis.clearHeld(); touchVec.x = touchVec.z = 0; };
   host.addEventListener('keydown', (e) => {
-    if (e.target !== host) return;
+    const t = e.target as HTMLElement;
+    // Buttons inside the stage keep Enter/Space/Tab for themselves; every other key drives the game.
+    if (t !== host && !(t.closest('button') && !['Enter', 'NumpadEnter', 'Space', 'Tab'].includes(e.code))) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'Tab' && e.shiftKey) return;
     onKey(e.code, e);
   });
   host.addEventListener('keyup', (e) => onKeyUp(e.code));
+  // After clicking a toolbar or panel button, hand the keyboard straight back to the game.
+  host.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button');
+    if (b && host.contains(b) && !b.closest('[data-touch]') && e.detail > 0) host.focus({ preventScroll: true });
+  });
   host.addEventListener('blur', releaseAll);
   window.addEventListener('blur', releaseAll);
   host.addEventListener('pointerdown', (e) => { if (e.target === renderer.domElement) host.focus({ preventScroll: true }); });
@@ -955,7 +973,15 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         else if (roll < 0.45) { humanSay('Selfie time!'); human.state = 'selfie'; human.stateT = -0.8; }
         else if (roll < 0.6) {
           const bench = level.boxes.find((b) => b.kind === 'bench' && Math.hypot((b.x0 + b.x1) / 2 - human.x, (b.z0 + b.z1) / 2 - human.z) < 4);
-          if (bench) { humanSay('So tired…'); human.state = 'sit'; human.stateT = -0.8; }
+          if (bench) {
+            // Sit on the side of the bench facing away from its backrest (toward the human here).
+            const cx = (bench.x0 + bench.x1) / 2, cz = (bench.z0 + bench.z1) / 2;
+            const alongX = bench.x1 - bench.x0 > bench.z1 - bench.z0;
+            const [nx, nz] = bench.face ?? (alongX ? [0, Math.sign(human.z - cz) || 1] : [Math.sign(human.x - cx) || 1, 0]);
+            human.seat = { x: cx + nx * 0.12, z: cz + nz * 0.12, heading: Math.atan2(nz, nx) };
+            human.seated = false;
+            humanSay('So tired…'); human.state = 'sit'; human.stateT = -0.8;
+          }
         }
       }
       // Reel: "Click!", then a new leash length 0.8 s later.
@@ -972,13 +998,25 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       }
       const holdStill = (human.state === 'phone' && human.stateT > 0 && human.stateT < rand(1.5, 2.8)) ||
         (human.state === 'selfie' && human.stateT > 0 && human.stateT < 2.2) ||
-        (human.state === 'sit' && human.stateT > 0 && human.stateT < 4);
-      if (human.state !== 'walk' && human.stateT > 4.2) human.state = 'walk';
+        (human.state === 'sit' && human.seated && human.stateT < 4);
+      if (human.state === 'sit' && !human.seated && human.stateT > 6) human.state = 'walk';
+      if (human.state !== 'walk' && human.state !== 'sit' && human.stateT > 4.2) human.state = 'walk';
+      if (human.state === 'sit' && human.seated && human.stateT > 4.2) { human.state = 'walk'; human.seated = false; human.seat = null; }
       // Follow the dog loosely; give in to a steady pull.
       const dx = dog.x - human.x, dz = dog.z - human.z, d = Math.hypot(dx, dz);
       const pulling = tension > 3;
       human.giveIn = clamp(human.giveIn + (pulling ? dt * 0.6 : -dt * 0.4), 0, 1);
       if (!holdStill && d > 2.4) { wantX = dx / d; wantZ = dz / d; }
+      if (human.state === 'sit' && human.seat && !human.seated && human.stateT > 0) {
+        // Walk up to the bench, then sit down onto it facing out.
+        const sx = human.seat.x - human.x, sz = human.seat.z - human.z, sd = Math.hypot(sx, sz);
+        if (sd < 1.0) {
+          human.seated = true; human.stateT = 0;
+          human.x = human.seat.x; human.z = human.seat.z; human.heading = human.seat.heading;
+          human.vx = human.vz = 0;
+        } else { wantX = sx / sd; wantZ = sz / sd; }
+      }
+      if (human.seated && tension < 15) { human.vx = 0; human.vz = 0; return; }
       if (holdStill) speed = 0;
       if (chase?.kind === 'neteja') { wantX = 0; wantZ = 0; speed = 0; human.state = 'phone'; human.stateT = 0.5; }
       if (chase?.kind === 'correfoc') {
@@ -1160,7 +1198,9 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     } else dog.y = g;
 
     // Integrate the human (unless whirling, which sets the position directly).
-    if (!whirl) {
+    if (human.seated) {
+      human.y = level.floor(human.x, human.z, human.y + 0.3);
+    } else if (!whirl) {
       const hx0 = human.x, hz0 = human.z;
       human.x += human.vx * dt;
       human.z += human.vz * dt;
@@ -1178,6 +1218,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         human.y = level.floor(human.x, human.z, dog.y + 0.3);
         human.stuck = 0;
         leash.reset(dog, handXZ());
+        debug.hops++;
       }
       if (Math.hypot(human.vx, human.vz) > 0.2 && human.state !== 'stumble') human.heading = angLerp(human.heading, Math.atan2(human.vz, human.vx), Math.min(1, dt * 8));
     }
@@ -1187,6 +1228,11 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       const obs = nearbyPoles((dog.x + human.x) / 2, (dog.z + human.z) / 2, leash.rest + 2, Math.max(dog.y, human.y));
       leash.step({ x: dog.x, z: dog.z }, handXZ(), obs, dt);
       const over = capStretch(leash, dog, human, dog.planted ? 14 : 1, 4);
+      if (over > 0) {
+        // The cap moves both ends; keep them out of walls afterwards.
+        collide(dog, DOG_R, dog.y);
+        if (!human.seated && !whirl) collide(human, HUMAN_R, human.y);
+      }
       if (over > 0 && dog.planted && Math.hypot(human.vx, human.vz) > 1.6 && human.state === 'walk') {
         human.state = 'stumble'; human.stumbleT = 0.8; humanSay('Whoa there!'); audio.stumble();
       }
@@ -1416,7 +1462,9 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       const [tx, tz] = w.path[w.i];
       const dx = tx - w.x, dz = tz - w.z, d = Math.hypot(dx, dz);
       let speed = w.speed;
-      // Step around Millie.
+      // Step around Millie and her human.
+      const hx = w.x - human.x, hz = w.z - human.z, hd = Math.hypot(hx, hz);
+      if (hd < 0.9) { w.x += (hx / (hd || 1)) * dt * 1.5; w.z += (hz / (hd || 1)) * dt * 1.5; }
       const ddx = w.x - dog.x, ddz = w.z - dog.z, dd = Math.hypot(ddx, ddz);
       if (dd < 1.4) {
         w.x += (ddx / (dd || 1)) * dt * 1.5; w.z += (ddz / (dd || 1)) * dt * 1.5;
@@ -1478,6 +1526,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       if (Math.hypot(sw.x - dog.x, sw.z + sw.dir * 2.2 - dog.z) < 1.4) sw.z -= sw.dir * sw.speed * dt; // waits for her
     }
     sweeper.group.position.set(sw.x, RAMBLA_Y, sw.z);
+    dynBoxes.length = 0;
+    dynBoxes.push({ x0: sw.x - 0.7, x1: sw.x + 0.7, z0: sw.z - 1.9, z1: sw.z + 1.9, top: GROUND_Y + 2.2, kind: 'sweeper' });
     sweeper.group.rotation.y = sw.dir > 0 ? -Math.PI / 2 : Math.PI / 2;
     sweeper.brushes.forEach((b, i) => { b.rotation.y += (i ? 1 : -1) * dt * 12; });
     sweeper.beacon.emissiveIntensity = 0.6 + Math.max(0, Math.sin(time * 9)) * 1.6;
@@ -1662,7 +1712,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     humanM.group.rotation.y = -human.heading;
     const hsp = Math.hypot(human.vx, human.vz);
     const pose: Pose = human.state === 'whirl' ? 'whirl' : human.state === 'stumble' || human.state === 'haul' ? 'stumble'
-      : human.state === 'bench' || (human.state === 'sit' && human.stateT > 0) ? 'sit' : human.state === 'phone' && human.stateT > 0 ? 'phone' : 'walk';
+      : human.state === 'bench' || (human.state === 'sit' && human.seated) ? 'sit' : human.state === 'phone' && human.stateT > 0 ? 'phone' : 'walk';
     humanM.animate(time, { speed: hsp, pose });
     humanShadow.position.set(human.x, human.y + 0.03, human.z);
 
@@ -1799,15 +1849,18 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       // underpass as Millie walks through, so the tunnel frames the sea.
       const T = level.tunnel;
       const tunnelT = Math.abs(dog.x) < 3.2 ? clamp(1 - Math.abs(dog.z - (T.z0 + T.z1) / 2) / 7.5, 0, 1) : 0;
-      let height = lerp(8.2, 2.0, tunnelT);
-      let back = lerp(10.5, 6.0, tunnelT);
+      // Portrait screens see less sideways, so pull back a little.
+      const portrait = clamp(1 / Math.max(0.4, camera.aspect), 1, 1.5);
+      let height = lerp(8.2 * portrait, 2.0, tunnelT);
+      let back = lerp(10.5 * portrait, 6.0, tunnelT);
       // Narrow streets: pull in toward Millie and climb so walls never block the view.
       if (tunnelT < 0.2) {
         for (let k = 0.5; k <= back; k += 0.5) {
           const pz = dog.z + k;
           if (level.boxes.some((b) => b.kind === 'building' && b.top > dog.y + 4 && dog.x > b.x0 - 1 && dog.x < b.x1 + 1 && pz > b.z0 - 0.8 && pz < b.z1 + 0.8)) {
-            const clear = Math.max(1.5, k - 0.8);
-            height += (back - clear) * 1.05;
+            // Walls in between turn see-through (fade.ts), so only ease in a little.
+            const clear = Math.max(6.5, k - 0.8);
+            height += Math.min(2.5, (back - clear) * 0.6);
             back = clear;
             break;
           }
@@ -1829,6 +1882,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
     camera.lookAt(camLook);
+    fadeUniforms.uFadeA.value.copy(camera.position);
+    fadeUniforms.uFadeB.value.set(dog.x, dog.y + 0.5, dog.z);
     // Fade the embankment a little when the camera dips into the underpass.
     sky.position.copy(camera.position);
   };
@@ -1875,6 +1930,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     };
   });
 
+  applyNearFade(scene);
   update(1 / 60);
   renderer.render(scene, camera);
   setRunning();
@@ -1889,6 +1945,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       get sky() { return skyMode; },
       get bones() { return bones; },
       get chase() { return chase; },
+      debug,
+      collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },
       get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
