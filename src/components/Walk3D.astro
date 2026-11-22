@@ -400,6 +400,47 @@ const KEYS = [
   .stage :global(.goals li.done) { color: #a9d672; }
   .stage :global(.goals li.done .tick) { background: #8bcb3c; box-shadow: none; }
   .stage :global(.goals .gl) { flex: 1; }
+  /* Phase 5: the area Millie is in, grouped goals and the reset button. */
+  .stage :global(.goals .garea) {
+    display: block;
+    margin-top: 6px;
+    font: 600 11px var(--font-body);
+    color: rgba(244, 241, 234, 0.78);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stage :global(.goals.open .garea) { display: none; }
+  .stage :global(.goals li.ah) {
+    justify-content: space-between;
+    min-height: 0;
+    margin-top: 6px;
+    font: 800 10.5px var(--font-display);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #ffb020;
+  }
+  .stage :global(.goals li.ah:first-child) { margin-top: 0; }
+  .stage :global(.goals li.asum) { color: rgba(244, 241, 234, 0.82); }
+  .stage :global(.goals li.asum.done) { color: #a9d672; }
+  .stage :global(.goals li.asum.done .tick) { background: #8bcb3c; box-shadow: none; }
+  .stage :global(.greset) {
+    position: absolute;
+    right: 8px;
+    z-index: 3;
+    min-height: 28px;
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(11, 20, 48, 0.78);
+    color: #f4f1ea;
+    font: 600 12px var(--font-body);
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .stage :global(.greset[hidden]) { display: none; }
+  .stage :global(.greset:hover) { background: rgba(229, 72, 122, 0.9); }
+  .stage :global(.greset:focus-visible) { outline: 2px solid var(--saffron); outline-offset: 2px; }
   .stage :global(.gm) {
     width: 50px;
     height: 6px;

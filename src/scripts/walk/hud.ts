@@ -14,7 +14,12 @@ export interface GoalRow {
   done: boolean;
   count?: number;
   target?: number;
+  /** Which area (progress.ts AREAS) the goal belongs to. */
+  area?: string;
 }
+
+/** Areas for grouping goals on the card (see progress.ts). */
+export interface GoalArea { id: string; label: string }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -41,6 +46,7 @@ export class Hud {
   private bubbles = new Map<string, Bubble>();
   goalsOpen = false;
   onPrompt?: (key: string) => void;
+  onResetProgress?: () => void;
   private lastBanner = '';
   private lastPrompt = '';
 
@@ -60,8 +66,10 @@ export class Hud {
       <button type="button" class="hud-card goals" data-h="goals" aria-expanded="false">
         <span class="gh"><span data-h="gtitle">GOALS 0/0</span><kbd class="kc pill">TAB</kbd></span>
         <span class="gprog"><i data-h="gprog"></i></span>
+        <span class="garea" data-h="garea"></span>
         <ul data-h="glist"></ul>
       </button>
+      <button type="button" class="greset" data-h="greset" hidden>Reset saved progress</button>
       <div class="toasts" data-h="toasts" aria-live="polite"></div>
       <div class="banner" data-h="banner" aria-live="polite"><i class="dot"></i><span data-h="btext"></span></div>
       <div class="shouts" data-h="shouts" aria-hidden="true"></div>
@@ -74,6 +82,7 @@ export class Hud {
     this.root = root;
     root.querySelectorAll<HTMLElement>('[data-h]').forEach((e) => { this.els[e.dataset.h!] = e; });
     this.els.goals.addEventListener('click', () => this.toggleGoals());
+    this.els.greset.addEventListener('click', (e) => { e.stopPropagation(); this.onResetProgress?.(); });
     this.els.prompts.addEventListener('pointerdown', (e) => {
       if ((e.target as HTMLElement).closest('[data-prompt-key]')) e.stopPropagation();
     });
@@ -89,6 +98,24 @@ export class Hud {
     this.goalsOpen = open;
     this.els.goals.classList.toggle('open', open);
     this.els.goals.setAttribute('aria-expanded', String(open));
+    this.placeReset();
+  }
+
+  /** The reset button sits just under the open goals card (a button can't hold another). */
+  placeReset() {
+    const r = this.els.greset, g = this.els.goals;
+    r.hidden = !this.goalsOpen;
+    if (!this.goalsOpen) return;
+    // Beside the card's lower-left corner, clear of the minimap below it; on
+    // narrow screens, where the card spans the width, just under it.
+    const w = (g.offsetParent as HTMLElement | null)?.clientWidth ?? 0;
+    if (g.offsetLeft > r.offsetWidth + 16) {
+      r.style.top = `${g.offsetTop + g.offsetHeight - r.offsetHeight}px`;
+      r.style.right = `${w - g.offsetLeft + 8}px`;
+    } else {
+      r.style.top = `${g.offsetTop + g.offsetHeight + 6}px`;
+      r.style.right = `${w - g.offsetLeft - g.offsetWidth}px`;
+    }
   }
 
   setVitals(v: { phones: number; bones: number; pee: number; marked: number; streak: number; zoomies: number; zoomMode: 'normal' | 'free' | 'golden'; time: number }) {
@@ -106,19 +133,43 @@ export class Hud {
     this.els.zoom.dataset.mode = v.zoomMode;
   }
 
-  setGoals(rows: GoalRow[]) {
+  setGoals(rows: GoalRow[], areas: GoalArea[] = [], current = '') {
     const done = rows.filter((r) => r.done).length;
     this.els.gtitle.textContent = `GOALS ${done}/${rows.length}`;
     this.els.goals.classList.toggle('all', done === rows.length);
     this.els.gprog.style.width = `${(done / Math.max(1, rows.length)) * 100}%`;
-    this.els.glist.innerHTML = rows
-      .map((r) => {
-        const meter = r.target && !r.done
-          ? `<span class="gm"><i style="width:${Math.min(100, ((r.count ?? 0) / r.target) * 100)}%"></i></span><span class="gn">${r.count ?? 0}/${r.target}</span>`
-          : '';
-        return `<li class="${r.done ? 'done' : ''}"><span class="tick">${r.done ? '✓' : ''}</span><span class="gl">${esc(r.label)}</span>${meter}</li>`;
-      })
-      .join('');
+    const row = (r: GoalRow) => {
+      const meter = r.target && !r.done
+        ? `<span class="gm"><i style="width:${Math.min(100, ((r.count ?? 0) / r.target) * 100)}%"></i></span><span class="gn">${r.count ?? 0}/${r.target}</span>`
+        : '';
+      return `<li class="${r.done ? 'done' : ''}"><span class="tick">${r.done ? '✓' : ''}</span><span class="gl">${esc(r.label)}</span>${meter}</li>`;
+    };
+    if (!areas.length) {
+      this.els.garea.textContent = '';
+      this.els.glist.innerHTML = rows.map(row).join('');
+      this.placeReset();
+      return;
+    }
+    const of = (id: string) => rows.filter((r) => r.area === id);
+    const tally = (rs: GoalRow[]) => `${rs.filter((r) => r.done).length}/${rs.length}`;
+    const here = areas.find((a) => a.id === current);
+    this.els.garea.textContent = here ? `${here.label} ${tally(of(here.id))}` : '';
+    // The area Millie is in, in full; goals that work anywhere; then the rest summed up.
+    const parts: string[] = [];
+    if (here) parts.push(`<li class="ah">${esc(here.label)}<span>${tally(of(here.id))}</span></li>`, ...of(here.id).map(row));
+    const anywhere = of('any');
+    if (anywhere.length && current !== 'any') parts.push(`<li class="ah">Anywhere<span>${tally(anywhere)}</span></li>`, ...anywhere.map(row));
+    const others = areas.filter((a) => a.id !== current && a.id !== 'any' && of(a.id).length);
+    if (others.length) {
+      parts.push('<li class="ah">Elsewhere</li>');
+      for (const a of others) {
+        const rs = of(a.id);
+        const all = rs.every((r) => r.done);
+        parts.push(`<li class="asum${all ? ' done' : ''}"><span class="tick">${all ? '✓' : ''}</span><span class="gl">${esc(a.label)}</span><span class="gn">${tally(rs)}</span></li>`);
+      }
+    }
+    this.els.glist.innerHTML = parts.join('');
+    this.placeReset();
   }
 
   /** Banner pill: prompts (saffron dot) and short news (leaf dot). Keys in [brackets] become keycaps. */
@@ -209,6 +260,7 @@ export class Hud {
   }
 
   update(dt: number) {
+    if (this.goalsOpen) this.placeReset(); // the card eases open, so follow its size
     for (let i = this.shouts.length - 1; i >= 0; i--) {
       const s = this.shouts[i];
       s.t += dt;

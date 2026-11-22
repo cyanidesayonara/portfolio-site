@@ -28,6 +28,8 @@ import { applyNearFade, fadeUniforms } from './fade';
 import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
 import { createTransitOverlay, playDepartureDoors } from './transit';
 import { trackVisibleViewport } from '../viewport';
+import { AREAS, AREA_BONUS, areaOfDistrict, loadProgress, saveProgress, clearProgress } from './progress';
+import { createStrays } from './strays';
 
 type CamMode = 'street' | 'follow' | 'overhead';
 
@@ -252,24 +254,34 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const markedSpots = new Set<object>();
 
   const goals: GoalRow[] = [
-    { id: 'mark', label: 'Mark 5 spots (Q)', done: false, count: 0, target: 5 },
-    { id: 'birds', label: 'Scatter the gulls or pigeons (E)', done: false },
-    { id: 'whirl', label: 'Fling your human with a pole whirl', done: false },
-    { id: 'finds', label: 'Dig up 3 finds on the beach (Space)', done: false, count: 0, target: 3 },
-    { id: 'hurdles', label: 'Clear the 3 hurdles in the pipicà (V)', done: false, count: 0, target: 3 },
-    { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5 },
-    { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false },
-    { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false },
-    { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false },
-    { id: 'stemma', label: 'Change the music at stemma (X)', done: false },
-    { id: 'pier', label: 'Walk to the end of the pier', done: false },
-    { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false },
-    { id: 'plaza', label: 'Help out on Plaça del Mercat', done: false, count: 0, target: 3 },
-    { id: 'butcher', label: 'Get away with the butcher\'s botifarra', done: false },
-    { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2 },
-    { id: 'hill_top', label: 'Climb to the hilltop church and head home', done: false },
+    { id: 'mark', label: 'Mark 5 spots (Q)', done: false, count: 0, target: 5, area: 'any' },
+    { id: 'birds', label: 'Scatter the gulls or pigeons (E)', done: false, area: 'any' },
+    { id: 'whirl', label: 'Fling your human with a pole whirl', done: false, area: 'any' },
+    { id: 'finds', label: 'Dig up 3 finds on the beach (Space)', done: false, count: 0, target: 3, area: 'seafront' },
+    { id: 'hurdles', label: 'Clear the 3 hurdles in the pipicà (V)', done: false, count: 0, target: 3, area: 'seafront' },
+    { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false, area: 'seafront' },
+    { id: 'stemma', label: 'Change the music at stemma (X)', done: false, area: 'seafront' },
+    { id: 'pier', label: 'Walk to the end of the pier', done: false, area: 'seafront' },
+    { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false, area: 'seafront' },
+    { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
+    { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
+    { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
+    { id: 'plaza', label: 'Help out on Plaça del Mercat', done: false, count: 0, target: 3, area: 'plaza' },
+    { id: 'butcher', label: 'Get away with the butcher’s botifarra', done: false, area: 'plaza' },
+    { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2, area: 'hill' },
+    { id: 'cats', label: 'Send 3 old-town cats running', done: false, count: 0, target: 3, area: 'hill' },
+    { id: 'hill_top', label: 'Climb to the hilltop church and head home', done: false, area: 'hill' },
   ];
   const goal = (id: string) => goals.find((g) => g.id === id)!;
+  // Progress is saved in this browser (progress.ts); ?walktest starts clean
+  // and never saves unless ?walksave is added too.
+  const saving = !walktest || searchParams.has('walksave');
+  let progressDirty = false;
+  let resetting = false;
+  // Counts reported by the game are per page load; saved counts are added on top.
+  const countBase: Record<string, number> = {};
+  let area = 'seafront';
+  const showGoals = () => hud.setGoals(goals, AREAS, area);
   const completeGoal = (id: string) => {
     const g = goal(id);
     if (g.done) return;
@@ -277,17 +289,55 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (g.target) g.count = g.target;
     hud.toast('Goal complete', g.label.replace(/ \([^)]*\)$/, ''), '#8bcb3c');
     audio.goal();
-    hud.setGoals(goals);
+    // Every goal in an area done: a bonus, once.
+    const a = AREAS.find((x) => x.id === g.area);
+    if (a && a.id !== 'any' && goals.filter((x) => x.area === a.id).every((x) => x.done)) {
+      setTimeout(() => {
+        bones += AREA_BONUS;
+        hud.shout(`${a.label.toUpperCase()} DONE +${AREA_BONUS}`, 'good');
+        progressDirty = true;
+      }, 1200);
+    }
+    showGoals();
+    progressDirty = true;
     if (goals.every((x) => x.done)) setTimeout(() => hud.shout('BEST WALK EVER', 'loud'), 900);
   };
   const bumpGoal = (id: string, n: number) => {
     const g = goal(id);
     if (g.done) return;
-    g.count = n;
-    if (g.target && n >= g.target) completeGoal(id);
-    else hud.setGoals(goals);
+    const c = Math.max(g.count ?? 0, (countBase[id] ?? 0) + n);
+    if (c === g.count) return;
+    g.count = c;
+    progressDirty = true;
+    if (g.target && c >= g.target) completeGoal(id);
+    else showGoals();
   };
-  hud.setGoals(goals);
+  const saved = saving ? loadProgress() : null;
+  if (saved) {
+    for (const g of goals) {
+      const sg = saved.goals[g.id];
+      if (!sg) continue;
+      g.done = !!sg.done;
+      if (g.target) g.count = g.done ? g.target : Math.min(g.target, sg.count ?? 0);
+      if (g.count) countBase[g.id] = g.count;
+    }
+    bones = Math.max(0, saved.bones | 0);
+  }
+  showGoals();
+  if (saving) {
+    const flush = () => { if (progressDirty && !resetting) { progressDirty = false; saveProgress(goals, bones); } };
+    let lastBones = bones;
+    setInterval(() => { if (bones !== lastBones) { lastBones = bones; progressDirty = true; } flush(); }, 3000);
+    window.addEventListener('pagehide', () => { progressDirty = true; flush(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { progressDirty = true; flush(); } });
+  }
+  hud.onResetProgress = () => {
+    if (!window.confirm('Reset your saved walk progress? Goals and bones start over.')) return;
+    resetting = true;
+    clearProgress();
+    progressDirty = false;
+    location.reload();
+  };
 
   const addBones = (n: number, why?: string) => {
     bones += n;
@@ -409,6 +459,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     offLeash: () => offLeash,
   });
   const hillDistrict = level.districts.find((d) => d.id === HILL.id)!;
+  // Old-town stray cats on the hill (strays.ts).
+  const strays = createStrays({
+    scene, audio, dog,
+    floor: (x, z, y) => level.floor(x, z, y),
+    collide: (p, r, y) => collide(p, r, y),
+    onScared: (n) => bumpGoal('cats', n),
+  });
   // Cyclists on the Rambla bike lane.
   interface Rider { g: THREE.Group; wheels: THREE.Object3D[]; rider: PersonModel; x: number; z: number; dir: number; speed: number; max: number; rang: number; light: THREE.MeshStandardMaterial }
   const riders: Rider[] = [];
@@ -734,6 +791,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     life.bark();
     plaza.bark();
     hill.bark();
+    strays.bark();
     burst(dog.x + Math.cos(dog.heading) * 0.5, dog.y + 0.75, dog.z + Math.sin(dog.heading) * 0.5, 0xffb020, 5, 1.5, 1.2, 0.4, 2);
     let scared = 0;
     for (const b of birds) {
@@ -1612,6 +1670,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const listenDir = new THREE.Vector3();
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
+    // Goals card follows the area Millie is in.
+    const nowArea = areaOfDistrict(level.districtAt(dog.x, dog.z).id);
+    if (nowArea !== area) { area = nowArea; showGoals(); }
     level.churchLandmark.visible = !hillDistrict.root.visible;
     const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
     if (slowmo > 0) slowmo -= rawDt;
@@ -1821,6 +1882,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     life.update(dt, time, skyMode);
     plaza.update(dt, time);
     hill.update(dt, time);
+    strays.update(dt, time);
     for (const w of walkers) {
       if (w.saidT > 0) w.saidT -= dt;
       const wVis = Math.hypot(w.x - dog.x, w.z - dog.z) < 52;
@@ -2470,6 +2532,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
     }
   }
+  if (saved && goals.some((g) => g.done || g.count)) {
+    const n = goals.filter((g) => g.done).length;
+    hud.toast('Welcome back', `${n}/${goals.length} goals done so far. Progress is saved in this browser; reset it from the goals card (Tab).`, '#1fc9b7', 5);
+  }
   prev = performance.now();
   setRunning();
   void options;
@@ -2478,7 +2544,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     (window as unknown as Record<string, unknown>).__walk = {
       dog, human, leash, level, goals, quest,
       get offLeash() { return offLeash; },
-      plaza, hill,
+      plaza, hill, strays,
+      get area() { return area; },
       get whirl() { return whirl; },
       get camMode() { return camMode; },
       get sky() { return skyMode; },
