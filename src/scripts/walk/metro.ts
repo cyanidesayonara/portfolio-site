@@ -6,7 +6,7 @@
   level it never names the real station: the signs just say Metro.
 
   The stairs are scenery: a railing collider keeps Millie at the head, and
-  the ride down is a cutscene (`playMetroDeparture()` in transit.ts) that
+  the ride down is a cutscene (`playDepartureDoors(..., 'metro')` in transit.ts) that
   links to the 2D street's own metro entrance (`/?via=metro`).
 */
 import * as THREE from 'three';

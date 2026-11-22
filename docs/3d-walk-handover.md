@@ -4,7 +4,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Ground rules
 
-- **Branch:** everything through Phase 5 is on `main` and deployed: PR #4 (Phase 4 hill, `8c44cae`), PR #5 (fullscreen modes and the train handoff, `047c8df`) and PR #7 (Phase 5, `92ff9c4`). PR #6 (`feat/metro-link`, the metro entrance and cutscenes in both games) is open and unmerged. Branch from an up-to-date `main` for new work, commit as you go and push.
+- **Branch:** everything is on `main` and deployed: PR #4 (Phase 4 hill), PR #5 (fullscreen modes and the train handoff), PR #6 (the metro link between both games), PR #7 (Phase 5) and PR #8 (this handover). No PRs are open. Branch from an up-to-date `main` for new work, commit as you go and push.
 - **Never merge to `main` without Santtu's explicit go-ahead.** Merging deploys the site to GitHub Pages (`.github/workflows/pages-deploy.yml`).
 - **Commit messages & PRs:** authored only by Santtu Nykänen. Never add `Co-authored-by` trailers or any AI/agent attribution anywhere (see `AGENTS.md`).
 - **Copy:** American English, professional. Santtu is a generalist developer, not a "game maker". Never invent stats or facts.
@@ -21,6 +21,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
   - **Driving the game:** `key(code, down)`, `tick(frames)` (runs fixed 60 Hz updates and renders), `teleport(x, z)` (also snaps the camera), `collide(p, r, y)`.
   - **`camera` + `render()`:** aim the camera by hand and render one frame (then `canvas.gl.toDataURL()` in the same task) to inspect distant scenery.
   - **`plaza`:** the Plaça del Mercat runtime (`plazaLife.ts`): `quests()`, `chasing()`, and `debug` (`butcher`, `boti`, `fris`, `paper`, `pigeons`).
+  - **Metro:** `/walk?via=metro` arrives at the head of the metro stairs; on the 2D street, `?via=metro&streettest` arrives across the road and `__street.teleport(1750, 375)` puts Millie at its stairs (Enter boards at once in test mode).
   - **Phase 5:** `area` (current goals area) and `strays` (`debug.cats`, `debug.scared`). `?walktest` starts with no saved progress and never saves; add `&walksave` to test saving.
   - **`hill`:** the Dalt de la Vila runtime (`hillLife.ts`): `quests()`, `bubbles()`, and `debug` (`bellRingT`, `miradorT`, `homeDone`, `pigeons`, `parkDog`).
   - **Street camera keys:** the default camera looks out to sea, so `W` heads toward the sea (-Z) and `S` inland (+Z); `A` is -X, `D` is +X.
@@ -87,7 +88,7 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 
 ## Next up
 
-1. **Review and merge PR #6 (metro)** once Santtu has played it. All its signs are generic ("Metro", "L2", "SORTIDA"). Santtu wants the entrance moved deeper into town, where the real station is, once the level spreads that far; it can stay where it is until then.
+1. **Move the metro entrance (later):** it sits at the west end of the Rambla (`metro` in `data/seafront.json`; the 2D street has its own across the road from `Estació`). Santtu wants it deeper in town, where the real station is, once the level spreads that far. All its signs stay generic ("Metro", "L2", "SORTIDA").
 2. **Swimming animation (Santtu, for later):** when the water gets deep enough, both characters should swim. Today Millie just floats at `WATER_Y - SWIM_SINK` once the water is deeper than `SWIM_DEPTH` (`dogSwimming` in `game3d.ts`) with no paddling, and the human stops at waist depth (`HUMAN_WADE`) and says they are not swimming. Wanted: a dog paddle for Millie (legs, head up, wake), and a swim stroke for the human so they can follow her out instead of stopping. The sea is the only deep water now; any other body of water added later should reuse the same `surface === 'water'` and depth checks.
 3. **Test on real phones and tablets:** fullscreen modes, touch buttons, audio by ear. Nothing has been verified on hardware yet. Also check that real fullscreen comes back on the first key press or tap after the train (automation can't produce a real user gesture).
 4. **Saved-progress trade-offs (Phase 5):** saved counts add this visit's progress on top of the saved count, so a favor repeated after a reload counts again (quest flags in `plazaLife`/`hillLife` are per page load), and the Home door finish and its bones can be replayed. Persist quest flags if this matters.
