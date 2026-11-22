@@ -1146,7 +1146,8 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     stemmaBars,
     underpassLight,
     tunnel: { x0: -CUT.tunnelX, x1: CUT.tunnelX, z0: CUT.sea0, z1: CUT.rambla1, cutZ0: CUT.sea1, cutZ1: CUT.rambla0, floor: CUT.floor },
-    start: { dog: { x: 0.8, z: 44 }, human: { x: -0.8, z: 46.5 } },
+    // On the promenade between the PoLR and stemma pavilions, clear of the cycle path.
+    start: { dog: { x: -22, z: -3.4 }, human: { x: -21.4, z: -1.2 } },
     pedPaths,
     birdSpots: {
       pigeons: [[-1.5, 45], [1, 47], [-0.5, 43.5], [8, 53], [-16, 52], [10, 71], [-6, 30], [6, 26], [-2, 24]] as [number, number][],

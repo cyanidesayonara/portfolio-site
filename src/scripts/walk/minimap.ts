@@ -1,0 +1,197 @@
+/*
+  The minimap: a top-down plan of the level drawn once from the level data,
+  with live markers on top. Small in the corner (centered on Millie, sea up,
+  like the street camera), or the whole town when enlarged with [M].
+*/
+import type { Level } from './level';
+
+export interface MapMarker {
+  x: number;
+  z: number;
+  color: string;
+  label?: string;
+  kind: 'stop' | 'quest' | 'threat' | 'place' | 'train';
+}
+
+// World window drawn on the plan (meters). The pier runs on past the top edge.
+const X0 = -96, X1 = 96, Z0 = -74, Z1 = 103;
+const PPM = 4; // plan pixels per meter
+
+const C = {
+  sea: '#2d6a92', shallow: '#3f86ad', sand: '#dcc58f', deck: '#a5794e', prom: '#cfc9bb',
+  rail: '#6d665a', track: '#3d3a35', rambla: '#e0d6c4', street: '#bdb19e', building: '#7d6e60',
+  pavilion: '#5b4a3c', wall: '#4d463e', fence: '#2f6b4f', green: '#9bc46a', pier: '#8d7356',
+};
+
+export class Minimap {
+  readonly el: HTMLElement;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private plan: HTMLCanvasElement;
+  private big = false;
+  onToggle?: (big: boolean) => void;
+
+  constructor(stage: HTMLElement, level: Level) {
+    this.el = document.createElement('div');
+    this.el.className = 'minimap';
+    this.el.innerHTML = '<canvas role="img" aria-label="Map of the seafront and town"></canvas><span class="mm-key"><kbd>M</kbd> Map</span>';
+    stage.appendChild(this.el);
+    this.canvas = this.el.querySelector('canvas')!;
+    this.ctx = this.canvas.getContext('2d')!;
+    this.el.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(); });
+    this.plan = this.drawPlan(level);
+  }
+
+  get enlarged() { return this.big; }
+
+  toggle(force?: boolean) {
+    this.big = force ?? !this.big;
+    this.el.classList.toggle('big', this.big);
+    this.onToggle?.(this.big);
+  }
+
+  private drawPlan(level: Level) {
+    const cv = document.createElement('canvas');
+    cv.width = (X1 - X0) * PPM;
+    cv.height = (Z1 - Z0) * PPM;
+    const g = cv.getContext('2d')!;
+    const R = (x0: number, z0: number, x1: number, z1: number, col: string) => {
+      g.fillStyle = col;
+      g.fillRect((Math.min(x0, x1) - X0) * PPM, (Math.min(z0, z1) - Z0) * PPM, Math.abs(x1 - x0) * PPM, Math.abs(z1 - z0) * PPM);
+    };
+    // Bands, sea to town.
+    R(X0, Z0, X1, -58, C.sea);
+    R(X0, -58, X1, -51, C.shallow);
+    R(X0, -51, X1, -20, C.sand);
+    R(X0, -20, X1, -10, C.deck);
+    R(X0, -10, X1, 4, C.prom);
+    R(X0, 4, X1, 14, C.rail);
+    for (const tz of [7.2, 10.8]) R(X0, tz - 0.4, X1, tz + 0.4, C.track);
+    R(X0, 14, X1, 34, C.rambla);
+    R(X0, 34, X1, Z1, '#62584c');
+    R(-34, 34, 34, Z1, C.street);
+    // Off-leash park.
+    R(60, -34, 80, -22.5, C.green);
+    // The underpass, cut through the railway.
+    R(-3, -4, 3, 22, '#9a9384');
+    // The pier.
+    R(-50, Z0, -46, -10, C.pier);
+    // Colliders: buildings, pavilions, walls and fences.
+    for (const b of level.boxes) {
+      const col = b.kind === 'building' ? (b.z1 < 0 ? C.pavilion : C.building)
+        : b.kind === 'wall' ? C.wall
+        : b.kind === 'fence' || b.kind === 'rail' ? C.fence
+        : b.kind === 'kiosk' || b.kind === 'containers' ? C.wall
+        : null;
+      if (col) R(b.x0, b.z0, b.x1, b.z1, col);
+    }
+    // A soft edge so the plan reads as a plan.
+    g.strokeStyle = 'rgba(0,0,0,0.25)';
+    g.lineWidth = 2;
+    g.strokeRect(1, 1, cv.width - 2, cv.height - 2);
+    return cv;
+  }
+
+  /** Redraw. `heading` is Millie's heading (radians, world XZ). */
+  draw(dog: { x: number; z: number; heading: number }, human: { x: number; z: number }, markers: MapMarker[]) {
+    const cv = this.canvas;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
+    if (!w || !h) return;
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const g = this.ctx;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#16233f';
+    g.fillRect(0, 0, w, h);
+
+    // World → canvas.
+    let scale: number, ox: number, oz: number;
+    if (this.big) {
+      scale = Math.min(w / (X1 - X0), h / (Z1 - Z0));
+      ox = X0 - (w / scale - (X1 - X0)) / 2;
+      oz = Z0 - (h / scale - (Z1 - Z0)) / 2;
+    } else {
+      scale = (w / 64); // 64 m across
+      ox = dog.x - w / scale / 2;
+      oz = dog.z - h / scale / 2 - 4; // a little more of what's ahead (toward the sea)
+    }
+    const px = (x: number) => (x - ox) * scale;
+    const pz = (z: number) => (z - oz) * scale;
+    g.imageSmoothingEnabled = true;
+    g.drawImage(this.plan, px(X0), pz(Z0), (X1 - X0) * scale, (Z1 - Z0) * scale);
+
+    const r = (this.big ? 5 : 4.5) * dpr;
+    const font = (size: number) => `800 ${Math.round(size * dpr)}px "Bricolage Grotesque", system-ui, sans-serif`;
+    const labels: { x: number; y: number; text: string; color: string }[] = [];
+
+    for (const m of markers) {
+      const x = px(m.x), y = pz(m.z);
+      if (!this.big && (x < -10 || y < -10 || x > w + 10 || y > h + 10)) {
+        // Off the small map: an edge pip for threats and stops so you can head there.
+        if (m.kind === 'threat' || m.kind === 'quest') {
+          const cx = Math.max(6 * dpr, Math.min(w - 6 * dpr, x)), cy = Math.max(6 * dpr, Math.min(h - 6 * dpr, y));
+          g.fillStyle = m.color;
+          g.beginPath(); g.arc(cx, cy, 3 * dpr, 0, Math.PI * 2); g.fill();
+        }
+        continue;
+      }
+      g.lineWidth = 1.5 * dpr;
+      g.strokeStyle = '#0b1430';
+      g.fillStyle = m.color;
+      if (m.kind === 'train') {
+        g.fillRect(x - 30 * scale, y - 1.6 * scale, 60 * scale, 3.2 * scale);
+        g.strokeRect(x - 30 * scale, y - 1.6 * scale, 60 * scale, 3.2 * scale);
+      } else if (m.kind === 'quest') {
+        // A "!" lozenge.
+        g.beginPath();
+        g.moveTo(x, y - r * 1.4); g.lineTo(x + r, y); g.lineTo(x, y + r * 1.4); g.lineTo(x - r, y); g.closePath();
+        g.fill(); g.stroke();
+        g.fillStyle = '#0b1430';
+        g.font = font(this.big ? 10 : 9);
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('!', x, y + 0.5 * dpr);
+      } else if (m.kind === 'threat') {
+        g.beginPath(); g.arc(x, y, r * 1.1, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.strokeStyle = m.color; g.globalAlpha = 0.45;
+        g.beginPath(); g.arc(x, y, r * 2, 0, Math.PI * 2); g.stroke();
+        g.globalAlpha = 1;
+      } else {
+        g.beginPath(); g.arc(x, y, m.kind === 'stop' ? r : r * 0.8, 0, Math.PI * 2); g.fill(); g.stroke();
+      }
+      if (m.label && (this.big || m.kind === 'stop')) labels.push({ x, y, text: m.label, color: m.color });
+    }
+
+    // Millie and her human.
+    const hx = px(human.x), hz = pz(human.z);
+    g.fillStyle = '#f4f1ea'; g.strokeStyle = '#0b1430'; g.lineWidth = 1.5 * dpr;
+    g.beginPath(); g.arc(hx, hz, r * 0.7, 0, Math.PI * 2); g.fill(); g.stroke();
+    const dx = px(dog.x), dz = pz(dog.z);
+    g.save();
+    g.translate(dx, dz);
+    g.rotate(dog.heading);
+    const s = r * 1.5;
+    g.beginPath();
+    g.moveTo(s * 1.2, 0); g.lineTo(-s * 0.8, s * 0.75); g.lineTo(-s * 0.35, 0); g.lineTo(-s * 0.8, -s * 0.75); g.closePath();
+    g.fillStyle = '#ffb020'; g.fill(); g.stroke();
+    g.restore();
+
+    // Labels last, on top, nudged apart.
+    if (labels.length) {
+      g.font = font(this.big ? 12 : 9.5);
+      g.textAlign = 'left'; g.textBaseline = 'middle';
+      const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
+      for (const l of labels) {
+        const tw = g.measureText(l.text).width, th = (this.big ? 15 : 12) * dpr;
+        let x = l.x + r + 3 * dpr, y = l.y;
+        for (let k = 0; k < 6 && placed.some((p) => x < p.x1 && x + tw > p.x0 && y - th / 2 < p.y1 && y + th / 2 > p.y0); k++) y += th * (k % 2 ? -k : k);
+        if (x + tw > w - 2) x = l.x - r - 3 * dpr - tw;
+        x = Math.max(2 * dpr, x);
+        placed.push({ x0: x, y0: y - th / 2, x1: x + tw, y1: y + th / 2 });
+        g.lineWidth = 3.5 * dpr; g.strokeStyle = 'rgba(11,20,48,0.9)';
+        g.strokeText(l.text, x, y);
+        g.fillStyle = '#f4f1ea';
+        g.fillText(l.text, x, y);
+      }
+    }
+  }
+}
