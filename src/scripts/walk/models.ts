@@ -105,7 +105,7 @@ export interface DogModel {
   tail: THREE.Group;
   ears: THREE.Object3D[];
   collarAnchor: THREE.Object3D;
-  animate: (t: number, s: { speed: number; dig: boolean; peeing: boolean; wag: number; air: boolean }) => void;
+  animate: (t: number, s: { speed: number; dig: boolean; peeing: boolean; wag: number; air: boolean; swim?: boolean }) => void;
 }
 
 export function makeDog(look: DogLook = MILLIE): DogModel {
@@ -236,14 +236,18 @@ export function makeDog(look: DogLook = MILLIE): DogModel {
       leg.rotation.z = moving ? Math.sin(gait + phase) * amp * (gallop ? 1.25 : 1) : 0;
       if (s.air) leg.rotation.z = i < 2 ? -0.6 : 0.7;
     });
+    if (s.swim) {
+      // Doggy paddle: quick small strokes, chin up, tail out behind.
+      legs.forEach((leg, i) => { leg.rotation.z = Math.sin(gait * 1.5 + (i % 2 ? Math.PI : 0) + (i < 2 ? 0 : 0.8)) * 0.55; });
+    }
     if (s.peeing) legs[3].rotation.x = -1.0;
     else legs[3].rotation.x = 0;
     body.position.y = moving ? Math.abs(Math.sin(gait)) * 0.03 * Math.min(1, s.speed / 3) : 0;
-    body.rotation.z = s.dig ? -0.22 : moving ? (gallop ? Math.sin(gait) * 0.09 : Math.sin(gait * 2) * 0.02) : 0;
+    body.rotation.z = s.swim ? 0.14 + Math.sin(gait) * 0.03 : s.dig ? -0.22 : moving ? (gallop ? Math.sin(gait) * 0.09 : Math.sin(gait * 2) * 0.02) : 0;
     head.rotation.z = s.dig ? -0.35 : Math.sin(t * 1.3) * 0.05;
     head.rotation.y = Math.sin(t * 0.7) * 0.12;
     tail.rotation.y = Math.sin(wagP) * (0.35 + s.wag * 0.4);
-    tail.rotation.z = s.dig ? -0.2 : 0.1 + s.wag * 0.2;
+    tail.rotation.z = s.swim ? -0.15 : s.dig ? -0.2 : 0.1 + s.wag * 0.2;
     ears.forEach((e, i) => {
       e.rotation.z = moving ? Math.sin(gait + i) * 0.12 : 0;
     });
@@ -269,7 +273,7 @@ export const NPC_TOPS = [0x4c6185, 0x9e4c47, 0x667a5c, 0xc7bda8, 0x3d3d45, 0xb28
 export const NPC_HAIRS = [0x2a1d14, 0x6b4026, 0x1a1a1a, 0xb08850, 0x8a8a8a, 0x5b3a29];
 export const NPC_SKINS = [0xf2c49e, 0xe0ac7e, 0xc68a5e, 0x8d5a3b, 0xf5d2b5];
 
-export type Pose = 'walk' | 'phone' | 'sit' | 'whirl' | 'stumble' | 'ride' | 'fish' | 'lie' | 'stand';
+export type Pose = 'walk' | 'phone' | 'sit' | 'whirl' | 'stumble' | 'ride' | 'fish' | 'lie' | 'stand' | 'scoot';
 
 export interface PersonModel {
   group: THREE.Group;
@@ -450,6 +454,14 @@ export function makePerson(look: PersonLook): PersonModel {
         arms.forEach((a) => { a.rotation.z = 1.2; });
         lf.rotation.z = 0.2; rf.rotation.z = 0.2;
         break;
+      case 'scoot':
+        // On a kick scooter: feet staggered on the deck, hands on the bar, a slight lean in.
+        legs[0].rotation.z = 0.16; legs[1].rotation.z = -0.2;
+        torso.rotation.z = -0.1;
+        arms.forEach((a) => { a.rotation.z = 0.6; });
+        lf.rotation.z = 0.1; rf.rotation.z = 0.1;
+        head.rotation.z = 0.08;
+        break;
       case 'lie':
         hips.position.y = 0.12;
         hips.rotation.z = -Math.PI / 2;
@@ -524,7 +536,7 @@ export function makeBike(style: BikeStyle, rider: PersonModel) {
     group.add(rod(V(0.42, 0.14, 0), V(0.38, 1.05, 0), 0.025, frame));
     group.add(rod(V(0.38, 1.05, -0.22), V(0.38, 1.05, 0.22), 0.02, frame));
     rider.group.position.set(-0.05, 0.16, 0);
-    rider.animate(0, { speed: 0, pose: 'stand' });
+    rider.animate(0, { speed: 0, pose: 'scoot' });
   } else {
     for (const x of [-0.52, 0.52]) {
       const w = new THREE.Mesh(G('bw', () => new THREE.TorusGeometry(0.33, 0.03, 6, 20)), tyre);
@@ -554,9 +566,13 @@ export function makeBike(style: BikeStyle, rider: PersonModel) {
       group.add(basket);
     }
     if (style === 'courier') {
-      const crate = box(0.42, 0.42, 0.42, M(0x703d9e, 0.7));
-      crate.position.set(-0.28, 1.95, 0);
-      rider.group.add(crate);
+      // A delivery backpack, strapped to the back (it leans with the rider).
+      const crate = box(0.36, 0.42, 0.4, M(0x1fc9b7, 0.7));
+      crate.position.set(-0.31, 0.3, 0);
+      rider.torso.add(crate);
+      const lid = box(0.38, 0.03, 0.42, M(0x168f83, 0.7));
+      lid.position.set(-0.31, 0.52, 0);
+      rider.torso.add(lid);
     }
     rider.group.position.set(-0.22, -0.08, 0);
   }

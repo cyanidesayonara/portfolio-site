@@ -51,6 +51,8 @@ export const TRAIN_Z = 9;
 const CUT = { x: 3, tunnelX: 2, rambla0: 22, rambla1: 14, sea0: 4, sea1: -4, floor: -2.7 };
 const RAMPS = [-64, -40, -23, 6, 21, 34, 46, 64];
 const PIER = { x0: -50, x1: -46, root: -10, rise: -30, end: -130, high: 1.2 };
+/** The swimming zone, fenced by a buoy line: x0..x1 along the beach, out to z. */
+export const SWIM = { x0: -40, x1: 44, z: -90 };
 export const PIPICA = { x0: 60, x1: 80, z0: -34, z1: -22.5, gateZ0: -29.2, gateZ1: -26.8 };
 
 const sandFloor = (z: number) => (z > -24 ? SAND_Y : SAND_Y - (-24 - z) * 0.035);
@@ -1029,6 +1031,30 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     mounds.push({ x: mx, z: mz, name, dug: false, mesh: m, loot });
   }
 
+  yield 'Swim zone';
+  // ---- Swim zone: an orange buoy line on a floating rope ----------------------------
+  {
+    const S = SWIM, shoreZ = -60, y = WATER_Y + 0.05;
+    const buoyGeo = new THREE.SphereGeometry(0.22, 10, 8);
+    const ropeM = M(0xf4f1ea, 0.7);
+    const line = (x0: number, z0: number, x1: number, z1: number) => {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      for (let s = 0, k = 0; s <= len; s += 2.5, k++) {
+        const t = s / len;
+        inst.add(k % 5 === 0 ? 'buoyY' : 'buoyO', buoyGeo, () => M(k % 5 === 0 ? 0xffc93c : 0xff7a2a, 0.45), mtx(x0 + (x1 - x0) * t, y, z0 + (z1 - z0) * t), false);
+      }
+      const rope = box(len, 0.03, 0.03, ropeM);
+      rope.position.set((x0 + x1) / 2, y + 0.02, (z0 + z1) / 2);
+      rope.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+      root.add(rope);
+      // Solid for swimmers: Millie can't slip under or over it.
+      boxes.push({ x0: Math.min(x0, x1) - 0.2, x1: Math.max(x0, x1) + 0.2, z0: Math.min(z0, z1) - 0.2, z1: Math.max(z0, z1) + 0.2, top: WATER_Y + 1.6, kind: 'buoys' });
+    };
+    line(S.x0, S.z, S.x1, S.z);
+    line(S.x0, shoreZ, S.x0, S.z);
+    line(S.x1, shoreZ, S.x1, S.z);
+  }
+
   yield 'Pipicà';
   // ---- Pipicà ---------------------------------------------------------------------------
   const P = PIPICA;
@@ -1260,7 +1286,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const clampBounds = (p: { x: number; z: number; y: number }) => {
     if (p.z > 34) { p.z = Math.min(p.z, 99); p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
     p.x = Math.max(-91.5, Math.min(91.5, p.x));
-    if (!onPier(p.x, p.z)) p.z = Math.max(p.z, -64);
+    // Out to the buoy line inside the swim zone; to the shallows elsewhere.
+    if (!onPier(p.x, p.z)) p.z = Math.max(p.z, p.x > SWIM.x0 && p.x < SWIM.x1 ? SWIM.z + 0.3 : -64);
   };
 
   yield 'Paths for pedestrians';
@@ -1324,7 +1351,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
 }
 
 /** Count of the build's steps, for a loading bar. */
-export const LEVEL_STEPS = 32;
+export const LEVEL_STEPS = 33;
 
 /** Wait for the next frame (or a moment, if the tab is hidden and frames are paused). */
 export const nextFrame = () => new Promise<void>((res) => {
