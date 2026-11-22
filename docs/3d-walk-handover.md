@@ -4,7 +4,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Ground rules
 
-- **Branch:** PR #1 (`redesign-astro`) and PR #2 (`walk-phase2-polish`) have been merged to `main`; `feat/transit-cutscene-polish` (PR #3) adds the 2D↔3D Estació train connection, loading cutscene, and 2D/3D polish. Put new work on a feature branch (or continue on `feat/transit-cutscene-polish` until PR #3 merges) with a PR against `main`. Commit as you go and push.
+- **Branch:** PR #1 (`redesign-astro`) and PR #2 (`walk-phase2-polish`) have been merged to `main`. `feat/transit-cutscene-polish` (PR #3, open, not merged) now carries a lot: the 2D↔3D Estació train connection and cutscene, mobile fullscreen fixes, leash and horizon fixes, recorded sound effects, the next-song shortcut and Phase 3 (Plaça del Mercat). Continue on it until Santtu merges it, or branch from it. Commit as you go and push.
 - **Never merge to `main` without Santtu's explicit go-ahead.** Merging deploys the site to GitHub Pages (`.github/workflows/pages-deploy.yml`).
 - **Commit messages & PRs:** authored only by Santtu Nykänen. Never add `Co-authored-by` trailers or any AI/agent attribution anywhere (see `AGENTS.md`).
 - **Copy:** American English, professional. Santtu is a generalist developer, not a "game maker". Never invent stats or facts.
@@ -20,16 +20,21 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
   - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`.
   - **Driving the game:** `key(code, down)`, `tick(frames)` (runs fixed 60 Hz updates and renders), `teleport(x, z)` (also snaps the camera), `collide(p, r, y)`.
   - **`camera` + `render()`:** aim the camera by hand and render one frame (then `canvas.gl.toDataURL()` in the same task) to inspect distant scenery.
+  - **`plaza`:** the Plaça del Mercat runtime (`plazaLife.ts`): `quests()`, `chasing()`, and `debug` (`butcher`, `boti`, `fris`, `paper`, `pigeons`).
+  - **Street camera keys:** the default camera looks out to sea, so `W` heads toward the sea (-Z) and `S` inland (+Z); `A` is -X, `D` is +X.
   - **`addTestDistrict()`:** a streamable district far off the map (x 400–460) for exercising build, bake and unload through `streamer.update(x, z)`.
 - **Stress test:** previous sessions used a snippet that drives Millie with random keys from many spots and checks for NaNs, leaving the bounds and safety "hops" (`debug.hops`). It isn't saved in the repo; rebuild it from the `__walk` API above.
-- **Browser pane:** when hidden, rAF is throttled. Timings look worse and screenshots can lag a frame. If Santtu is playing in the preview tab, test in a separate tab instead of reloading theirs.
+- **Browser pane:** when hidden, rAF is throttled. Timings look worse (the load's `build` readout can show ~7 s instead of ~1.5 s) and screenshots can lag a frame. If Santtu is playing in the preview tab, test in a separate tab instead of reloading theirs.
 
 ## Architecture (`src/scripts/walk/`)
 
 | File | What it does |
 | --- | --- |
 | `game3d.ts` | Everything at runtime: renderer, loading bar, input (focus-gated), physics at 120 Hz, the human's AI, leash, goals, quests, chases (La Neteja, correfoc, Dimoni), NPC walkers and cyclists, train, cameras (street, follow and overhead; wheel and `-`/`=` zoom; drag and `[`/`]` orbit), HUD wiring, minimap, theme and sky, fullscreen, the `?walktest` hooks. |
-| `level.ts` | `buildLevelSteps()`: the level as a generator that yields between sections, so it builds behind a loading bar. It produces geometry, colliders, floor and surface functions, quest and NPC data, and the three districts. Exports layout constants (`GROUND_Y`, `WATER_Y`, `PIPICA`, `SWIM`, …). |
+| `level.ts` | `buildLevelSteps()`: the level as a generator that yields between sections, so it builds behind a loading bar. It produces geometry, colliders, floor and surface functions, quest and NPC data, and the districts (three resident, plus the streamed plaza). Exports layout constants (`GROUND_Y`, `WATER_Y`, `PIPICA`, `SWIM`, …), `pipicaAt()` and `pipicaBenches`. |
+| `plaza.ts` | Phase 3: Plaça del Mercat as a streamable district (`makePlazaDistrict()`): the square, fountain, trees, newsstand, café terrace, market hall, butcher's stall, second pipicà and Carrer Major's signs, built in small steps with colliders added straight to the grid (tagged `plaza`). `PLAZA` holds the shared positions. |
+| `plazaLife.ts` | The plaza at runtime: vendor, grandpa, waiter, dog-park regular and butcher; the newspaper, terrace and fetch quests; the botifarra chase (with simple alley routing). Hooks into `game3d.ts` for pickup/drop, bark, prompts, bubbles and the shared one-chase-at-a-time rule. |
+| `horizon.ts` | Distant silhouettes faded into the fog color: inland hills and the city skyline down the coast. |
 | `data/seafront.json`, `layout.ts` | Portable town layout data (bounds, zones, tracks, streets, blocks, pavilions, landmarks, POIs) plus `buildDistrictBlocksSteps()` and colored `buildDistrictStandin()`. |
 | `meshbuilder.ts` | `DirectBuilder`: accumulates non-indexed triangles straight into chunked, vertex-colored material buckets so static blocks and stand-ins need no intermediate `Mesh`/`BoxGeometry` allocations. |
 | `world.ts` | `District`, `ColliderGrid` (8 m cells; colliders tagged by district) and `Streamer`: live within 80 m, stand-in beyond 100 m, unload beyond 170 m for streamable districts, with build and bake jobs under a 4 ms per-frame budget. |
@@ -39,10 +44,10 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 | `leash.ts` | A port of the real game's leash: Verlet rope, tug, stretch cap, pole-whirl detector. |
 | `fade.ts` | See-through dither for anything between the camera and Millie. Millie and her human are exempt. |
 | `minimap.ts` | A top-down plan drawn once from level data, plus live markers. Turns with the follow camera; `M` enlarges it. |
-| `hud.ts`, `audio.ts`, `theme.ts`, `textures.ts` | HUD DOM, Web Audio (stemma jukebox stems plus synthesized SFX), day/rain/night presets, procedural canvas textures. |
+| `hud.ts`, `audio.ts`, `theme.ts`, `textures.ts` | HUD DOM, Web Audio (stemma jukebox stems; recorded CC0 effects from `public/audio/sfx` with positional panning, distance falloff and synth fallback; `N` skips songs), day/rain/night presets, procedural canvas textures. |
 | `transit.ts` | Animated R1 commuter-train loading cutscene and sliding-door reveal connecting the 2D street `Estació` stop to 3D `Estació` and back (`?via=train`). |
 
-`src/components/Walk3D.astro` holds the markup, toolbar, panels and all HUD CSS, and lazy-loads `game3d`. `src/pages/walk.astro` is the page. The home page (`src/pages/index.astro`) still uses the 2D `StreetMap.astro`.
+`src/scripts/viewport.ts` sizes both games' window-filling fullscreen mode from `visualViewport`. `src/components/Walk3D.astro` holds the markup, toolbar, panels and all HUD CSS, and lazy-loads `game3d`. `src/pages/walk.astro` is the page. The home page (`src/pages/index.astro`) still uses the 2D `StreetMap.astro`.
 
 ## Map expansion plan (where this is heading)
 
@@ -59,15 +64,25 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 | 0 | done (`e96692d`) | Districts, collider grid, floor and surface dispatch, perf readout. |
 | 1 | done (`cab9081`) | Streamer, sliced build behind a loading bar, sliced baking, stand-ins, unloading (tested with the synthetic district). |
 | 2 | done | Layout as data: districts described in `data/seafront.json` (zones, street lines, block outlines with heights and facade style, pavilions, landmarks, POIs), with procedural facades (`layout.ts`). The minimap and colliders come from the same data, stand-ins carry block/pavilion/landmark colors, and `DirectBuilder` builds merged geometry directly instead of meshes-then-bake. |
-| 3 | next | The first new district: the center north of Carrer del Mar (a square, a shopping street, a second pipicà, a new chase, 2–3 quests). |
+| 3 | done (`fcc520f`) | Plaça del Mercat north of Carrer del Mar: a square with a fountain, a market hall, a second pipicà, Carrer Major (shopping street), three quests (newspaper, terrace, fetch) and the botifarra chase. Generic Catalan look for now; refine from reference photos later. Two goals added (14 in all). |
 | 4 | | Terrain (height grid, sloped streets, stairs) and the hill district, with the church as a landmark that's always visible. |
 | 5 | | Goals per district, progress saved in the browser, more life. |
 
 **Measured costs (headless SwiftShader `?walktest`):**
 - **Build:** ~1.5 s total build time (`LEVEL_STEPS = 53`), longest single step ~54 ms (`Districts`). Streaming slices stay ~0.2 ms at rest and ~1.5 ms max step when streaming `addTestDistrict()`.
 - **Baking:** the three districts bake during the loading bar; town blocks and `addTestDistrict()` build chunked merged geometry directly via `DirectBuilder`.
-- **Draw calls:** ~589–761 depending on the view (642 at start, 761 in Carrer del Mar, 172 facing sea from the pier end with stand-ins, 634–671 looking back toward land from the pier end).
+- **Draw calls:** ~589–761 depending on the view (642 at start, 761 in Carrer del Mar, 172 facing sea from the pier end with stand-ins, 634–671 looking back toward land from the pier end); ~696 on Plaça del Mercat.
+- **Plaza streaming:** 30 build steps, longest ~2.7 ms cold (plane trees share one bark material and sign textures are spread over steps); it streams in during the first seconds of play, not during the loading screen.
 - **Godot:** if the town outgrows the web, the plan is to move PoLR 2 there; keep layout data portable for that.
+
+## Next up
+
+1. **Merge decision on PR #3** (Santtu). It's large; review in the preview first.
+2. **Test on real phones and tablets:** fullscreen controls, touch buttons, audio by ear. Nothing has been verified on hardware yet.
+3. **Plaça del Mercat polish:** reference photos for the real square and shopping street; more ambient walkers and shoppers there; maybe a market interior.
+4. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
+5. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
+6. **Phase 4:** terrain and the hill district.
 
 ## Polish backlog (from Santtu's playtesting)
 
