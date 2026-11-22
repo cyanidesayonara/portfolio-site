@@ -89,8 +89,11 @@ function merge(parts: THREE.BufferGeometry[]) {
 const CHUNK = 36;
 const tmpPos = new THREE.Vector3();
 
-/** Merge every static mesh under `root` (marked-dynamic subtrees are left alone). Returns meshes merged. */
-export function bakeStatic(root: THREE.Object3D) {
+/**
+ * Merge every static mesh under `root` (marked-dynamic subtrees are left alone). Returns meshes merged.
+ * `originZ` starts the chunk grid at a district's edge, so districts don't leave sliver chunks.
+ */
+export function bakeStatic(root: THREE.Object3D, originZ = 0) {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const buckets = new Map<string, Bucket>();
@@ -100,7 +103,7 @@ export function bakeStatic(root: THREE.Object3D) {
     if (mergeable(o)) {
       // Chunk by position so off-screen parts of the level still get culled.
       o.getWorldPosition(tmpPos);
-      const key = `${bucketKey(o)}|${Math.floor(tmpPos.x / CHUNK)},${Math.floor(tmpPos.z / CHUNK)}`;
+      const key = `${bucketKey(o)}|${Math.floor(tmpPos.x / CHUNK)},${Math.floor((tmpPos.z - originZ) / CHUNK)}`;
       const mat = o.material as THREE.MeshStandardMaterial;
       const vc = key.startsWith('vc');
       let b = buckets.get(key);

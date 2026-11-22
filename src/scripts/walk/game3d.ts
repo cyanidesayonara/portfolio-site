@@ -130,7 +130,9 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   coriolisTex.colorSpace = THREE.SRGBColorSpace;
   coriolisTex.magFilter = THREE.NearestFilter;
 
+  const buildT0 = performance.now();
   const level: Level = buildLevel(scene, { coriolisTex });
+  const buildMs = performance.now() - buildT0;
   const audio = new WalkAudio();
   const hud = new Hud(host);
   let mapFrame = 0;
@@ -554,7 +556,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       if (d < r && d > 1e-4) { p.x = cx + (dx / d) * r; p.z = cz + (dz / d) * r; }
       else if (d <= 1e-4) p.x = p.x < (b.x0 + b.x1) / 2 ? b.x0 - r : b.x1 + r;
     }
-    for (const c of level.circles) {
+    for (const c of level.grid.circlesNear(p.x, p.z, r + 0.05)) {
       if (!activeCircle(c, feetY) || feetY > c.top - 0.02) continue;
       const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz), min = c.r + r;
       if (d < min) {
@@ -562,7 +564,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         else p.x += min;
       }
     }
-    for (const b of level.boxes) {
+    for (const b of level.grid.boxesNear(p.x, p.z, r + 0.05)) {
       if (!activeBox(b, feetY) || feetY > b.top - 0.02) continue;
       const cx = clamp(p.x, b.x0, b.x1), cz = clamp(p.z, b.z0, b.z1);
       const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
@@ -586,7 +588,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     p.x = x0; p.z = z0;
   };
   const nearbyPoles = (x: number, z: number, rad: number, y: number) =>
-    level.circles.filter((c) => c.obstacle && activeCircle(c, y) && Math.abs(c.x - x) < rad && Math.abs(c.z - z) < rad).map((c) => c.obstacle!);
+    level.grid.circlesNear(x, z, rad).filter((c) => c.obstacle && activeCircle(c, y) && Math.abs(c.x - x) < rad && Math.abs(c.z - z) < rad).map((c) => c.obstacle!);
 
   const debug = { hops: 0 };
   const handPos = new THREE.Vector3();
@@ -630,7 +632,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     dog.peeing = 0.8;
     audio.pee();
     let best: Level['circles'][number] | null = null, bd = 1.3;
-    for (const c of level.circles) {
+    for (const c of level.grid.circlesNear(dog.x, dog.z, 2)) {
       if (!c.canPee || !activeCircle(c, dog.y)) continue;
       const d = Math.hypot(c.x - dog.x, c.z - dog.z) - c.r;
       if (d < bd) { bd = d; best = c; }
@@ -1043,7 +1045,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
         if (roll < 0.3) { humanSay('Ring ring…'); human.state = 'phone'; human.stateT = -0.8; }
         else if (roll < 0.45) { humanSay('Selfie time!'); human.state = 'selfie'; human.stateT = -0.8; }
         else if (roll < 0.6) {
-          const bench = level.boxes.find((b) => b.kind === 'bench' && Math.hypot((b.x0 + b.x1) / 2 - human.x, (b.z0 + b.z1) / 2 - human.z) < 4);
+          const bench = level.grid.boxesNear(human.x, human.z, 4).find((b) => b.kind === 'bench' && Math.hypot((b.x0 + b.x1) / 2 - human.x, (b.z0 + b.z1) / 2 - human.z) < 4);
           if (bench) {
             // Sit on the side of the bench facing away from its backrest (toward the human here).
             const cx = (bench.x0 + bench.x1) / 2, cz = (bench.z0 + bench.z1) / 2;
@@ -2012,7 +2014,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       for (let i = 1; i <= steps; i++) {
         const t = i / steps;
         const px = lerp(dog.x, bx, t), pz = lerp(dog.z, bz, t);
-        if (level.boxes.some((b) => b.top > 4 && px > b.x0 - 0.3 && px < b.x1 + 0.3 && pz > b.z0 - 0.3 && pz < b.z1 + 0.3)) {
+        if (level.grid.boxesNear(px, pz, 0.3).some((b) => b.top > 4 && px > b.x0 - 0.3 && px < b.x1 + 0.3 && pz > b.z0 - 0.3 && pz < b.z1 + 0.3)) {
           const tt = (i - 1) / steps;
           bx = lerp(dog.x, bx, tt); bz = lerp(dog.z, bz, tt);
           break;
@@ -2038,7 +2040,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       if (tunnelT < 0.2) {
         for (let k = 0.5; k <= back; k += 0.5) {
           const pz = dog.z + k;
-          if (level.boxes.some((b) => b.kind === 'building' && b.top > dog.y + 4 && dog.x > b.x0 - 1 && dog.x < b.x1 + 1 && pz > b.z0 - 0.8 && pz < b.z1 + 0.8)) {
+          if (level.grid.boxesNear(dog.x, pz, 1).some((b) => b.kind === 'building' && b.top > dog.y + 4 && dog.x > b.x0 - 1 && dog.x < b.x1 + 1 && pz > b.z0 - 0.8 && pz < b.z1 + 0.8)) {
             // Walls in between turn see-through (fade.ts), so only ease in a little.
             const clear = Math.max(6.5, k - 0.8);
             height += Math.min(2.5, (back - clear) * 0.6);
@@ -2088,11 +2090,32 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   let onScreen = true;
   let rafId = 0;
   let engaged = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Perf readout (?walktest): frame rate, worst frame, render cost, build time, district.
+  const perfEl = new URLSearchParams(location.search).has('walktest') ? document.createElement('pre') : null;
+  const perf = { frames: 0, worst: 0, t: 0, worstWindow: 0 };
+  if (perfEl) {
+    perfEl.className = 'perf';
+    perfEl.setAttribute('aria-hidden', 'true');
+    host.appendChild(perfEl);
+  }
+  const perfTick = (frameMs: number, now: number) => {
+    if (!perfEl) return;
+    perf.frames++;
+    perf.worstWindow = Math.max(perf.worstWindow, frameMs);
+    if (now - perf.t < 500) return;
+    const fps = (perf.frames * 1000) / (now - perf.t || 1);
+    perf.worst = perf.worstWindow;
+    perf.frames = 0; perf.worstWindow = 0; perf.t = now;
+    const i = renderer.info;
+    perfEl.textContent = `${fps.toFixed(0)} fps · worst ${perf.worst.toFixed(0)} ms · ${i.render.calls} calls · ${(i.render.triangles / 1000).toFixed(0)}k tris · ${i.memory.geometries} geos · build ${buildMs.toFixed(0)} ms · ${level.districtAt(dog.x, dog.z).label}`;
+  };
   const loop = (now: number) => {
-    const dt = Math.min(0.05, Math.max(0.001, (now - prev) / 1000));
+    const frameMs = now - prev;
+    const dt = Math.min(0.05, Math.max(0.001, frameMs / 1000));
     prev = now;
     update(dt);
     renderer.render(scene, camera);
+    perfTick(frameMs, now);
     rafId = requestAnimationFrame(loop);
   };
   const setRunning = () => {
@@ -2132,6 +2155,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },
+      buildMs,
       beachDevils, life,
       get info() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
