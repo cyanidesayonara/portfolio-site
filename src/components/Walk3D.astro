@@ -49,7 +49,7 @@ const KEYS = [
         <button type="button" class="tb" data-sky="rain" aria-pressed="false">Rain</button>
         <button type="button" class="tb" data-sky="night" aria-pressed="false">Night</button>
       </span>
-      <button type="button" class="tb" data-camera>Camera: Street</button>
+      <button type="button" class="tb" data-camera>Cam: Street</button>
       <button type="button" class="tb" data-fullscreen aria-pressed="false">Fullscreen</button>
     </div>
 
@@ -545,7 +545,7 @@ const KEYS = [
   .stage :global(.prompts) {
     position: absolute;
     left: 50%;
-    bottom: 14px;
+    bottom: 54px;
     transform: translateX(-50%);
     display: flex;
     gap: 22px;
@@ -742,13 +742,21 @@ const KEYS = [
   }
   kbd.wide { padding: 0 8px; }
   @media (max-width: 720px) {
-    .stage { height: clamp(420px, 72vh, 640px); }
-    .stage :global(.vitals) { transform: scale(0.8); transform-origin: top left; }
-    .stage :global(.goals) { transform: scale(0.85); transform-origin: top right; }
-    .stage :global(.banner) { top: auto; bottom: 200px; max-width: calc(100% - 32px); }
-    .toolbar { left: 8px; right: 8px; bottom: auto; top: 104px; }
-    .toolbar .tb { min-height: 28px; padding: 4px 9px; font-size: 11px; }
+    .stage { height: clamp(460px, 76vh, 680px); }
+    .stage :global(.vitals) { transform: scale(0.72); transform-origin: top left; left: 8px; top: 8px; }
+    .stage :global(.goals) { width: 128px; padding: 7px 10px; }
+    .stage :global(.goals .gh) { font-size: 11px; }
+    .stage :global(.goals .gh kbd) { display: none; }
+    .stage :global(.goals.open) { width: calc(100% - 16px); z-index: 2; }
+    .stage :global(.toasts) { top: 50px; }
+    .stage :global(.banner) { top: auto; bottom: 214px; max-width: calc(100% - 24px); font-size: 12px; }
+    .toolbar { left: 8px; right: 8px; bottom: auto; top: 84px; flex-wrap: nowrap; gap: 4px; overflow-x: auto; }
+    .toolbar .tb { min-height: 28px; padding: 4px 8px; font-size: 10.5px; white-space: nowrap; }
     @media (pointer: fine) { .toolbar { top: auto; bottom: 8px; } }
-    .keys { display: none; }
+    .stage :global(.shout) { font-size: 22px; }
+    figcaption { display: none; }
+  }
+  @media (pointer: coarse) {
+    .focus-hint { display: none; }
   }
 </style>

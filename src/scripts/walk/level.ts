@@ -32,7 +32,7 @@ import {
   slabTexture, flagstoneTexture, concreteTexture, wallPanelTexture, tileFloorTexture, muralTexture, paintTexture,
 } from './textures';
 
-export interface BoxCollider { x0: number; x1: number; z0: number; z1: number; top: number; minY?: number; kind: string }
+export interface BoxCollider { x0: number; x1: number; z0: number; z1: number; top: number; minY?: number; kind: string; face?: [number, number] }
 export interface CircleCollider {
   x: number; z: number; r: number; top: number; minY?: number; maxY?: number;
   kind: string; canPee: boolean; canWhirl: boolean; marked: boolean; obstacle?: Obstacle;
@@ -396,18 +396,23 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   }
   place(makeContainers(), 30, GROUND_Y, 73.2, Math.PI);
   boxes.push({ x0: 22.6, x1: 30.8, z0: 72.4, z1: 74, top: GROUND_Y + 1.6, kind: 'containers' });
-  for (const [x, z] of [[-30, 53], [28, 89]]) {
+  for (const [x, z] of [[-30, 50.6], [28, 86.6]]) {
     place(makeBin(), x, GROUND_Y, z);
     addCircle(x, z, 0.25, GROUND_Y + 0.9, 'bin', true, false);
   }
   // A quiet bench in side street B (east) where the kid's ball rolled under.
   place(makeBench(), 24, GROUND_Y, 73.4, Math.PI);
-  boxes.push({ x0: 23.1, x1: 24.9, z0: 72.9, z1: 73.9, top: GROUND_Y + 0.5, kind: 'bench' });
+  boxes.push({ x0: 23.1, x1: 24.9, z0: 72.9, z1: 73.9, top: GROUND_Y + 0.5, kind: 'bench', face: [0, -1] });
   // Shop signs for the quest shops.
   const sideSign = (title: string, sub: string, color: string, x: number, z: number, ry: number) => {
     const s = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 0.1), new THREE.MeshStandardMaterial({ map: signTexture(title, sub, color, { aspect: 3.4 / 0.7 }) }));
     place(s, x, GROUND_Y + 3.4, z, ry);
   };
+  const kidBalcony = box(1.8, 0.14, 0.8, M(0xb4ada0, 0.85));
+  kidBalcony.position.set(-14, GROUND_Y + 4.18, 91.6);
+  root.add(kidBalcony);
+  for (let i = 0; i <= 8; i++) root.add(rod(new THREE.Vector3(-14.85 + i * 0.21, GROUND_Y + 4.25, 91.25), new THREE.Vector3(-14.85 + i * 0.21, GROUND_Y + 5.1, 91.25), 0.012, ironM, 4));
+  root.add(rod(new THREE.Vector3(-14.9, GROUND_Y + 5.1, 91.25), new THREE.Vector3(-13.1, GROUND_Y + 5.1, 91.25), 0.025, ironM, 4));
   sideSign('Fruiteria', 'Fruita i verdura', '#8bcb3c', -12, 50.15, 0);
   sideSign('Forn de pa', 'Pa · Coques · Galetes', '#ffb020', 12, 50.15, 0);
   // Monkey-selfie mural in side street B (a nod to the real one nearby).
@@ -499,7 +504,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
       const bx = x + dx;
       if (Math.abs(bx) < 5 || (bx > 36 && bx < 58)) continue;
       place(makeBench(), bx, GROUND_Y, 15.8, Math.PI);
-      boxes.push({ x0: bx - 0.9, x1: bx + 0.9, z0: 15.4, z1: 16.1, top: GROUND_Y + 0.5, kind: 'bench' });
+      boxes.push({ x0: bx - 0.9, x1: bx + 0.9, z0: 15.4, z1: 16.1, top: GROUND_Y + 0.5, kind: 'bench', face: [0, -1] });
     }
   }
   // Café terraces under square cream umbrellas.
@@ -772,7 +777,7 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
   for (let x = -84; x <= 84; x += 28) {
     const gm = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), glyphMat);
     gm.rotation.x = -Math.PI / 2;
-    gm.position.set(x, GROUND_Y + 0.012, 1.6);
+    gm.position.set(x, GROUND_Y + 0.012, -5.7);
     root.add(gm);
   }
 
@@ -1120,10 +1125,10 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     [[-30, 52.8], [-12, 53.2], [12, 52.8], [30, 53.2]],
     [[30, 70.8], [10, 71.2], [-10, 70.8], [-30, 71.2]],
     [[-30, 88.8], [0, 89.2], [30, 88.8]],
-    [[-86, 24], [-40, 23.5], [0, 24.5], [40, 23.5], [86, 24]],
-    [[86, 19], [30, 19.5], [-30, 18.6], [-86, 19]],
+    [[-86, 24], [-40, 23.5], [0, 24.5], [40, 23.5], [62, 23.5], [66, 21.4], [76, 21.4], [86, 24]],
+    [[86, 19], [30, 19.5], [6, 23.4], [-6, 23.4], [-30, 18.6], [-86, 19]],
     [[-86, 29], [-20, 28.4], [20, 29], [86, 28.5]],
-    [[-86, -5], [-30, -5.5], [10, -4.5], [86, -5]],
+    [[-86, -7.6], [-30, -7.4], [10, -7.7], [86, -7.5]],
     [[86, -14.5], [60, -15], [-60, -15], [-86, -14.5]],
     [[-80, -54], [0, -55], [80, -54]],
     [[-48, -12], [-48, -60], [-48, -126]],
@@ -1150,14 +1155,14 @@ export function buildLevel(scene: THREE.Scene, opts: LevelOpts) {
     quests: {
       kid: { x: -14, y: GROUND_Y + 4.25, z: 91.7, ry: Math.PI / 2 },
       ball: { x: 24, z: 72.4 },
-      tofu: { spots: [[-29, 70.5], [-17, 72.8], [-1.8, 77], [2, 84.5], [13, 89.6], [20, 86.7]] as [number, number][] },
+      tofu: { spots: [[-29, 70.5], [-17, 72.8], [-2.6, 71.5], [-1.8, 77], [2, 84.5], [2.6, 88.8], [13, 89.6], [20, 86.7]] as [number, number][] },
       crate: { x: -11, z: 50.8, ry: 0 },
       grocer: { x: -13.4, z: 50.9, ry: -Math.PI / 2 },
       baker: { x: 12.5, z: 50.9, ry: -Math.PI / 2 },
       mural: { x: 16, z: 68.8 },
       sweeper: { x: 0, z0: 40, z1: 96 },
     },
-    correfoc: { x0: 76, x1: -2, z: 24 },
+    correfoc: { x0: 80, x1: -2, z: 24 },
     station: { x: STATION_X },
   };
 }
