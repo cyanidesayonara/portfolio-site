@@ -1506,6 +1506,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let lightPoolT = 0;
   let pierReached = false;
 
+  let runT = 0, dogNoiseT = 0;
+  const listenDir = new THREE.Vector3();
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
     const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
@@ -1522,6 +1524,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const sp = Math.hypot(dog.vx, dog.vz);
     dog.speed = sp;
     dog.stillTime = sp < 0.2 ? dog.stillTime + dt : 0;
+    // Little dog noises: panting after a good run, a sniff when she stops by a pole or tree.
+    runT = sp > 4 ? runT + dt : Math.max(0, runT - dt * 0.5);
+    dogNoiseT -= dt;
+    if (dogNoiseT <= 0 && dog.stillTime > 0.35 && dog.stillTime - dt <= 0.35) {
+      if (runT > 2.5) { audio.pant(); runT = 0; dogNoiseT = 5; }
+      else if (level.grid.circlesNear(dog.x, dog.z, 1.2).some((c) => c.obstacle && Math.hypot(c.x - dog.x, c.z - dog.z) < 1.1)) { audio.sniff(); dogNoiseT = 4; }
+    }
 
     // Coriolis texture, only when nearby or focused.
     if (coriolis.tick(time * 1000) && (coriolisFocus || Math.abs(camPos.z - level.coriolis.z) < 45)) {
@@ -2123,6 +2132,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
     // ---- Camera ----
     updateCamera(rawDt, inTunnel);
+    camera.getWorldDirection(listenDir);
+    audio.setListener(camera.position.x, camera.position.z, listenDir.x, listenDir.z);
 
     // Speech bubbles follow heads.
     const proj = (x: number, y: number, z: number) => {

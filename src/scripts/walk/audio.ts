@@ -1,9 +1,36 @@
 /*
   Sound for the 3D walk: real songs separated into stems by stemma (from
   stemma's own demo set, public/audio/stemma), looped in sync with per-stem
-  mutes and level meters, plus small synthesized effects. Nothing loads or
+  mutes and level meters, plus effects (recorded samples, see below). Nothing loads or
   plays until the visitor turns sound on.
 */
+
+// Effects: recorded samples in public/audio/sfx (CC0 / public domain, see CREDITS.md
+// there), placed around the listener (pan, distance, air absorption) with a little
+// random variation; the synthesized versions below play until they load.
+
+/** Sample groups: one of the takes is picked at random (never the same twice running). */
+const SAMPLES = {
+  bark: ['bark-1', 'bark-2', 'bark-3', 'bark-4', 'bark-5'],
+  otherDog: ['dog-other-1', 'dog-other-2', 'dog-other-3', 'dog-other-4'],
+  yap: ['yap-1', 'yap-2'],
+  sniff: ['sniff'],
+  lap: ['lap-1', 'lap-2', 'lap-3', 'lap-4'],
+  pant: ['pant'],
+  howl: ['howl'],
+  whine: ['whine'],
+  splash: ['splash-1', 'splash-2', 'splash-3', 'splash-4'],
+} satisfies Record<string, string[]>;
+export type SampleGroup = keyof typeof SAMPLES;
+
+export interface SampleOpts {
+  /** World position; omit for sounds at the player (Millie). */
+  at?: { x: number; z: number };
+  vol?: number;
+  /** Playback rate (pitch and speed together); a random +-4 % is added. */
+  rate?: number;
+  delay?: number;
+}
 
 export type StemGroup = 'vocals' | 'drums' | 'bass' | 'other';
 export const STEM_GROUPS: StemGroup[] = ['vocals', 'drums', 'bass', 'other'];
@@ -53,6 +80,10 @@ export class WalkAudio {
   on = false;
   musicOn = true;
   onSongChange: ((s: SongMeta) => void) | null = null;
+  private samples = new Map<string, AudioBuffer>();
+  private samplesLoading = false;
+  private lastTake = new Map<SampleGroup, string>();
+  private listener = { x: 0, z: 0, fx: 0, fz: -1 };
 
   constructor(private base = '/audio/stemma') {}
 
@@ -118,12 +149,80 @@ export class WalkAudio {
     }
     void this.ctx.resume();
     this.on = true;
+    void this.loadSamples();
     void this.loadIndex().then(() => { if (this.musicOn) void this.playSong(this.songId); });
   }
 
   disable() {
     this.on = false;
     void this.ctx?.suspend();
+  }
+
+  /** Fetch and decode every effect sample once (small mono MP3s, ~200 KB in all). */
+  private async loadSamples(sfxBase = '/audio/sfx') {
+    if (this.samplesLoading || !this.ctx) return;
+    this.samplesLoading = true;
+    const c = this.ctx;
+    const names = new Set<string>(Object.values(SAMPLES).flat());
+    await Promise.all([...names].map(async (n) => {
+      try {
+        const res = await fetch(`${sfxBase}/${n}.mp3`);
+        if (!res.ok) return;
+        this.samples.set(n, await c.decodeAudioData(await res.arrayBuffer()));
+      } catch { /* keep the synthesized fallback */ }
+    }));
+  }
+
+  /** Where the ears are: the camera's position and the direction it looks (XZ). */
+  setListener(x: number, z: number, fx: number, fz: number) {
+    const l = Math.hypot(fx, fz) || 1;
+    this.listener.x = x; this.listener.z = z; this.listener.fx = fx / l; this.listener.fz = fz / l;
+  }
+
+  /**
+    Play a recorded take from a group. Returns false if nothing is loaded yet (the
+    caller then synthesizes). Sounds with a position are panned by their bearing
+    from the camera, get quieter with distance and lose their highs far away.
+  */
+  sample(group: SampleGroup, o: SampleOpts = {}): boolean {
+    if (!this.ctx || !this.on) return false;
+    const takes = SAMPLES[group].filter((n) => this.samples.has(n));
+    if (!takes.length) return false;
+    const last = this.lastTake.get(group);
+    const pool = takes.length > 1 ? takes.filter((n) => n !== last) : takes;
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    this.lastTake.set(group, name);
+    const c = this.ctx, t = c.currentTime + (o.delay ?? 0);
+    const src = c.createBufferSource();
+    src.buffer = this.samples.get(name)!;
+    src.playbackRate.value = (o.rate ?? 1) * (0.96 + Math.random() * 0.08);
+    const g = c.createGain();
+    let vol = o.vol ?? 1;
+    let node: AudioNode = src;
+    if (o.at) {
+      const dx = o.at.x - this.listener.x, dz = o.at.z - this.listener.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 60) return true; // out of earshot: count it as played
+      vol *= 1 / (1 + Math.pow(d / 7, 1.4));
+      // Bearing relative to where the camera looks: right of it pans right.
+      const right = (this.listener.fx * dz - this.listener.fz * dx) / (d || 1);
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 16000 / (1 + d / 9);
+      node.connect(lp);
+      node = lp;
+      if (c.createStereoPanner) {
+        const pan = c.createStereoPanner();
+        pan.pan.value = Math.max(-0.85, Math.min(0.85, right * Math.min(1, d / 4)));
+        node.connect(pan);
+        node = pan;
+      }
+    }
+    g.gain.value = vol;
+    node.connect(g);
+    g.connect(this.sfxBus);
+    src.start(t);
+    return true;
   }
 
   /** Underpass echo amount, 0..1. */
@@ -271,17 +370,25 @@ export class WalkAudio {
   }
 
   bark() {
+    if (this.sample('bark', { vol: 0.95 })) return;
     this.tone(420, 0.09, 'sawtooth', 0.22, 260);
     this.hiss(0.1, 900, 2.5, 0.16);
     this.tone(380, 0.08, 'sawtooth', 0.18, 240, 0.13);
     this.hiss(0.09, 850, 2.5, 0.12, 'bandpass', undefined, 0.13);
   }
-  /** Another dog's bark: higher for small dogs. */
-  smallBark(scale = 0.8) {
+  /** Another dog's bark: higher for small dogs, placed where that dog is. */
+  smallBark(scale = 0.8, at?: { x: number; z: number }) {
+    const small = scale < 0.75;
+    if (this.sample(small ? 'yap' : 'otherDog', { at, vol: 0.9, rate: small ? 1.05 / Math.max(0.6, scale) : 0.85 / Math.max(0.6, scale) })) return;
     const f = 520 / Math.max(0.5, scale);
     this.tone(f, 0.07, 'sawtooth', 0.12, f * 0.62);
     this.hiss(0.07, f * 2, 2.5, 0.08);
   }
+  sniff(at?: { x: number; z: number }) { this.sample('sniff', { at, vol: 0.6 }); }
+  /** A few quick breaths after a run. */
+  pant() { for (let i = 0; i < 3; i++) this.sample('pant', { vol: 0.42 - i * 0.06, delay: i * 0.36, rate: 1.1 }); }
+  whine() { this.sample('whine', { vol: 0.55 }); }
+  howl(at?: { x: number; z: number }) { this.sample('howl', { at, vol: 0.8 }); }
   /** A palas ball off a wooden bat. */
   pock() { this.tone(900, 0.05, 'triangle', 0.08, 600); this.hiss(0.03, 2500, 2, 0.05, 'bandpass'); }
   jump() { this.tone(300, 0.16, 'square', 0.08, 620); }
@@ -291,12 +398,23 @@ export class WalkAudio {
   pickup() { [660, 880, 1320].forEach((f, i) => this.tone(f, 0.12, 'triangle', 0.14, undefined, i * 0.06)); }
   goal() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.13, undefined, i * 0.07)); }
   click() { this.tone(1800, 0.03, 'square', 0.05); }
-  slurp() { this.tone(500, 0.25, 'sine', 0.1, 260); }
+  /** Drinking: a few laps from the bowl. */
+  slurp() {
+    if (this.sample('lap', { vol: 0.8 })) {
+      this.sample('lap', { vol: 0.7, delay: 0.32 });
+      this.sample('lap', { vol: 0.75, delay: 0.62 });
+      return;
+    }
+    this.tone(500, 0.25, 'sine', 0.1, 260);
+  }
   flutter() { for (let i = 0; i < 6; i++) this.hiss(0.06, 1400 + Math.random() * 600, 3, 0.08, 'bandpass', undefined, i * 0.05); }
   gull() { this.tone(1500, 0.28, 'sawtooth', 0.05, 900); this.tone(1600, 0.22, 'sawtooth', 0.04, 1000, 0.32); }
   bell() { this.tone(2300, 0.5, 'sine', 0.1); this.tone(2300, 0.5, 'sine', 0.08, undefined, 0.16); }
   hey() { this.tone(330, 0.25, 'sawtooth', 0.06, 280); }
-  splash() { this.hiss(0.35, 1200, 0.8, 0.18, 'bandpass', 500); }
+  splash(at?: { x: number; z: number }) {
+    if (this.sample('splash', { at, vol: 0.9 })) return;
+    this.hiss(0.35, 1200, 0.8, 0.18, 'bandpass', 500);
+  }
   stumble() { this.tone(220, 0.3, 'sine', 0.12, 110); this.hiss(0.2, 400, 1, 0.12, 'lowpass'); }
   whoosh(pitch = 1) { this.hiss(0.28, 600 * pitch, 2, 0.12, 'bandpass', 1500 * pitch); }
   fling() { this.whoosh(1.4); this.tone(200, 0.5, 'triangle', 0.12, 700); }
