@@ -20,6 +20,7 @@ import { bakeStatic, bakeSteps, drain } from './bake';
 import { DirectBuilder } from './meshbuilder';
 import { makeCitySkyline, makeInlandHills } from './horizon';
 import { PLAZA, inPlazaPipica, makePlazaDistrict } from './plaza';
+import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } from './hill';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
@@ -1055,6 +1056,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // Hills inland (+Z), the city's skyline far down the coast behind the chimneys (-X).
   root.add(makeInlandHills(WATER_Y - 12));
   root.add(makeCitySkyline(WATER_Y - 2));
+  const churchLandmark = makeChurchLandmark();
+  root.add(churchLandmark);
 
   const poles: Obstacle[] = circles.filter((c) => c.obstacle).map((c) => c.obstacle!);
 
@@ -1158,6 +1161,21 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(plaza.root);
   bowls.push({ ...PLAZA.bowl });
   fountains.push({ ...PLAZA.drink });
+  // Dalt de la Vila (hill.ts): streams in beyond Carrer Major.
+  const hillGlass = makeLanternPost().glass;
+  lampGlass.push(hillGlass);
+  for (const [x, z] of HILL.lamps) lampSpots.push(new THREE.Vector3(x, hillFloor(x, z) + 4.4, z));
+  const hill = makeHillDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('hill')!, ground, newInstancer: () => new Instancer(), r,
+    mats: {
+      flag: flagMat, flagTile: flag.tileMeters, panot: panotMat, panotTile: panot.tileMeters, sand: sandMat,
+      wall: wallPlasterMat, litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM, lampGlass: hillGlass,
+    },
+  });
+  districts.push(hill);
+  root.add(hill.root);
+  bowls.push({ ...HILL.bowl });
+  fountains.push({ ...HILL.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
@@ -1172,16 +1190,28 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  /** Which pipicà (x, z) is in: 0 by the beach, 1 on Plaça del Mercat, -1 for neither. */
-  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : -1);
+  /** Which pipicà (x, z) is in: 0 beach, 1 Plaça del Mercat, 2 Dalt de la Vila, -1 neither. */
+  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : inHillPipica(x, z) ? 2 : -1);
   const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
   /** Where Millie's human waits while she's off the leash in each pipicà. */
-  const pipicaBenches = [humanBench, PLAZA.pipicaBench];
+  const pipicaBenches: { x: number; z: number; heading?: number }[] = [
+    humanBench,
+    PLAZA.pipicaBench,
+    { ...HILL.pipicaBench, heading: Math.PI },
+  ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
-    // Carrer del Mar and its side streets; beyond it the plaza, the market alleys and Carrer Major
-    // (the buildings' colliders do the rest).
+    // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
     if (p.z > 34 && p.z < PLAZA.z0) { p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
-    if (p.z >= PLAZA.z0) { p.z = Math.min(p.z, PLAZA.street.z1 - 0.4); p.x = Math.max(PLAZA.street.x0 + 0.4, Math.min(PLAZA.street.x1 - 0.4, p.x)); return; }
+    if (p.z >= PLAZA.z0 && p.z < HILL.z0) {
+      p.x = Math.max(PLAZA.street.x0 + 0.4, Math.min(PLAZA.street.x1 - 0.4, p.x));
+      if (p.z > PLAZA.street.z1 - 0.4 && Math.abs(p.x) >= 2.9) p.z = PLAZA.street.z1 - 0.4;
+      return;
+    }
+    if (p.z >= HILL.z0) {
+      p.z = Math.min(p.z, HILL.maxZ);
+      p.x = Math.max(HILL.minX, Math.min(HILL.maxX, p.x));
+      return;
+    }
     p.x = Math.max(-91.5, Math.min(91.5, p.x));
     // Out to the buoy line inside the swim zone; to the shallows elsewhere.
     if (!onPier(p.x, p.z)) p.z = Math.max(p.z, p.x > SWIM.x0 && p.x < SWIM.x1 ? SWIM.z + 0.3 : -64);
@@ -1205,11 +1235,13 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     [[-80, -54], [0, -55], [80, -54]],
     [[-48, -12], [-48, -60], [-48, -126]],
     ...PLAZA.pedPaths,
+    ...HILL.pedPaths,
   ];
 
   return {
     root, layout: SEAFRONT_LAYOUT, boxes, circles, poles, stops, mounds, lampSpots, lampGlass, litWindowMat, wetMats,
     floor, surface, inPipica, pipicaAt, pipicaBenches, clampBounds, ramps: RAMPS, grid, districts, districtAt, addRuntimeCircle,
+    churchLandmark,
     /** Where the build time goes (ms): building props, splitting into districts, instancing + baking. */
     timings: { build: tBuilt - T0, split: tSplit - tBuilt, bake: tBaked - tSplit },
     waterMat, foamMat, sea, sunbathers, fishers, hurdles, bowls, fountains, humanBench, terraceSeats,
