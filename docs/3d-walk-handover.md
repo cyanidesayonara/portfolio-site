@@ -21,6 +21,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
   - **Driving the game:** `key(code, down)`, `tick(frames)` (runs fixed 60 Hz updates and renders), `teleport(x, z)` (also snaps the camera), `collide(p, r, y)`.
   - **`camera` + `render()`:** aim the camera by hand and render one frame (then `canvas.gl.toDataURL()` in the same task) to inspect distant scenery.
   - **`plaza`:** the Plaça del Mercat runtime (`plazaLife.ts`): `quests()`, `chasing()`, and `debug` (`butcher`, `boti`, `fris`, `paper`, `pigeons`).
+  - **Phase 5:** `area` (current goals area) and `strays` (`debug.cats`, `debug.scared`). `?walktest` starts with no saved progress and never saves; add `&walksave` to test saving.
   - **`hill`:** the Dalt de la Vila runtime (`hillLife.ts`): `quests()`, `bubbles()`, and `debug` (`bellRingT`, `miradorT`, `homeDone`, `pigeons`, `parkDog`).
   - **Street camera keys:** the default camera looks out to sea, so `W` heads toward the sea (-Z) and `S` inland (+Z); `A` is -X, `D` is +X.
   - **`addTestDistrict()`:** a streamable district far off the map (x 400–460) for exercising build, bake and unload through `streamer.update(x, z)`.
@@ -70,8 +71,8 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 | 1 | done (`cab9081`) | Streamer, sliced build behind a loading bar, sliced baking, stand-ins, unloading (tested with the synthetic district). |
 | 2 | done | Layout as data: districts described in `data/seafront.json` (zones, street lines, block outlines with heights and facade style, pavilions, landmarks, POIs), with procedural facades (`layout.ts`). The minimap and colliders come from the same data, stand-ins carry block/pavilion/landmark colors, and `DirectBuilder` builds merged geometry directly instead of meshes-then-bake. |
 | 3 | done (`fcc520f`) | Plaça del Mercat north of Carrer del Mar: a square with a fountain, a market hall, a second pipicà, Carrer Major (shopping street), three quests (newspaper, terrace, fetch) and the botifarra chase. Generic Catalan look for now; refine from reference photos later. Two goals added (14 in all). |
-| 4 | done (PR #4, awaiting merge) | Terrain (`HeightGrid`, sloped streets, two stone stairways, upper ramp) and Dalt de la Vila (`hill.ts`, `hillLife.ts`): `Museu`, third pipicà, `Església` & always-visible `Campanar` landmark, Mirador overlook, generic wooden Home door, two new goals (16 in all). Verified in `?walktest` (routes, quests, pipicà, stress test, unloading); see the measured costs below. |
-| 5 | | Goals per district, progress saved in the browser, more life. |
+| 4 | done (merged in PR #4) | Terrain (`HeightGrid`, sloped streets, two stone stairways, upper ramp) and Dalt de la Vila (`hill.ts`, `hillLife.ts`): `Museu`, third pipicà, `Església` & always-visible `Campanar` landmark, Mirador overlook, generic wooden Home door, two new goals (16 in all). Verified in `?walktest` (routes, quests, pipicà, stress test, unloading); see the measured costs below. |
+| 5 | done (Phase 5 PR) | Goals grouped by area (`progress.ts` `AREAS`: seafront, Rambla and Carrer del Mar, Plaça del Mercat, Dalt de la Vila, anywhere); the goals card shows the area Millie is in, the others summed up, and finishing an area pays +5 bones. Progress (goals, partial counts, bones) is saved in `localStorage` (`walk3d-progress-v1`) with a reset button beside the open goals card. More life: stray cats on the hill (`strays.ts`, a new `cats` goal, 17 goals in all) and pigeons circling the bell tower. |
 
 **Measured costs (headless SwiftShader `?walktest`):**
 - **Build:** ~1.5 s total build time (`LEVEL_STEPS = 53`), longest single step ~54 ms (`Districts`). Streaming slices stay ~0.2 ms at rest and ~1.5 ms max step when streaming `addTestDistrict()`.
@@ -83,7 +84,7 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 
 ## Next up
 
-1. **Review and merge the Phase 4 PR (#4)** once Santtu gives the go-ahead. Browser verification is done: no console errors; all three climbs (lower street, east stairs, west ramp, church stairs) are smooth in both directions with `debug.hops === 0`; bell, mirador and Home door quests and both hill goals complete; `pipica3` off-leash works (its bench was moved beside the gate, where it no longer blocks the exit, and the human can reach the seat); a random-input stress test from 14 hill spots found no NaNs, falls or hops; the hill unloads from the pier and `churchLandmark` swaps in. Known quirks: the grass bank behind the Museu is climbable up to the top-square wall (a harmless dead end), scattering the hilltop or plaza pigeons does not count toward the `birds` goal, and the `bake hill` step (~7 ms) is the heaviest streaming step so far.
+1. **Review and merge the Phase 5 PR.** Saved counts work by adding this visit's progress on top of the saved count, so repeating a favor after a reload counts again (quest flags in `plazaLife`/`hillLife` are per page load). The Home door finish and its bones can be replayed after a reload.
 2. **Test on real phones and tablets:** fullscreen controls, touch buttons, audio by ear. Nothing has been verified on hardware yet.
 3. **Plaça del Mercat and Dalt de la Vila polish:** reference photos for the real squares and streets; more ambient walkers and shoppers there; maybe a market interior.
 4. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
@@ -91,6 +92,8 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 6. **Phase 5:** goals per district, progress saved in the browser, more life.
 
 ## Polish backlog (from Santtu's playtesting)
+
+- **Metro entrance (PR #6):** Santtu would like it deeper in town, where the real station is, once the level spreads out that far; fine where it is for now.
 
 - **Done (PR #3 follow-up):** rope segments are pushed out of poles to the side they were on last frame (`Leash.pushSegment()`), so fast pulls no longer tunnel through thin poles; the pole whirl spins the way the rope pulls the hand around the pole (`startWhirl()`); the old green horizon slab is replaced by two hazy inland ridges and a distant city skyline down the coast (`horizon.ts`, faded into the current fog color each frame; camera far plane is 1800).
 - **Fullscreen modes and the train (Santtu's playtest):** both games have two modes, "Fill window" (the `immersive` class, works everywhere) and "Fullscreen" (also asks the browser for real fullscreen; hidden where the API is missing). The train is a page change, which always drops real fullscreen and focus, so the mode rides along as `?fs=window|screen`: the arriving page fills the window at once, takes keyboard focus, and upgrades to real fullscreen on the first key or tap (browsers only allow it from a user gesture). The 3D toolbar wraps before the minimap (`right: 192px`). The upgrade-on-key step needs a real key press, so it has not been verified by automation.

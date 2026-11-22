@@ -115,6 +115,13 @@ export function createHillLife(ctx: HillCtx) {
     if (any) audio.flutter();
   };
 
+  // ---- Pigeons wheeling around the bell tower ----
+  const wheel = Array.from({ length: 6 }, (_, i) => {
+    const b = makeBird('pigeon');
+    add(b.group);
+    return { b, a: (i / 6) * Math.PI * 2, r: rand(5.5, 9), h: rand(17, 24), w: rand(0.45, 0.7) * (i % 2 ? 1 : -1), bob: rand(0, 6) };
+  });
+
   // ---- Free dog in the third pipicà ----
   const parkDogM = makeDog({
     fur: 0xd8a866, dark: 0x8a5a2a, muzzle: 0xf4e4c8, paws: 0xf4efe2, collar: 0xe5487a, scale: 0.78, ears: 'drop',
@@ -177,6 +184,19 @@ export function createHillLife(ctx: HillCtx) {
         if (Math.random() < dt * 0.4) p.b.group.rotation.y = rand(0, 6.28);
       }
       p.b.group.position.set(p.x, p.y, p.z);
+    }
+
+    // Tower pigeons: lazy circles round the campanar, faster for a while after the bell.
+    const rush = bellRingT > 0 ? 2.2 : 1;
+    for (const p of wheel) {
+      p.a += p.w * rush * dt;
+      const x = HILL.bellPos.x + Math.cos(p.a) * p.r;
+      const z = HILL.bellPos.z + Math.sin(p.a) * p.r;
+      const y = TOP_Y + p.h + Math.sin(time * 0.8 + p.bob) * 0.8;
+      p.b.group.position.set(x, y, z);
+      // Face along the circle (tangent), wings beating.
+      p.b.group.rotation.y = -(p.a + (p.w > 0 ? Math.PI / 2 : -Math.PI / 2));
+      p.b.wings.forEach((w, k) => { w.rotation.x = Math.sin(time * 16 + p.bob + k * Math.PI) * 0.8; });
     }
 
     // Free dog in pipica3.
