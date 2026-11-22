@@ -41,6 +41,7 @@ const KEYS = [
       <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
       <div class="tools">
         <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
+        <button class="sound" type="button" data-restart>Restart</button>
         <button class="sound" type="button" data-fullscreen aria-pressed="false">Fullscreen</button>
       </div>
     </div>
@@ -102,7 +103,10 @@ const KEYS = [
     width: 100%;
     height: clamp(300px, 34vw, 420px);
     cursor: pointer;
-    touch-action: manipulation;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
   /* Fullscreen: the real thing where the browser allows it, otherwise
      the street fills the window (iPhone Safari). */
@@ -116,6 +120,8 @@ const KEYS = [
   .street:global(.immersive) {
     position: fixed;
     inset: 0;
+    height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
     z-index: 1000;
   }
   .street:fullscreen .stage,
@@ -126,6 +132,7 @@ const KEYS = [
   .street:fullscreen canvas,
   .street:global(.immersive) canvas {
     height: 100%;
+    touch-action: none;
   }
   .street:fullscreen figcaption,
   .street:global(.immersive) figcaption {
@@ -144,7 +151,12 @@ const KEYS = [
   }
   .tools {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+  }
+  @media (max-width: 520px) {
+    .tools { gap: 6px; }
+    .sound { padding: 0 11px; font-size: 13px; }
   }
   /* Keycaps for the controls: shown once the game runs, on keyboards only. */
   .keys {

@@ -910,7 +910,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
-    if (!drag.moved) { drag.moved = true; renderer.domElement.setPointerCapture(e.pointerId); }
+    if (!drag.moved) { drag.moved = true; try { renderer.domElement.setPointerCapture(e.pointerId); } catch {} }
     drag.x = e.clientX; drag.y = e.clientY;
     orbitBy(dx * 0.006, dy * 0.006);
   });
@@ -970,6 +970,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     camSnap = true;
     hud.banner('Back where we started', 'news');
   };
+  q('[data-restart]')?.addEventListener('click', resetWalk);
+  const PROMPT_CODE: Record<string, string> = { X: 'KeyX', Enter: 'Enter', G: 'KeyG', E: 'KeyE', Space: 'Space' };
+  let digPulse = 0;
+  hud.onPrompt = (k) => {
+    engage();
+    const code = PROMPT_CODE[k];
+    if (!code) return;
+    if (code === 'Space') digPulse = Math.max(digPulse, 0.3);
+    onKey(code);
+    onKeyUp(code);
+  };
   const onKey = (code: string, e?: KeyboardEvent) => {
     const repeat = e?.repeat ?? false;
     if (coriolisFocus) {
@@ -1019,7 +1030,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const ck = CORIOLIS_KEYS[code];
     if (ck) coriolis.setHeld(ck, false);
   };
-  const releaseAll = () => { held.clear(); coriolis.clearHeld(); touchVec.x = touchVec.z = 0; touches.clear(); pinchDist = 0; drag = null; };
+  const releaseAll = () => {
+    held.clear(); coriolis.clearHeld(); touchVec.x = touchVec.z = 0;
+    touches.clear(); pinchDist = 0; drag = null;
+    stick?.classList.remove('sprinting');
+    root.querySelectorAll<HTMLButtonElement>('[data-touch]').forEach((b) => b.classList.remove('held'));
+  };
   host.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement;
     // Buttons inside the stage keep Enter/Space/Tab for themselves; every other key drives the game.
@@ -1039,6 +1055,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   host.addEventListener('pointerdown', (e) => { if (e.target === renderer.domElement) host.focus({ preventScroll: true }); });
 
   // ---- Touch: virtual stick + action buttons -------------------------------------------
+  root.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') root.classList.add('has-touch');
+  });
   const stick = q<HTMLElement>('[data-stick]');
   const knob = q<HTMLElement>('[data-knob]');
   if (stick && knob) {
@@ -1051,21 +1070,38 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (l > 1) { dx /= l; dy /= l; }
       touchVec.x = dx; touchVec.z = dy;
       knob.style.transform = `translate(${dx * 28}px, ${dy * 28}px)`;
-      if (l > 0.92) held.add('ShiftLeft'); else held.delete('ShiftLeft');
+      const sprint = l > 0.82;
+      if (sprint) held.add('ShiftLeft'); else held.delete('ShiftLeft');
+      stick.classList.toggle('sprinting', sprint);
     };
-    stick.addEventListener('pointerdown', (e) => { id = e.pointerId; stick.setPointerCapture(e.pointerId); move(e); e.preventDefault(); });
+    stick.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      id = e.pointerId;
+      try { stick.setPointerCapture(e.pointerId); } catch {}
+      move(e);
+    });
     stick.addEventListener('pointermove', (e) => { if (e.pointerId === id) move(e); });
-    const end = () => { id = null; touchVec.x = touchVec.z = 0; knob.style.transform = ''; held.delete('ShiftLeft'); };
+    const end = (e: PointerEvent) => {
+      if (e.pointerId !== id) return;
+      id = null; touchVec.x = touchVec.z = 0; knob.style.transform = '';
+      held.delete('ShiftLeft');
+      stick.classList.remove('sprinting');
+    };
     stick.addEventListener('pointerup', end);
     stick.addEventListener('pointercancel', end);
   }
   root.querySelectorAll<HTMLButtonElement>('[data-touch]').forEach((b) => {
     const code = b.dataset.touch!;
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); onKey(code); });
-    const up = () => onKeyUp(code);
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      try { b.setPointerCapture(e.pointerId); } catch {}
+      b.classList.add('held');
+      if (code === 'Space') digPulse = Math.max(digPulse, 0.28);
+      onKey(code);
+    });
+    const up = () => { b.classList.remove('held'); onKeyUp(code); };
     b.addEventListener('pointerup', up);
     b.addEventListener('pointercancel', up);
-    b.addEventListener('pointerleave', up);
   });
 
   // ---- Proximity helpers --------------------------------------------------------------
@@ -1293,8 +1329,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const running = wantsRun && (dog.zoom > 0.02 || freeZoom);
     if (running && !freeZoom) dog.zoom = Math.max(0, dog.zoom - 0.16 * dt);
     else if (!running) dog.zoom = Math.min(1, dog.zoom + 0.07 * dt);
+    if (digPulse > 0) digPulse = Math.max(0, digPulse - dt);
     dog.planted = held.has('Space') && inp.mag === 0 && !offLeash;
-    dog.digging = held.has('Space');
+    dog.digging = held.has('Space') || digPulse > 0;
     const surf = level.surface(dog.x, dog.z, dog.y);
     const depth = Math.max(0, WATER_Y - level.floor(dog.x, dog.z, dog.y));
     dogSwimming = surf === 'water' && depth > SWIM_DEPTH;

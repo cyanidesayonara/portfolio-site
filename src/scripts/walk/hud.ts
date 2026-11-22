@@ -40,6 +40,7 @@ export class Hud {
   private toasts: { el: HTMLElement; t: number }[] = [];
   private bubbles = new Map<string, Bubble>();
   goalsOpen = false;
+  onPrompt?: (key: string) => void;
   private lastBanner = '';
   private lastPrompt = '';
 
@@ -73,6 +74,15 @@ export class Hud {
     this.root = root;
     root.querySelectorAll<HTMLElement>('[data-h]').forEach((e) => { this.els[e.dataset.h!] = e; });
     this.els.goals.addEventListener('click', () => this.toggleGoals());
+    this.els.prompts.addEventListener('pointerdown', (e) => {
+      if ((e.target as HTMLElement).closest('[data-prompt-key]')) e.stopPropagation();
+    });
+    this.els.prompts.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-prompt-key]');
+      if (!btn) return;
+      e.stopPropagation();
+      this.onPrompt?.(btn.dataset.promptKey!);
+    });
   }
 
   toggleGoals(open = !this.goalsOpen) {
@@ -153,7 +163,7 @@ export class Hud {
 
   /** Bottom keycap prompts, e.g. [{key:'X', label:'Play the wall'}]. */
   prompts(items: { key: string; label: string }[]) {
-    const html = items.map((i) => `<span class="pi">${keycap(i.key)}<span>${esc(i.label)}</span></span>`).join('');
+    const html = items.map((i) => `<button type="button" class="pi" data-prompt-key="${esc(i.key)}">${keycap(i.key)}<span>${esc(i.label)}</span></button>`).join('');
     if (html === this.lastPrompt) return;
     this.lastPrompt = html;
     this.els.prompts.innerHTML = html;

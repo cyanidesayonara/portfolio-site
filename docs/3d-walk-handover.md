@@ -70,7 +70,7 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 ## Polish backlog (from Santtu's playtesting)
 
 - Articulated human knees, hip/shoulder counter-rotation, `selfie` pose, and multi-segment dog tail wag are in; other models and animations can still use refinement.
-- Touch pinch-to-zoom and 1-finger canvas orbit are implemented; not yet verified on real phone hardware (along with true browser fullscreen and audio by ear).
+- Touch pinch-to-zoom, 1-finger canvas orbit, a compact 2×2 core touch button pad, tappable contextual prompt pills, and a toolbar Restart button are implemented (also added Restart, drag-to-steer, touch hold-prevention, and contextual `GO IN` to the home page's 2D street); not yet verified on real phone hardware (along with true browser fullscreen and audio by ear).
 - Stand-ins now use layout facade, roof, pavilion accent, and landmark colors/silhouettes (visually verified from the pier in headless Chrome).
 - The home page still runs the 2D map. Santtu wants the 3D walk there once it's solid (`<Walk3D lazy />`, ideally loading only the seafront district).
 
