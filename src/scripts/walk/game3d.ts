@@ -153,6 +153,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
   const dogShadow = blobShadow(0.45);
   scene.add(dogShadow);
   const humanM: PersonModel = makePerson(HUMAN_LOOK);
+  let humanPull = 0;
   scene.add(collapseRig(humanM.group));
   const humanShadow = blobShadow(0.4);
   scene.add(humanShadow);
@@ -816,6 +817,39 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     if (camBtn) camBtn.textContent = `Cam: ${camMode === 'street' ? 'Street' : camMode === 'follow' ? 'Follow' : 'Overhead'}`;
   };
   camBtn?.addEventListener('click', cycleCam);
+  const setCamMode = (m: CamMode) => { if (camMode !== m) { camMode = m; if (camBtn) camBtn.textContent = `Cam: ${m === 'street' ? 'Street' : m === 'follow' ? 'Follow' : 'Overhead'}`; } };
+
+  // Camera controls: wheel / − = zoom in any mode; drag / [ ] orbit (switching to follow).
+  let camZoom = 1, camPitch = 1, camHandsOff = 0;
+  const zoomBy = (f: number) => { camZoom = clamp(camZoom * f, 0.55, 1.9); };
+  const orbitBy = (dYaw: number, dPitch = 0) => {
+    if (camMode !== 'follow') { followYaw = camMode === 'street' ? -Math.PI / 2 : followYaw; setCamMode('follow'); }
+    followYaw += dYaw;
+    camPitch = clamp(camPitch + dPitch, 0.45, 2.2);
+    camHandsOff = 2; // let the auto-follow wait while you look around
+  };
+  host.addEventListener('wheel', (e) => {
+    // Only while playing, so the page still scrolls past the game.
+    if (!host.contains(document.activeElement) && !full) return;
+    e.preventDefault();
+    zoomBy(Math.exp(e.deltaY * 0.0012));
+  }, { passive: false });
+  let drag: null | { id: number; x: number; y: number; moved: boolean } = null;
+  host.addEventListener('pointerdown', (e) => {
+    if (e.target !== renderer.domElement || e.pointerType === 'touch' || e.button !== 0) return;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  host.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    if (!drag.moved) { drag.moved = true; renderer.domElement.setPointerCapture(e.pointerId); }
+    drag.x = e.clientX; drag.y = e.clientY;
+    orbitBy(dx * 0.006, dy * 0.006);
+  });
+  const endDrag = (e: PointerEvent) => { if (drag && e.pointerId === drag.id) drag = null; };
+  host.addEventListener('pointerup', endDrag);
+  host.addEventListener('pointercancel', endDrag);
   root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => { skyOverride = true; applySky(b.dataset.sky as SkyMode); }));
 
   // Fullscreen: fill the window with a reveal, and ask the browser for real fullscreen too.
@@ -888,6 +922,9 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       case 'KeyC': cycleCam(); break;
       case 'Tab': hud.toggleGoals(); break;
       case 'KeyM': minimap.toggle(); break;
+      case 'Minus': case 'NumpadSubtract': zoomBy(1.15); break;
+      case 'Equal': case 'NumpadAdd': zoomBy(1 / 1.15); break;
+      case 'BracketLeft': case 'BracketRight': orbitBy(0); break;
       case 'Digit1': skyOverride = true; applySky('day'); break;
       case 'Digit2': skyOverride = true; applySky('rain'); break;
       case 'Digit3': skyOverride = true; applySky('night'); break;
@@ -1496,7 +1533,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     } else begT = 0;
 
     // ---- NPCs ----
-    life.update(dt, time);
+    life.update(dt, time, skyMode);
     for (const w of walkers) {
       if (w.saidT > 0) w.saidT -= dt;
       const wVis = Math.hypot(w.x - dog.x, w.z - dog.z) < 52;
@@ -1817,7 +1854,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     // Minimap (every other frame when small; it's a cheap 2D blit either way).
     mapFrame++;
     if (minimap.enlarged || mapFrame % 2 === 0) {
-      const marks: MapMarker[] = level.stops.map((s) => ({ x: s.x, z: s.z - 4, color: s.color, label: s.label, kind: 'stop' as const }));
+      const marks: MapMarker[] = level.stops.map((s) => ({ x: s.x, z: s.z - 4, color: s.color, label: s.label, short: s.id === 'leash' ? 'Leash game' : s.id === 'how' ? 'How I build' : undefined, kind: 'stop' as const }));
       marks.push(
         { x: level.station.x, z: 17, color: '#e5302a', label: 'Estació', kind: 'place' },
         { x: 70, z: -28, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
@@ -1834,7 +1871,7 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       marks.push({ x: cf.x, z: level.correfoc.z, color: '#ff8a2a', label: 'Correfoc', kind: 'threat' });
       marks.push({ x: level.dimoni.x, z: level.dimoni.z, color: '#ff4a3d', label: 'Dimoni', kind: 'threat' });
       if (Math.abs(tr.x) < 220) marks.push({ x: tr.x, z: tr.z, color: '#e8e4dc', kind: 'train' });
-      minimap.draw(dog, human, marks);
+      minimap.draw(dog, human, marks, camMode === 'follow' ? camYaw : 0);
     }
 
     // ---- Visuals ----
@@ -1849,7 +1886,10 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
     const hsp = Math.hypot(human.vx, human.vz);
     const pose: Pose = human.state === 'whirl' ? 'whirl' : human.state === 'stumble' || human.state === 'haul' ? 'stumble'
       : human.state === 'bench' || (human.state === 'sit' && human.seated) ? 'sit' : human.state === 'phone' && human.stateT > 0 ? 'phone' : 'walk';
-    humanM.animate(time, { speed: hsp, pose });
+    // How hard Millie is towing them, toward where they're heading (not when they're the ones hauling).
+    const towing = human.state === 'haul' ? 0 : clamp((lastTension - 2) / 14, 0, 1) * clamp(Math.cos(Math.atan2(dog.z - human.z, dog.x - human.x) - human.heading) + 0.3, 0, 1);
+    humanPull += (towing - humanPull) * Math.min(1, dt * 6);
+    humanM.animate(time, { speed: hsp, pose, pull: humanPull });
     humanShadow.position.set(human.x, human.y + 0.03, human.z);
 
     // Rope mesh: hand to collar with a sag that disappears as it goes taut.
@@ -1960,9 +2000,12 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       camYaw = 0;
       rate = 5;
     } else if (camMode === 'follow') {
-      if (sp2() > 0.4) followYaw = angLerp(followYaw, dog.heading, Math.min(1, dt * 2.2));
+      if (held.has('BracketLeft')) orbitBy(-dt * 1.8);
+      if (held.has('BracketRight')) orbitBy(dt * 1.8);
+      if (camHandsOff > 0) camHandsOff -= dt;
+      else if (sp2() > 0.4) followYaw = angLerp(followYaw, dog.heading, Math.min(1, dt * 2.2));
       camYaw = followYaw + Math.PI / 2;
-      const back = 6.5;
+      const back = 6.5 * camZoom;
       let bx = dog.x - Math.cos(followYaw) * back, bz = dog.z - Math.sin(followYaw) * back;
       // Pull in so walls never come between the camera and Millie.
       const steps = 12;
@@ -1975,11 +2018,11 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
           break;
         }
       }
-      pos = new THREE.Vector3(bx, dog.y + (inTunnel ? 1.6 : 3.2), bz);
+      pos = new THREE.Vector3(bx, dog.y + (inTunnel ? 1.6 : 3.2 * camPitch * Math.sqrt(camZoom)), bz);
       look = new THREE.Vector3(dog.x + Math.cos(followYaw) * 3, dog.y + 0.9, dog.z + Math.sin(followYaw) * 3);
     } else if (camMode === 'overhead') {
       camYaw = 0;
-      pos = new THREE.Vector3(dog.x, dog.y + 26, dog.z + 8);
+      pos = new THREE.Vector3(dog.x, dog.y + 26 * camZoom, dog.z + 8 * camZoom);
       look = target.clone();
     } else {
       camYaw = 0;
@@ -1989,8 +2032,8 @@ export function startWalk3D(root: HTMLElement, options: WalkOptions = {}) {
       const tunnelT = Math.abs(dog.x) < 3.2 ? clamp(1 - Math.abs(dog.z - (T.z0 + T.z1) / 2) / 7.5, 0, 1) : 0;
       // Portrait screens see less sideways, so pull back a little.
       const portrait = clamp(1 / Math.max(0.4, camera.aspect), 1, 1.5);
-      let height = lerp(8.2 * portrait, 2.0, tunnelT);
-      let back = lerp(10.5 * portrait, 6.0, tunnelT);
+      let height = lerp(8.2 * portrait * camZoom, 2.0, tunnelT);
+      let back = lerp(10.5 * portrait * camZoom, 6.0, tunnelT);
       // Narrow streets: pull in toward Millie and climb so walls never block the view.
       if (tunnelT < 0.2) {
         for (let k = 0.5; k <= back; k += 0.5) {

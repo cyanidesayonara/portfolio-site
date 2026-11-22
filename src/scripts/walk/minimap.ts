@@ -10,6 +10,8 @@ export interface MapMarker {
   z: number;
   color: string;
   label?: string;
+  /** Shorter name for the small map. */
+  short?: string;
   kind: 'stop' | 'quest' | 'threat' | 'place' | 'train';
 }
 
@@ -93,7 +95,7 @@ export class Minimap {
   }
 
   /** Redraw. `heading` is Millie's heading (radians, world XZ). */
-  draw(dog: { x: number; z: number; heading: number }, human: { x: number; z: number }, markers: MapMarker[]) {
+  draw(dog: { x: number; z: number; heading: number }, human: { x: number; z: number }, markers: MapMarker[], camYaw = 0) {
     const cv = this.canvas;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
@@ -105,27 +107,41 @@ export class Minimap {
     g.fillRect(0, 0, w, h);
 
     // World → canvas.
-    let scale: number, ox: number, oz: number;
+    // The small map turns with the follow camera (what's ahead is up); the big one stays sea-up.
+    const yaw = this.big ? 0 : camYaw;
+    const cosY = Math.cos(-yaw), sinY = Math.sin(-yaw);
+    let scale: number, cx: number, cz: number, sx: number, sy: number;
     if (this.big) {
       scale = Math.min(w / (X1 - X0), h / (Z1 - Z0));
-      ox = X0 - (w / scale - (X1 - X0)) / 2;
-      oz = Z0 - (h / scale - (Z1 - Z0)) / 2;
+      cx = (X0 + X1) / 2; cz = (Z0 + Z1) / 2; sx = w / 2; sy = h / 2;
     } else {
-      scale = (w / 64); // 64 m across
-      ox = dog.x - w / scale / 2;
-      oz = dog.z - h / scale / 2 - 4; // a little more of what's ahead (toward the sea)
+      scale = w / 64; // 64 m across
+      cx = dog.x; cz = dog.z; sx = w / 2; sy = h / 2 + 4 * scale; // a little more of what's ahead
     }
-    const px = (x: number) => (x - ox) * scale;
-    const pz = (z: number) => (z - oz) * scale;
+    const tf = (x: number, z: number) => {
+      const dx = (x - cx) * scale, dz = (z - cz) * scale;
+      return { x: sx + dx * cosY - dz * sinY, y: sy + dx * sinY + dz * cosY };
+    };
     g.imageSmoothingEnabled = true;
-    g.drawImage(this.plan, px(X0), pz(Z0), (X1 - X0) * scale, (Z1 - Z0) * scale);
+    g.save();
+    g.translate(sx, sy);
+    g.rotate(-yaw);
+    g.drawImage(this.plan, (X0 - cx) * scale, (Z0 - cz) * scale, (X1 - X0) * scale, (Z1 - Z0) * scale);
+    g.restore();
+    // Small map: only the nearest couple of pavilions get a name, so labels never pile up.
+    const named = new Set<MapMarker>();
+    if (!this.big) {
+      markers.filter((m) => m.kind === 'stop' && Math.hypot(m.x - dog.x, m.z - dog.z) < 22)
+        .sort((a, b) => Math.hypot(a.x - dog.x, a.z - dog.z) - Math.hypot(b.x - dog.x, b.z - dog.z))
+        .slice(0, 2).forEach((m) => named.add(m));
+    }
 
     const r = (this.big ? 5 : 4.5) * dpr;
     const font = (size: number) => `800 ${Math.round(size * dpr)}px "Bricolage Grotesque", system-ui, sans-serif`;
     const labels: { x: number; y: number; text: string; color: string }[] = [];
 
     for (const m of markers) {
-      const x = px(m.x), y = pz(m.z);
+      const { x, y } = tf(m.x, m.z);
       if (!this.big && (x < -10 || y < -10 || x > w + 10 || y > h + 10)) {
         // Off the small map: an edge pip for threats and stops so you can head there.
         if (m.kind === 'threat' || m.kind === 'quest') {
@@ -139,8 +155,10 @@ export class Minimap {
       g.strokeStyle = '#0b1430';
       g.fillStyle = m.color;
       if (m.kind === 'train') {
-        g.fillRect(x - 30 * scale, y - 1.6 * scale, 60 * scale, 3.2 * scale);
-        g.strokeRect(x - 30 * scale, y - 1.6 * scale, 60 * scale, 3.2 * scale);
+        g.save(); g.translate(x, y); g.rotate(-yaw);
+        g.fillRect(-30 * scale, -1.6 * scale, 60 * scale, 3.2 * scale);
+        g.strokeRect(-30 * scale, -1.6 * scale, 60 * scale, 3.2 * scale);
+        g.restore();
       } else if (m.kind === 'quest') {
         // A "!" lozenge.
         g.beginPath();
@@ -158,17 +176,17 @@ export class Minimap {
       } else {
         g.beginPath(); g.arc(x, y, m.kind === 'stop' ? r : r * 0.8, 0, Math.PI * 2); g.fill(); g.stroke();
       }
-      if (m.label && (this.big || m.kind === 'stop')) labels.push({ x, y, text: m.label, color: m.color });
+      if (m.label && (this.big || named.has(m))) labels.push({ x, y, text: this.big ? m.label : m.short ?? m.label, color: m.color });
     }
 
     // Millie and her human.
-    const hx = px(human.x), hz = pz(human.z);
+    const hp = tf(human.x, human.z), hx = hp.x, hz = hp.y;
     g.fillStyle = '#f4f1ea'; g.strokeStyle = '#0b1430'; g.lineWidth = 1.5 * dpr;
     g.beginPath(); g.arc(hx, hz, r * 0.7, 0, Math.PI * 2); g.fill(); g.stroke();
-    const dx = px(dog.x), dz = pz(dog.z);
+    const dp = tf(dog.x, dog.z);
     g.save();
-    g.translate(dx, dz);
-    g.rotate(dog.heading);
+    g.translate(dp.x, dp.y);
+    g.rotate(dog.heading - yaw);
     const s = r * 1.5;
     g.beginPath();
     g.moveTo(s * 1.2, 0); g.lineTo(-s * 0.8, s * 0.75); g.lineTo(-s * 0.35, 0); g.lineTo(-s * 0.8, -s * 0.75); g.closePath();
@@ -180,13 +198,18 @@ export class Minimap {
       g.font = font(this.big ? 12 : 9.5);
       g.textAlign = 'left'; g.textBaseline = 'middle';
       const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
+      // Each label tries right, left, above and below its marker; if all collide it's skipped.
+      const hit = (b: { x0: number; y0: number; x1: number; y1: number }) => placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
       for (const l of labels) {
-        const tw = g.measureText(l.text).width, th = (this.big ? 15 : 12) * dpr;
-        let x = l.x + r + 3 * dpr, y = l.y;
-        for (let k = 0; k < 6 && placed.some((p) => x < p.x1 && x + tw > p.x0 && y - th / 2 < p.y1 && y + th / 2 > p.y0); k++) y += th * (k % 2 ? -k : k);
-        if (x + tw > w - 2) x = l.x - r - 3 * dpr - tw;
-        x = Math.max(2 * dpr, x);
-        placed.push({ x0: x, y0: y - th / 2, x1: x + tw, y1: y + th / 2 });
+        const tw = g.measureText(l.text).width, th = (this.big ? 15 : 12) * dpr, gap = r + 3 * dpr;
+        const spots = [
+          { x: l.x + gap, y: l.y }, { x: l.x - gap - tw, y: l.y },
+          { x: l.x - tw / 2, y: l.y - th }, { x: l.x - tw / 2, y: l.y + th },
+        ].map((p) => ({ x: Math.max(2 * dpr, Math.min(w - tw - 2 * dpr, p.x)), y: Math.max(th / 2, Math.min(h - th / 2, p.y)) }));
+        const spot = spots.find((p) => !hit({ x0: p.x - 2, y0: p.y - th / 2, x1: p.x + tw + 2, y1: p.y + th / 2 }));
+        if (!spot) continue;
+        const x = spot.x, y = spot.y;
+        placed.push({ x0: x - 2, y0: y - th / 2, x1: x + tw + 2, y1: y + th / 2 });
         g.lineWidth = 3.5 * dpr; g.strokeStyle = 'rgba(11,20,48,0.9)';
         g.strokeText(l.text, x, y);
         g.fillStyle = '#f4f1ea';

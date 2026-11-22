@@ -46,16 +46,17 @@ export function applyNearFade(root: THREE.Object3D) {
             `#include <clipping_planes_fragment>
             {
               float keep = 1.0;
-              // Close to the camera.
+              // Close to the camera (but never Millie or her human themselves).
+              vec3 hc = vFadeW - uFadeC;
+              bool isHuman = length(hc.xz) < 0.55 && hc.y > -0.05 && hc.y < 2.0;
+              bool isDog = distance(vFadeW, uFadeB) < 0.95;
               float dc = distance(vFadeW, uFadeA);
-              keep = min(keep, clamp((dc - 2.0) / 2.6, 0.0, 1.0));
+              if (!isHuman && !isDog) keep = min(keep, clamp((dc - 2.0) / 2.6, 0.0, 1.0));
               // Between the camera and Millie (but not right around her).
               vec3 ab = uFadeB - uFadeA;
               float len2 = max(dot(ab, ab), 0.0001);
               float t = clamp(dot(vFadeW - uFadeA, ab) / len2, 0.0, 1.0);
               float tMax = 1.0 - 1.6 / sqrt(len2);
-              vec3 hc = vFadeW - uFadeC;
-              bool isHuman = length(hc.xz) < 0.55 && hc.y > -0.05 && hc.y < 2.0;
               if (t < tMax && !isHuman) {
                 float ds = distance(vFadeW, uFadeA + ab * t);
                 float radius = 0.7 + t * 0.7;
@@ -69,7 +70,7 @@ export function applyNearFade(root: THREE.Object3D) {
             }`,
           );
       };
-      m.customProgramCacheKey = () => 'seethrough3';
+      m.customProgramCacheKey = () => 'seethrough4';
       m.needsUpdate = true;
     }
   });

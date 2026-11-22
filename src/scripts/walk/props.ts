@@ -7,7 +7,7 @@
 */
 import * as THREE from 'three';
 import { M, box, cyl, capsule, rod, sphere, shadowed, makeCafeSet, makePerson, type PersonModel } from './models';
-import { rng } from './textures';
+import { rng, signTexture } from './textures';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
@@ -198,7 +198,8 @@ export function makeArch(width: number, signTex: THREE.Texture) {
   g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.06, 6), steel));
   const face = new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.5 });
   const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.08, 24), [M(0x2a5aa8, 0.5), face, face]);
-  disc.rotation.x = Math.PI / 2;
+  // Spin the cap's texture upright, then stand the disc up to face the street.
+  disc.rotation.set(Math.PI / 2, Math.PI / 2, 0);
   disc.position.set(0, 6.0, 0);
   g.add(disc);
   shadowed(g);
@@ -379,4 +380,45 @@ export function makeDevil(): { person: PersonModel; spark: THREE.Object3D } {
   fork.rotation.z = -0.4;
   (person.arms[1].getObjectByName('fore') as THREE.Group).add(fork);
   return { person, spark };
+}
+
+/**
+ * A fingerpost: a steel pole with arrow-tipped arms. Each arm points along
+ * `angle` (world radians, atan2(dz, dx)) and reads correctly from both sides.
+ */
+export function makeFingerpost(arms: { title: string; sub?: string; color: string; angle: number }[]) {
+  const g = new THREE.Group();
+  const steel = M(0x2a2f3d, 0.5, 0.4);
+  const h = 2.3 + arms.length * 0.42;
+  g.add(rod(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, h, 0), 0.05, steel, 8));
+  const cap = sphere(0.08, steel);
+  cap.position.y = h;
+  g.add(cap);
+  const edge = M(0xf4f1ea, 0.6);
+  arms.forEach((a, i) => {
+    const len = 1.9, tall = 0.36;
+    const front = signTexture(a.title, a.sub ?? '', a.color, { aspect: len / tall });
+    const back = front.clone();
+    back.repeat.x = -1;
+    back.offset.x = 1;
+    back.needsUpdate = true;
+    // The cloned texture shares the canvas; redraws (fonts loading) need to reach it too.
+    document.fonts?.ready.then(() => { back.needsUpdate = true; }).catch(() => {});
+    const mf = new THREE.MeshStandardMaterial({ map: front, roughness: 0.6 });
+    const mb = new THREE.MeshStandardMaterial({ map: back, roughness: 0.6 });
+    const arm = new THREE.Group();
+    const board = new THREE.Mesh(new THREE.BoxGeometry(len, tall, 0.05), [edge, edge, edge, edge, mf, mb]);
+    board.position.x = 0.1 + len / 2;
+    arm.add(board);
+    const tipShape = new THREE.Shape();
+    tipShape.moveTo(0, -tall / 2); tipShape.lineTo(0.28, 0); tipShape.lineTo(0, tall / 2); tipShape.closePath();
+    const tip = new THREE.Mesh(new THREE.ExtrudeGeometry(tipShape, { depth: 0.05, bevelEnabled: false }), M(new THREE.Color(a.color).getHex(), 0.5));
+    tip.position.set(0.1 + len, 0, -0.025);
+    arm.add(tip);
+    arm.position.y = h - 0.3 - i * 0.42;
+    arm.rotation.y = -a.angle;
+    g.add(arm);
+  });
+  shadowed(g);
+  return g;
 }
