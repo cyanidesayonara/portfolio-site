@@ -37,7 +37,7 @@ export class Hud {
   root: HTMLElement;
   private els: Record<string, HTMLElement> = {};
   private shouts: { el: HTMLElement; t: number }[] = [];
-  private toasts: { el: HTMLElement; t: number }[] = [];
+  private toasts: { el: HTMLElement; t: number; ttl: number }[] = [];
   private bubbles = new Map<string, Bubble>();
   goalsOpen = false;
   onPrompt?: (key: string) => void;
@@ -142,13 +142,13 @@ export class Hud {
     while (this.shouts.length > 2) this.shouts.shift()!.el.remove();
   }
 
-  toast(title: string, body: string, accent = '#8bcb3c') {
+  toast(title: string, body: string, accent = '#8bcb3c', ttl = 3) {
     const el = document.createElement('div');
     el.className = 'toast';
     el.style.setProperty('--ac', accent);
     el.innerHTML = `<b>${esc(title)}</b><span>${esc(body)}</span>`;
     this.els.toasts.appendChild(el);
-    this.toasts.push({ el, t: 0 });
+    this.toasts.push({ el, t: 0, ttl });
     while (this.toasts.length > 2) this.toasts.shift()!.el.remove();
   }
 
@@ -222,10 +222,10 @@ export class Hud {
       const t = this.toasts[i];
       t.t += dt;
       const slide = Math.min(1, t.t / 0.18);
-      const fade = t.t > 2.5 ? 1 - (t.t - 2.5) / 0.5 : 1;
+      const fade = t.t > t.ttl - 0.5 ? 1 - (t.t - t.ttl + 0.5) / 0.5 : 1;
       t.el.style.opacity = String(Math.max(0, fade));
       t.el.style.transform = `translateX(${((1 - slide) * 60).toFixed(1)}px)`;
-      if (t.t > 3) { t.el.remove(); this.toasts.splice(i, 1); }
+      if (t.t > t.ttl) { t.el.remove(); this.toasts.splice(i, 1); }
     }
     this.bubbles.forEach((b, id) => {
       b.life += dt;

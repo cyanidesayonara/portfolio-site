@@ -1390,13 +1390,18 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       soundBtn.textContent = on ? 'Sound on' : 'Sound off';
     }
   }
-  // Fullscreen: the Fullscreen API where it exists, a window-filling mode where it doesn't.
-  const fsBtn = fig.querySelector<HTMLButtonElement>('[data-fullscreen]');
-  const isFull = () => document.fullscreenElement === fig || fig.classList.contains('immersive');
+  // Two fullscreen modes: "window" fills the browser window (works everywhere),
+  // "screen" asks for real fullscreen and falls back to filling the window. A
+  // page change (the train to 3D) drops real fullscreen, so the mode rides along
+  // in the URL (?fs=) and is restored on arrival.
+  type FsMode = 'off' | 'window' | 'screen';
+  const fsButtons = Array.from(fig.querySelectorAll<HTMLButtonElement>('[data-fs]'));
+  const canRealFs = !!fig.requestFullscreen && document.fullscreenEnabled !== false;
+  if (!canRealFs) fsButtons.filter((b) => b.dataset.fs === 'screen').forEach((b) => { b.hidden = true; });
+  let fsMode: FsMode = 'off';
+  const isFull = () => fsMode !== 'off';
   const syncFs = () => {
-    if (!fsBtn) return;
-    fsBtn.textContent = isFull() ? 'Exit fullscreen' : 'Fullscreen';
-    fsBtn.setAttribute('aria-pressed', String(isFull()));
+    for (const b of fsButtons) b.setAttribute('aria-pressed', String(b.dataset.fs === fsMode));
   };
   let untrackViewport: (() => void) | null = null;
   function immersive(on: boolean) {
@@ -1404,24 +1409,49 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (on && !untrackViewport) untrackViewport = trackVisibleViewport(fig);
     else if (!on && untrackViewport) { untrackViewport(); untrackViewport = null; }
     document.documentElement.style.overflow = on ? 'hidden' : '';
+  }
+  function setFsMode(mode: FsMode) {
+    if (mode === fsMode) return;
+    fsMode = mode;
+    if (mode === 'off') {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      immersive(false);
+    } else if (mode === 'window') {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      immersive(true);
+    } else {
+      // Fill the window until (and unless) the browser grants real fullscreen;
+      // some browsers and embedded views refuse or ignore the request silently.
+      immersive(true);
+      fig.requestFullscreen?.().catch(() => { if (fsMode === 'screen') { fsMode = 'window'; syncFs(); } });
+    }
+    if (mode !== 'off') { takeLeash(); fig.focus({ preventScroll: true }); }
     syncFs();
   }
   function toggleFullscreen() {
-    if (isFull()) {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-      immersive(false);
-      return;
-    }
-    takeLeash();
-    fig.focus({ preventScroll: true });
-    // Some browsers and embedded views refuse or ignore the request without
-    // saying so: if the street isn't fullscreen shortly after, fill the window.
-    const req = fig.requestFullscreen?.();
-    if (req) req.catch(() => immersive(true));
-    window.setTimeout(() => { if (document.fullscreenElement !== fig) immersive(true); else syncFs(); }, 400);
+    setFsMode(isFull() ? 'off' : canRealFs ? 'screen' : 'window');
   }
-  fsBtn?.addEventListener('click', toggleFullscreen);
-  document.addEventListener('fullscreenchange', syncFs);
+  fsButtons.forEach((b) => b.addEventListener('click', () => {
+    const m = b.dataset.fs as FsMode;
+    setFsMode(fsMode === m ? 'off' : m);
+  }));
+  // Leaving real fullscreen with the browser's own Escape or gesture: back to the page.
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsMode === 'screen') setFsMode('off'); });
+  // After the train: fill the window at once, and go real fullscreen on the
+  // first key or tap (browsers only allow it in response to one).
+  function restoreFs(mode: string | null) {
+    if (mode !== 'window' && mode !== 'screen') return;
+    setFsMode('window');
+    if (mode !== 'screen' || !canRealFs) return;
+    const upgrade = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.code === 'Escape') return;
+      fig.removeEventListener('keydown', upgrade, true);
+      fig.removeEventListener('pointerdown', upgrade, true);
+      if (fsMode === 'window') setFsMode('screen');
+    };
+    fig.addEventListener('keydown', upgrade, true);
+    fig.addEventListener('pointerdown', upgrade, true);
+  }
 
   if (soundBtn) {
     soundBtn.setAttribute('aria-pressed', String(wantSound));
@@ -1435,6 +1465,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (near.stop.id === 'station') {
       const url = new URL(a?.getAttribute('href') || near.stop.href, location.origin);
       if (wantSound) url.searchParams.set('sound', '1');
+      if (fsMode !== 'off') url.searchParams.set('fs', fsMode);
       if (!reduced && !streetTest) {
         sound.stationChime();
         boarding = { href: url.pathname + url.search + url.hash, t: 0, sent: false };
@@ -1582,11 +1613,16 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     playing = true;
     if (!reduced && !streetTest) arriving = 0.45;
-    toast = { text: 'Arrived from 3D Estació!', t: 3 };
-    fig.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    const fsWanted = params.get('fs');
+    toast = { text: fsWanted === 'screen' && canRealFs ? 'Arrived from 3D! Press any key for fullscreen' : 'Arrived from 3D Estació!', t: 3 };
+    if (fsWanted === 'window' || fsWanted === 'screen') restoreFs(fsWanted);
+    else fig.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    // Arriving by train continues the walk: take the keys without another click.
+    fig.focus({ preventScroll: true });
     if (!streetTest) {
       params.delete('via');
       params.delete('sound');
+      params.delete('fs');
       const qs = params.toString();
       history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
     }
