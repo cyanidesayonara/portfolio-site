@@ -69,7 +69,18 @@ export function startWalk3D(root: HTMLElement) {
   if (!host) return;
 
   // ---- Three.js Renderer, Scene & Lighting -----------------------------------------
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  let renderer: THREE.WebGLRenderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  } catch {
+    root.classList.add('no-webgl');
+    const msg = document.createElement('p');
+    msg.className = 'webgl-fallback';
+    msg.textContent = 'This 3D street needs WebGL, which this browser has turned off or doesn’t support. The 2D street on the home page works everywhere.';
+    host.replaceChildren(msg);
+    return;
+  }
+  renderer.domElement.setAttribute('aria-hidden', 'true');
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -323,14 +334,23 @@ export function startWalk3D(root: HTMLElement) {
       px: 0, py: 0, pz: 0,
     };
   });
-  rope.forEach((n) => { n.px = n.x; n.py = n.y; n.pz = n.z; });
+  // Lay the rope straight from hand to collar (start, re-clip and reset).
+  const resetRope = () => {
+    rope.forEach((n, i) => {
+      const t = i / ROPE_N;
+      n.x = human.x + (dog.x - human.x) * t;
+      n.y = human.y + 0.8 * (1 - t) + 0.4 * t;
+      n.z = human.z + (dog.z - human.z) * t;
+      n.px = n.x; n.py = n.y; n.pz = n.z;
+    });
+  };
+  resetRope();
 
   let weather: WeatherMode = 'day';
   let camMode: CameraMode = 'classic';
   let coriolisFocused = false;
   let stemmaOpen = false;
   let offLeash = false;
-  let clippedInPark = false;
   let pee = 0.75;
   let bonesGot = 0;
   let findsGot = 0;
@@ -354,6 +374,8 @@ export function startWalk3D(root: HTMLElement) {
   };
 
   const held = new Set<string>();
+  const UP = new THREE.Vector3(0, 1, 0);
+  const segDir = new THREE.Vector3();
   const camTargetPos = new THREE.Vector3(10.5, 11.5, 17.5);
   const camTargetLook = new THREE.Vector3(11.4, 0.8, 3.0);
   const currentLook = new THREE.Vector3(11.4, 0.8, 3.0);
@@ -448,6 +470,16 @@ export function startWalk3D(root: HTMLElement) {
     return fy;
   };
 
+  // Ledges taller than a step (the Mirador deck's front and side) block walking;
+  // the ramp rises gradually, and a jump gets Millie high enough to hop up.
+  const STEP_UP = 0.35;
+  const blockLedge = (p: { x: number; z: number }, x0: number, z0: number, feetY: number) => {
+    if (world.floorHeight(p.x, p.z) <= feetY + STEP_UP) return;
+    if (world.floorHeight(p.x, z0) <= feetY + STEP_UP) { p.z = z0; return; }
+    if (world.floorHeight(x0, p.z) <= feetY + STEP_UP) { p.x = x0; return; }
+    p.x = x0; p.z = z0;
+  };
+
   const solveRope = () => {
     const handX = human.x + Math.cos(human.heading) * 0.25;
     const handY = human.y + 1.02;
@@ -458,6 +490,7 @@ export function startWalk3D(root: HTMLElement) {
 
     rope[0].x = handX; rope[0].y = handY; rope[0].z = handZ;
     rope[ROPE_N].x = colX; rope[ROPE_N].y = colY; rope[ROPE_N].z = colZ;
+    ropeWrapped = false;
 
     for (let i = 1; i < ROPE_N; i++) {
       const n = rope[i];
@@ -496,19 +529,36 @@ export function startWalk3D(root: HTMLElement) {
           if (d < min && d > 1e-4) {
             n.x = c.x + (dx / d) * min;
             n.z = c.z + (dz / d) * min;
+            if (iter === 5 && n.y < c.h) ropeWrapped = true;
           }
         }
       }
     }
   };
 
+  // When the rope bends around a pole, its path is longer than the straight
+  // dog-to-human line: measure it so the wrap really shortens the leash.
+  let ropeWrapped = false;
+  const ropePathLength = () => {
+    let len = 0;
+    for (let i = 0; i < ROPE_N; i++) {
+      len += Math.hypot(rope[i + 1].x - rope[i].x, rope[i + 1].z - rope[i].z);
+    }
+    return len;
+  };
+
   // ---- Actions (Jump, Mark, Dig, Bark, Whirl, Interact) -------------------------
+  // Particles and pee marks share geometry/materials, so removing them frees nothing on the GPU
+  // and nothing new is allocated per action.
+  const particleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+  const particleMats = new Map<number, THREE.MeshBasicMaterial>();
+  const stainGeo = new THREE.CircleGeometry(0.32, 12);
+  const stainMat = new THREE.MeshBasicMaterial({ color: 0xffd14a, transparent: true, opacity: 0.85 });
   const spawnBurst = (x: number, y: number, z: number, colorHex: number, count = 10) => {
+    let mat = particleMats.get(colorHex);
+    if (!mat) { mat = new THREE.MeshBasicMaterial({ color: colorHex }); particleMats.set(colorHex, mat); }
     for (let i = 0; i < count; i++) {
-      const m = new THREE.Mesh(
-        new THREE.BoxGeometry(0.14, 0.14, 0.14),
-        new THREE.MeshBasicMaterial({ color: colorHex }),
-      );
+      const m = new THREE.Mesh(particleGeo, mat);
       m.position.set(x, y, z);
       scene.add(m);
       const a = Math.random() * Math.PI * 2;
@@ -519,7 +569,8 @@ export function startWalk3D(root: HTMLElement) {
 
   const doJump = () => {
     if (!dog.onGround) return;
-    dog.vy = 5.6;
+    // Peak ≈ v²/2g = 6.5²/35 ≈ 1.2: clears bollards, hydrants and benches, not fences.
+    dog.vy = 6.5;
     dog.onGround = false;
     sound.jump();
   };
@@ -538,10 +589,7 @@ export function startWalk3D(root: HTMLElement) {
     sound.pee();
     const mx = best ? best.x + (dog.x - best.x) * 0.6 : dog.x;
     const mz = best ? best.z + (dog.z - best.z) * 0.6 : dog.z;
-    const stain = new THREE.Mesh(
-      new THREE.CircleGeometry(0.32, 12),
-      new THREE.MeshBasicMaterial({ color: 0xffd14a, transparent: true, opacity: 0.85 }),
-    );
+    const stain = new THREE.Mesh(stainGeo, stainMat);
     stain.rotation.x = -Math.PI / 2;
     stain.position.set(mx, world.floorHeight(mx, mz) + 0.025, mz);
     scene.add(stain);
@@ -661,7 +709,11 @@ export function startWalk3D(root: HTMLElement) {
     }
 
     // Update embedded Coriolis simulator texture
-    if (coriolisSim.tick(simTimeMs)) {
+    // Re-upload the wall texture only when the sim changed, and only while it is
+    // close enough to see (or being played).
+    const wallX = world.coriolisStop.x + world.coriolisStop.w * 0.58;
+    const wallVisible = coriolisFocused || Math.abs(camera.position.x - wallX) < 40;
+    if (coriolisSim.tick(simTimeMs) && wallVisible) {
       coriolisSim.renderToCanvas(coriolisCtx, 4, 1);
       coriolisTex.needsUpdate = true;
     }
@@ -683,6 +735,7 @@ export function startWalk3D(root: HTMLElement) {
     if (dog.peeing > 0) dog.peeing = Math.max(0, dog.peeing - dt);
 
     const speed = dog.dig ? 1.8 : dog.sprint ? 8.2 : 5.1;
+    const dogX0 = dog.x, dogZ0 = dog.z;
     dog.x += ix * speed * dt;
     dog.z += iz * speed * dt;
     if (dog.moving) {
@@ -695,7 +748,9 @@ export function startWalk3D(root: HTMLElement) {
     }
 
     // Gravity + Jump height vs ground elevation
-    const groundY = pushOut(dog, DOG_R, dog.y - world.floorHeight(dog.x, dog.z));
+    pushOut(dog, DOG_R, dog.y - world.floorHeight(dog.x, dog.z));
+    blockLedge(dog, dogX0, dogZ0, dog.y);
+    const groundY = world.floorHeight(dog.x, dog.z);
     if (!dog.onGround || dog.y > groundY + 0.01) {
       dog.vy -= 17.5 * dt;
       dog.y += dog.vy * dt;
@@ -710,16 +765,14 @@ export function startWalk3D(root: HTMLElement) {
 
     // Off-leash park gate logic
     const inPark = dog.x > PARK_X + 1.0 && dog.z < CURB_Z;
-    if (!offLeash && inPark && !clippedInPark) {
+    if (!offLeash && inPark) {
       offLeash = true;
       showToast('OFF LEASH! Run free in the park!', 2.4);
       sound.pickup();
     } else if (offLeash && !inPark && Math.hypot(dog.x - human.x, dog.z - human.z) < 2.2) {
       offLeash = false;
-      clippedInPark = false;
+      resetRope();
       showToast('Leash clipped back on', 1.6);
-    } else if (!inPark) {
-      clippedInPark = false;
     }
 
     // Human & Whirl logic
@@ -756,23 +809,35 @@ export function startWalk3D(root: HTMLElement) {
         // Elastic leash constraint between dog and human
         const ndx = dog.x - human.x, ndz = dog.z - human.z;
         const nd = Math.hypot(ndx, ndz) || 1;
-        if (nd > ROPE_LEN) {
-          const excess = nd - ROPE_LEN;
+        // Wrapped: pull each end toward its neighboring rope node (around the pole).
+        const wrapLen = ropeWrapped ? ropePathLength() : 0;
+        const effLen = Math.max(nd, wrapLen);
+        if (effLen > ROPE_LEN) {
+          const excess = Math.min(effLen - ROPE_LEN, 0.6);
           const mDog = dog.dig ? 0.05 : 0.75;
           const mHum = dog.dig ? 0.95 : 0.25;
-          dog.x -= (ndx / nd) * excess * mDog;
-          dog.z -= (ndz / nd) * excess * mDog;
-          human.x += (ndx / nd) * excess * mHum;
-          human.z += (ndz / nd) * excess * mHum;
+          let dux = ndx / nd, duz = ndz / nd, hux = dux, huz = duz;
+          if (wrapLen > nd) {
+            const a = rope[ROPE_N - 2], b = rope[2];
+            const da = Math.hypot(dog.x - a.x, dog.z - a.z) || 1;
+            const db = Math.hypot(b.x - human.x, b.z - human.z) || 1;
+            dux = (dog.x - a.x) / da; duz = (dog.z - a.z) / da;
+            hux = (b.x - human.x) / db; huz = (b.z - human.z) / db;
+          }
+          dog.x -= dux * excess * mDog;
+          dog.z -= duz * excess * mDog;
+          human.x += hux * excess * mHum;
+          human.z += huz * excess * mHum;
           human.patience = Math.max(0, human.patience - dt * 0.14);
         } else {
           human.patience = Math.min(1, human.patience + dt * 0.12);
         }
       } else {
-        // Human waits by the park bench while Millie is off-leash
-        const tx = PARK_X + 3.2, tz = 5.2;
+        // Human waits by the park bench while Millie runs, then walks over to
+        // clip the leash back on once she leaves the park.
+        const tx = inPark ? PARK_X + 3.2 : dog.x, tz = inPark ? 5.2 : dog.z;
         const dx = tx - human.x, dz = tz - human.z, d = Math.hypot(dx, dz);
-        if (d > 0.3) {
+        if (d > (inPark ? 0.3 : 1.6)) {
           human.walking = true;
           human.x += (dx / d) * 2.5 * dt;
           human.z += (dz / d) * 2.5 * dt;
@@ -782,7 +847,9 @@ export function startWalk3D(root: HTMLElement) {
           human.walking = false;
         }
       }
-      human.y = pushOut(human, HUMAN_R);
+      pushOut(human, HUMAN_R);
+      blockLedge(human, hx0, hz0, human.y);
+      human.y = world.floorHeight(human.x, human.z);
       const moved = Math.hypot(human.x - hx0, human.z - hz0);
       if (human.walking && moved < 0.01) human.stuck += dt;
       else human.stuck = 0;
@@ -831,7 +898,7 @@ export function startWalk3D(root: HTMLElement) {
         const len = Math.hypot(vx, vy, vz) || 0.001;
         seg.position.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
         seg.scale.set(1, len, 1);
-        seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(vx / len, vy / len, vz / len));
+        seg.quaternion.setFromUnitVectors(UP, segDir.set(vx / len, vy / len, vz / len));
       }
     } else {
       ropeSegs.forEach((s) => { s.visible = false; });
@@ -1013,6 +1080,8 @@ export function startWalk3D(root: HTMLElement) {
         pText = 'Smells like treasure! Press Space to dig';
       else if (!dragonAwake && Math.hypot(dog.x - world.dragonPos.x, dog.z - world.dragonPos.z) < 4.5)
         pText = 'El Drac mosaic statue — Press E to bark!';
+      else if (nearStop?.id === 'park')
+        pText = 'The off-leash park: head through the gate and let Millie run';
       else if (nearStop)
         pText = `At ${nearStop.label} — Press Enter to visit page`;
       promptEl.textContent = pText;
@@ -1053,30 +1122,32 @@ export function startWalk3D(root: HTMLElement) {
   // ---- Input Handling --------------------------------------------------------------
   const handleKeyDown = (code: string, e?: KeyboardEvent) => {
     held.add(code);
+    const repeat = e?.repeat ?? false;
     if (coriolisFocused) {
-      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); toggleCoriolisFocus(); return; }
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) toggleCoriolisFocus(); return; }
+      // Letter commands win over WASD, so S opens Settings like on the project page.
+      const cmd: SimCommand | null =
+        code === 'KeyM' ? 'Menu' : code === 'KeyS' ? 'Settings' : code === 'KeyC' ? 'Overlay'
+          : code === 'Space' ? 'Next' : code === 'KeyH' ? 'Home' : null;
+      if (cmd) { e?.preventDefault(); if (!repeat) coriolisSim.command(cmd, simTimeMs); return; }
+      if (code === 'KeyR') { e?.preventDefault(); if (!repeat) coriolisSim.rotate(simTimeMs); return; }
       const ck = CORIOLIS_KEYMAP[code];
       if (ck) {
         e?.preventDefault();
         coriolisSim.setHeld(ck, true);
         coriolisSim.key(ck, simTimeMs);
-        return;
       }
-      if (code === 'KeyM') { e?.preventDefault(); coriolisSim.command('Menu', simTimeMs); return; }
-      if (code === 'KeyS') { e?.preventDefault(); coriolisSim.command('Settings', simTimeMs); return; }
-      if (code === 'KeyC') { e?.preventDefault(); coriolisSim.command('Overlay', simTimeMs); return; }
-      if (code === 'Space') { e?.preventDefault(); coriolisSim.command('Next', simTimeMs); return; }
-      if (code === 'KeyH') { e?.preventDefault(); coriolisSim.command('Home', simTimeMs); return; }
-      if (code === 'KeyR') { e?.preventDefault(); coriolisSim.rotate(simTimeMs); return; }
       return;
     }
 
-    if (MOVE_MAP[code] || code === 'Space' || code === 'Tab') e?.preventDefault();
+    if (MOVE_MAP[code] || code === 'Space' || code === 'Tab' || code === 'Enter') e?.preventDefault();
+    if (repeat) return; // held keys move Millie via `held`; actions fire once per press
 
     if (code === 'KeyV') doJump();
     else if (code === 'KeyQ' || code === 'Delete') doMark();
     else if (code === 'Space') doDigAction();
-    else if (code === 'KeyE' || code === 'ControlLeft') doBark();
+    else if (code === 'KeyE') doBark();
+    else if (code === 'Escape' && stemmaOpen) toggleStemmaMixer();
     else if (code === 'KeyG' || code === 'PageDown') doPickup();
     else if (code === 'KeyF' || code === 'End') {
       showToast('Good dog.', 1.4);
@@ -1091,13 +1162,14 @@ export function startWalk3D(root: HTMLElement) {
       goalsOpen = !goalsOpen;
       goalsEl?.classList.toggle('open', goalsOpen);
     }
-    else if (code === 'Enter' && nearStop) {
+    else if (code === 'Enter' && nearStop && nearStop.id !== 'park') {
       location.href = nearStop.href;
     }
     else if (code === 'KeyR') {
       dog.x = 11.4; dog.y = 0.14; dog.z = 3.8; dog.vy = 0; dog.onGround = true;
       human.x = 8.4; human.y = 0.14; human.z = 3.1; human.whirl = null;
       offLeash = false;
+      resetRope();
       showToast('Back to the start of the block', 1.5);
     }
   };
@@ -1113,12 +1185,29 @@ export function startWalk3D(root: HTMLElement) {
     if (camBtn) camBtn.textContent = `Cam: ${camMode === 'classic' ? '3/4' : camMode === 'follow' ? 'Follow' : 'Plaza'}`;
   };
 
-  window.addEventListener('keydown', (e) => {
-    if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+  // Keys are only captured while the stage itself has focus (click it or Tab to it),
+  // so the rest of the page keeps normal keyboard behavior. Shift+Tab and Esc leave.
+  const releaseAll = () => {
+    held.clear();
+    coriolisSim.clearHeld();
+  };
+  host.addEventListener('keydown', (e) => {
+    if (e.target !== host) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'Tab' && e.shiftKey) return;
+    if (e.code === 'Escape' && !coriolisFocused && !stemmaOpen) {
+      if (root.classList.contains('immersive')) setImmersive(false);
+      else host.blur();
+      return;
+    }
     handleKeyDown(e.code, e);
   });
-  window.addEventListener('keyup', (e) => handleKeyUp(e.code));
-  window.addEventListener('blur', () => { held.clear(); coriolisSim.clearHeld(); });
+  host.addEventListener('keyup', (e) => handleKeyUp(e.code));
+  host.addEventListener('blur', releaseAll);
+  window.addEventListener('blur', releaseAll);
+  host.addEventListener('pointerdown', (e) => {
+    if (e.target === renderer.domElement) host.focus({ preventScroll: true });
+  });
 
   // Toolbar & Overlay Button Wiring
   soundBtn?.addEventListener('click', () => {
@@ -1128,10 +1217,25 @@ export function startWalk3D(root: HTMLElement) {
     soundBtn.textContent = sound.on ? 'Sound on' : 'Sound off';
   });
 
+  // Real Fullscreen API where available (not iPhone Safari); otherwise fill the window.
+  const syncFull = () => {
+    const on = document.fullscreenElement === root || root.classList.contains('immersive');
+    if (fullBtn) fullBtn.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
+  };
+  const setImmersive = (on: boolean) => {
+    root.classList.toggle('immersive', on);
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+    syncFull();
+  };
   fullBtn?.addEventListener('click', () => {
-    if (document.fullscreenElement === root) void document.exitFullscreen();
-    else if (root.requestFullscreen) void root.requestFullscreen();
+    if (document.fullscreenElement === root) { void document.exitFullscreen().catch(() => {}); return; }
+    if (root.classList.contains('immersive')) { setImmersive(false); return; }
+    host.focus({ preventScroll: true });
+    const req = root.requestFullscreen?.();
+    if (req) req.catch(() => setImmersive(true));
+    else setImmersive(true);
   });
+  document.addEventListener('fullscreenchange', syncFull);
 
   camBtn?.addEventListener('click', cycleCamera);
   weatherBtns.forEach((b) => b.addEventListener('click', () => applyWeather(b.dataset.weather as WeatherMode)));
@@ -1191,20 +1295,35 @@ export function startWalk3D(root: HTMLElement) {
   new ResizeObserver(resize).observe(host);
   resize();
 
+  // Only simulate and render while the stage is on screen and the tab is visible.
   let prev = performance.now();
+  let onScreen = true;
+  let rafId = 0;
   const loop = (now: number) => {
     const dt = Math.min(0.05, Math.max(0.001, (now - prev) / 1000));
     prev = now;
     update(dt);
     renderer.render(scene, camera);
-    requestAnimationFrame(loop);
+    rafId = requestAnimationFrame(loop);
   };
+  // With reduced motion, the street holds still until the player engages with it.
+  let engaged = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const setRunning = () => {
+    const run = engaged && onScreen && !document.hidden;
+    if (run && !rafId) { prev = performance.now(); rafId = requestAnimationFrame(loop); }
+    else if (!run && rafId) { cancelAnimationFrame(rafId); rafId = 0; releaseAll(); }
+  };
+  new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; setRunning(); }).observe(host);
+  document.addEventListener('visibilitychange', setRunning);
+  const engage = () => { if (!engaged) { engaged = true; setRunning(); } };
+  host.addEventListener('focus', engage);
+  root.addEventListener('pointerdown', engage);
   update(1 / 60);
   renderer.render(scene, camera);
-  requestAnimationFrame(loop);
+  setRunning();
 
   // Deterministic test hook for headless checks (?walktest)
-  if (location.search.includes('walktest')) {
+  if (new URLSearchParams(location.search).has('walktest')) {
     (window as unknown as Record<string, unknown>).__walk = {
       dog,
       human,

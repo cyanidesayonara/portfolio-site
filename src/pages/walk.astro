@@ -39,7 +39,7 @@ const KEYS = [
 
   <section class="wrap">
     <figure class="walk-shell" data-walk-3d>
-      <div class="stage" data-stage>
+      <div class="stage" data-stage tabindex="0" role="application" aria-roledescription="game" aria-label="3D street game. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, X uses the wall or mixer, C changes camera, 1 to 4 change the sky, Tab shows goals, Enter goes into a shop. Shift+Tab or Escape leaves the game.">
         <!-- Top-left PoLR HUD -->
         <div class="hud-tl">
           <div class="hud-pill bars">
@@ -127,6 +127,7 @@ const KEYS = [
             <button type="button" data-touch-key="KeyE">Bark</button>
             <button type="button" data-touch-key="KeyQ">Mark</button>
             <button type="button" data-touch-key="KeyX">Use</button>
+            <button type="button" data-touch-key="ShiftLeft">Run</button>
           </div>
         </div>
       </div>
@@ -192,12 +193,20 @@ const KEYS = [
     overflow: hidden;
     border: 1px solid var(--line);
   }
-  .walk-shell:fullscreen {
+  .walk-shell:fullscreen,
+  .walk-shell:global(.immersive) {
     display: flex;
     flex-direction: column;
     border-radius: 0;
   }
-  .walk-shell:fullscreen .stage {
+  .walk-shell:global(.immersive) {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    margin: 0;
+  }
+  .walk-shell:fullscreen .stage,
+  .walk-shell:global(.immersive) .stage {
     flex: 1 1 auto;
     height: auto;
   }
@@ -207,6 +216,16 @@ const KEYS = [
     background: #0b1430;
     overflow: hidden;
     user-select: none;
+  }
+  .stage:focus-visible {
+    outline: 3px solid var(--accent, #ffb020);
+    outline-offset: -3px;
+  }
+  .stage :global(.webgl-fallback) {
+    margin: 0;
+    padding: 32px;
+    color: #f4efe6;
+    max-width: 52ch;
   }
   .stage :global(canvas) {
     display: block;
@@ -473,6 +492,10 @@ const KEYS = [
   .touch-dpad button:nth-child(3) { grid-column: 2; grid-row: 2; }
   .touch-dpad button:nth-child(4) { grid-column: 3; grid-row: 2; }
   .touch-pad button {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     padding: 10px 6px;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.25);
