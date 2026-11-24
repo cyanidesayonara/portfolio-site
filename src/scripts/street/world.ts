@@ -115,7 +115,7 @@ export function buildWorld(stops: Stop[]): World {
   const shops = stopLots.filter((l) => l.type === 'shop');
 
   const solids: Solid[] = [];
-  const crossings = [600, 1480].filter((c) => c < park.x - 80);
+  const crossings = [600, 1480, 2120].filter((c) => c < park.x - 80);
   const nearCrossing = (px: number) => crossings.some((c) => px > c - 40 && px < c + 100);
 
   // The curb line: lampposts and trees, with bins and hydrants between.
@@ -542,16 +542,14 @@ function drawShop(c: CanvasRenderingContext2D, w: World, l: Extract<Lot, { type:
   }
   c.fillStyle = 'rgba(0,0,0,0.15)';
   c.fillRect(l.x + 4, 47, aw, 2);
-  // Display windows with something in them
+  // Retro dark glass bezels: live 8/16-bit animations draw inside each frame in game.ts.
   for (const wx of [l.x + 18, l.x + l.w / 2 + 16]) {
     const ww = l.w / 2 - 34;
-    c.fillStyle = 'rgba(255,255,255,0.6)';
+    c.fillStyle = '#14203d';
+    c.fillRect(wx - 2, 88, ww + 4, 28);
+    c.fillStyle = '#0b1430';
     c.fillRect(wx, 90, ww, 24);
     w.windows.push({ x: wx, y: 90, w: ww, h: 24 });
-    c.fillStyle = accent;
-    c.globalAlpha = 0.55;
-    for (let k = 0; k < 3; k++) c.fillRect(wx + 6 + k * (ww / 3), 102, ww / 3 - 10, 10);
-    c.globalAlpha = 1;
   }
   c.fillStyle = '#2a2f3d';
   c.fillRect(l.x + l.w / 2 - 11, 88, 22, FACADE - 88);

@@ -28,9 +28,32 @@ const STOPS = ui.stops.map((s) => ({
 const KEYS = ui.keys;
 ---
 
-<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label={ui.ariaLabel} aria-describedby="street-caption">
+<figure
+  class="street"
+  data-street
+  data-stops={JSON.stringify(STOPS)}
+  data-try-booth={ui.tryBooth}
+  data-close-booth={ui.closeBooth}
+  data-open-page={ui.openPage}
+  tabindex="0"
+  aria-label={ui.ariaLabel}
+  aria-describedby="street-caption"
+>
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
+    <aside class="retro-booth" data-retro-booth hidden aria-live="polite">
+      <header class="rb-head">
+        <b data-retro-title>Eat Prey Nap</b>
+        <div class="rb-actions">
+          <a class="rb-link" data-retro-link href="#">{ui.openPage}</a>
+          <button type="button" class="rb-close" data-retro-close aria-label={ui.closeBooth}>×</button>
+        </div>
+      </header>
+      <div class="rb-body">
+        <canvas class="rb-screen" data-retro-canvas width="160" height="100"></canvas>
+        <div class="rb-ctrl" data-retro-controls></div>
+      </div>
+    </aside>
   </div>
   <figcaption>
     <div class="bar">
@@ -295,5 +318,102 @@ const KEYS = ui.keys;
   }
   .stops a:global(.near) {
     transform: translateY(-2px);
+  }
+
+  .retro-booth {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 8px 10px;
+    background: #0f162b;
+    color: #f4f1ea;
+    border: 3px solid #f4f1ea;
+    box-shadow: 4px 4px 0 #070b18;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    z-index: 6;
+  }
+  .retro-booth[hidden] { display: none; }
+  .rb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .rb-head b {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .rb-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rb-link {
+    padding: 3px 8px;
+    border: 2px solid #5eea8c;
+    color: #5eea8c;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .rb-close {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 2px solid #f4f1ea;
+    background: #1a284d;
+    color: #f4f1ea;
+    font: 800 14px/1 ui-monospace, monospace;
+    cursor: pointer;
+  }
+  .rb-body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+  .rb-screen {
+    display: block;
+    width: 160px;
+    height: 100px;
+    image-rendering: pixelated;
+    border: 2px solid #3c4f82;
+    background: #070b18;
+    cursor: pointer;
+  }
+  .rb-ctrl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+  }
+  .rb-ctrl :global(button) {
+    padding: 4px 8px;
+    border: 2px solid #3c4f82;
+    background: #1a284d;
+    color: #f4f1ea;
+    font: 700 11px ui-monospace, monospace;
+    cursor: pointer;
+  }
+  .rb-ctrl :global(button[aria-pressed='true']) {
+    border-color: #f0c44d;
+    background: #f0c44d;
+    color: #0b1430;
+  }
+  .rb-ctrl :global(span.rb-stat) {
+    font-size: 11px;
+    color: #b7c2df;
+    width: 100%;
+  }
+  @media (max-width: 600px) {
+    .retro-booth { left: 6px; right: 6px; bottom: 6px; max-height: 44%; padding: 6px 8px; }
+    .rb-body { gap: 8px; }
+    .rb-screen { width: 128px; height: 80px; }
+    .rb-ctrl :global(button) { padding: 3px 6px; font-size: 10px; }
   }
 </style>

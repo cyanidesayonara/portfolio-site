@@ -30,6 +30,10 @@ import { createTransitOverlay, playDepartureDoors } from './transit';
 import { trackVisibleViewport } from '../viewport';
 import { AREAS, AREA_BONUS, areaOfDistrict, loadProgress, saveProgress, clearProgress } from './progress';
 import { createStrays } from './strays';
+import {
+  EatPreyNapSim, DopepodSim, CAT_PALETTES, CAT_SIZES, createBoardwalkBoothScreens,
+} from './booths';
+import projectMeta from '../../data/project-meta.json';
 
 type CamMode = 'street' | 'follow' | 'overhead';
 
@@ -135,7 +139,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   sun.shadow.normalBias = 0.03;
   scene.add(sun, sun.target);
 
-  // ---- Coriolis LED wall texture ------------------------------------------------------
+  // ---- Coriolis & boardwalk booth screens ---------------------------------------------
   const cCanvas = document.createElement('canvas');
   cCanvas.width = cCanvas.height = 512;
   const cCtx = cCanvas.getContext('2d')!;
@@ -143,6 +147,15 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const coriolisTex = new THREE.CanvasTexture(cCanvas);
   coriolisTex.colorSpace = THREE.SRGBColorSpace;
   coriolisTex.magFilter = THREE.NearestFilter;
+  const catSim = new EatPreyNapSim();
+  const podSim = new DopepodSim();
+  const polrMeta = projectMeta.projects['path-of-leash-resistance'];
+  const boothScreens = createBoardwalkBoothScreens({
+    catSim,
+    podSim,
+    commits: polrMeta?.commits ?? 2242,
+    mainWalks: polrMeta?.mainWalks ?? 51,
+  });
 
   // Build in slices behind a loading bar (or commuter train cutscene), then bake what's
   // near the start. The rest bakes in the background while you play (the Streamer).
@@ -170,7 +183,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       yield r.value;
     }
   };
-  const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex })), () => {
+  const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex, boothScreens: boothScreens.textures })), () => {
     transit.setProgress(Math.min(70, (stepsDone / LEVEL_STEPS) * 70));
   }, 14);
   const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : viaMetro ? level.metro.dog : level.start.dog;
@@ -246,6 +259,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let combo: null | { links: string[]; pts: number; t: number } = null;
   let coriolisFocus = false;
   let stemmaOpen = false;
+  let catFocus = false;
+  let podOpen = false;
   let camMode: CamMode = 'street';
   let skyMode: SkyMode = isNightTheme() ? 'night' : 'day';
   let nearStop: Level['stops'][number] | null = null;
@@ -422,6 +437,23 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const tofuM = makeTofu();
   scene.add(collapseRig(tofuM.group));
   const tofu = { i: 0, x: Q.tofu.spots[0][0], z: Q.tofu.spots[0][1], darting: false, heading: 0, alert: 0, home: false };
+  // A second Tofu lounges by the Eat Prey Nap boardwalk booth, batting at the mouse on screen.
+  const boothTofuM = makeTofu();
+  scene.add(collapseRig(boothTofuM.group));
+  const boothTofu = {
+    x: level.boothTofuAnchor.x,
+    z: level.boothTofuAnchor.z,
+    jumpY: 0,
+    vy: 0,
+    heading: -Math.PI / 2,
+    pounceCooldown: 0.9,
+    swatted: false,
+    speed: 0,
+  };
+  boothTofuM.group.position.set(boothTofu.x, GROUND_Y, boothTofu.z);
+  boothTofuM.group.rotation.y = -boothTofu.heading;
+  const raycaster = new THREE.Raycaster();
+  const tapNdc = new THREE.Vector2();
   // Fruit crate outside the fruiteria.
   const crate = makeFruitCrate();
   crate.group.position.set(Q.crate.x, RAMBLA_Y, Q.crate.z);
@@ -803,7 +835,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   // ---- Actions ------------------------------------------------------------------------
   const doJump = () => {
-    if (!dog.onGround || coriolisFocus || dogSwimming) return;
+    if (!dog.onGround || coriolisFocus || catFocus || podOpen || dogSwimming) return;
     dog.vy = 6.5;
     dog.onGround = false;
     audio.jump();
@@ -913,15 +945,118 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
   };
 
+  const catPanel = q<HTMLElement>('[data-cat-panel]');
+  const podPanel = q<HTMLElement>('[data-pod-panel]');
+  const anyBoothOpen = () => coriolisFocus || stemmaOpen || catFocus || podOpen;
+  const syncPanels = () => {
+    root.classList.toggle('panel-open', anyBoothOpen());
+    q('[data-coriolis-panel]')?.classList.toggle('open', coriolisFocus);
+    stemmaPanel?.classList.toggle('open', stemmaOpen);
+    catPanel?.classList.toggle('open', catFocus);
+    podPanel?.classList.toggle('open', podOpen);
+  };
+  const closeOtherBooths = (keep?: 'coriolis' | 'stemma' | 'cat' | 'pod') => {
+    if (keep !== 'coriolis' && coriolisFocus) { coriolisFocus = false; coriolis.clearHeld(); }
+    if (keep !== 'stemma') stemmaOpen = false;
+    if (keep !== 'cat') catFocus = false;
+    if (keep !== 'pod') podOpen = false;
+  };
+
   const toggleCoriolis = () => {
     coriolisFocus = !coriolisFocus;
     coriolis.clearHeld();
-    q('[data-coriolis-panel]')?.classList.toggle('open', coriolisFocus);
     if (coriolisFocus) {
-      setStemma(false);
+      closeOtherBooths('coriolis');
       completeGoal('coriolis');
     }
+    syncPanels();
   };
+
+  // ---- Eat Prey Nap booth panel ------------------------------------------------------
+  const catScoreEl = q<HTMLElement>('[data-cat-score]');
+  const catPalLabel = q<HTMLElement>('[data-cat-pal-label]');
+  const catSizeLabel = q<HTMLElement>('[data-cat-size-label]');
+  const catWatchBtn = q<HTMLButtonElement>('[data-cat-watch]');
+  let catToastDone = false;
+  const syncCatUi = () => {
+    const st = catSim.getMouseState();
+    if (catPalLabel) catPalLabel.textContent = CAT_PALETTES[st.palette].name;
+    if (catSizeLabel) catSizeLabel.textContent = CAT_SIZES[st.size].label;
+    if (catScoreEl) catScoreEl.textContent = `${st.catches}`;
+    catWatchBtn?.setAttribute('aria-pressed', String(st.watchOnly));
+  };
+  const setCat = (open: boolean) => {
+    catFocus = open;
+    if (open) {
+      closeOtherBooths('cat');
+      syncCatUi();
+      if (!catToastDone) {
+        catToastDone = true;
+        hud.toast('Eat Prey Nap', 'Tap or click the booth screen to pounce at the mouse.', '#f0c44d');
+      }
+    }
+    syncPanels();
+  };
+  q('[data-cat-close]')?.addEventListener('click', () => setCat(false));
+  q('[data-cat-palette]')?.addEventListener('click', () => { catSim.cyclePalette(); audio.click(); syncCatUi(); });
+  q('[data-cat-size]')?.addEventListener('click', () => { catSim.cycleSize(); audio.click(); syncCatUi(); });
+  q('[data-cat-watch]')?.addEventListener('click', () => { catSim.toggleWatchOnly(); audio.click(); syncCatUi(); });
+  const triggerCatPounce = (u: number, v: number) => {
+    const res = catSim.pawAt(u, v, false);
+    if (res === 'catch') {
+      audio.chime();
+      hud.shout('CAUGHT!', 'good');
+      boothTofu.vy = Math.max(boothTofu.vy, 2.8);
+    } else if (res === 'pin') {
+      audio.click();
+      hud.shout('PINNED!', 'plain');
+    } else {
+      audio.click();
+    }
+    syncCatUi();
+    return res;
+  };
+  q('[data-cat-pounce]')?.addEventListener('click', () => {
+    const ms = catSim.getMouseState();
+    triggerCatPounce(ms.u, ms.v);
+  });
+
+  // ---- dopepod booth panel -----------------------------------------------------------
+  const podNowEl = q<HTMLElement>('[data-pod-now]');
+  const podPlayBtn = q<HTMLButtonElement>('[data-pod-play]');
+  let podToastDone = false;
+  const syncPodUi = () => {
+    const st = podSim.getState();
+    if (podNowEl) podNowEl.textContent = `${st.showName} · ${st.episodeTitle}`;
+    if (podPlayBtn) {
+      podPlayBtn.setAttribute('aria-pressed', String(st.playing));
+      podPlayBtn.textContent = st.playing ? 'Pause' : 'Play';
+    }
+    root.querySelectorAll<HTMLButtonElement>('[data-pod-show]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.podShow) === st.showIdx));
+    });
+  };
+  const setPod = (open: boolean) => {
+    podOpen = open;
+    if (open) {
+      closeOtherBooths('pod');
+      syncPodUi();
+      if (!podToastDone) {
+        podToastDone = true;
+        hud.toast('dopepod', 'Switch podcasts or scrub episodes from the booth.', '#d94ca6');
+      }
+    }
+    syncPanels();
+  };
+  q('[data-pod-close]')?.addEventListener('click', () => setPod(false));
+  podPlayBtn?.addEventListener('click', () => { podSim.togglePlay(); audio.click(); syncPodUi(); });
+  q('[data-pod-prev]')?.addEventListener('click', () => { podSim.prevEpisode(); audio.click(); syncPodUi(); });
+  q('[data-pod-next]')?.addEventListener('click', () => { podSim.nextEpisode(); audio.click(); syncPodUi(); });
+  root.querySelectorAll<HTMLButtonElement>('[data-pod-show]').forEach((b) => b.addEventListener('click', () => {
+    podSim.selectShow(Number(b.dataset.podShow ?? 0));
+    audio.click();
+    syncPodUi();
+  }));
 
   // ---- stemma panel -------------------------------------------------------------------
   const stemmaPanel = q<HTMLElement>('[data-stemma-panel]');
@@ -998,11 +1133,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   });
   const setStemma = (open: boolean) => {
     stemmaOpen = open;
-    stemmaPanel?.classList.toggle('open', open);
     if (open) {
+      closeOtherBooths('stemma');
       if (!audio.on) setSound(true);
       void audio.loadIndex().then(() => { renderSongs(); renderCredit(audio.song()); });
     }
+    syncPanels();
   };
   q('[data-stemma-close]')?.addEventListener('click', () => setStemma(false));
 
@@ -1082,13 +1218,29 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    if (catFocus || coriolisFocus) return;
     if (!drag.moved) { drag.moved = true; try { renderer.domElement.setPointerCapture(e.pointerId); } catch {} }
     drag.x = e.clientX; drag.y = e.clientY;
     orbitBy(dx * 0.006, dy * 0.006);
   });
   const endDrag = (e: PointerEvent) => {
     if (touches.delete(e.pointerId) && touches.size < 2) pinchDist = 0;
-    if (drag && e.pointerId === drag.id) drag = null;
+    if (drag && e.pointerId === drag.id) {
+      const wasTap = !drag.moved && e.type === 'pointerup';
+      drag = null;
+      if (wasTap && level.catScreen.mesh && (catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 9)) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          tapNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          tapNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(tapNdc, camera);
+          const hits = raycaster.intersectObject(level.catScreen.mesh, false);
+          if (hits.length && hits[0].uv) {
+            triggerCatPounce(hits[0].uv.x, 1 - hits[0].uv.y);
+          }
+        }
+      }
+    }
   };
   host.addEventListener('pointerup', endDrag);
   host.addEventListener('pointercancel', endDrag);
@@ -1246,6 +1398,30 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (ck) { e?.preventDefault(); coriolis.setHeld(ck, true); coriolis.key(ck, time * 1000); }
       return;
     }
+    if (catFocus) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) setCat(false); return; }
+      if (!repeat && (code === 'KeyP' || code === 'KeyC')) { e?.preventDefault(); catSim.cyclePalette(); audio.click(); syncCatUi(); return; }
+      if (!repeat && (code === 'KeyS' || code === 'Tab')) { e?.preventDefault(); catSim.cycleSize(); audio.click(); syncCatUi(); return; }
+      if (!repeat && code === 'KeyW') { e?.preventDefault(); catSim.toggleWatchOnly(); audio.click(); syncCatUi(); return; }
+      if (!repeat && (code === 'Space' || code === 'Enter')) {
+        e?.preventDefault();
+        const ms = catSim.getMouseState();
+        triggerCatPounce(ms.u, ms.v);
+        return;
+      }
+      return;
+    }
+    if (podOpen) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) setPod(false); return; }
+      if (!repeat && (code === 'Space' || code === 'KeyK')) { e?.preventDefault(); podSim.togglePlay(); audio.click(); syncPodUi(); return; }
+      if (!repeat && (code === 'ArrowRight' || code === 'KeyL')) { e?.preventDefault(); podSim.nextEpisode(); audio.click(); syncPodUi(); return; }
+      if (!repeat && (code === 'ArrowLeft' || code === 'KeyJ')) { e?.preventDefault(); podSim.prevEpisode(); audio.click(); syncPodUi(); return; }
+      if (!repeat && code.startsWith('Digit')) {
+        const n = Number(code.slice(5)) - 1;
+        if (n >= 0 && n < 4) { e?.preventDefault(); podSim.selectShow(n); audio.click(); syncPodUi(); return; }
+      }
+      return;
+    }
     if (MOVE[code] || ['Space', 'Tab', 'Enter', 'ShiftLeft', 'ShiftRight'].includes(code)) e?.preventDefault();
     held.add(code);
     if (repeat) return;
@@ -1267,11 +1443,15 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       case 'KeyR': resetWalk(); break;
       case 'KeyX':
         if (nearCoriolis()) toggleCoriolis();
+        else if (nearCatBooth()) setCat(!catFocus);
+        else if (nearPodBooth()) setPod(!podOpen);
         else if (nearStemma() || stemmaOpen) setStemma(!stemmaOpen);
         break;
       case 'Escape':
         if (minimap.enlarged) minimap.toggle(false);
         else if (stemmaOpen) setStemma(false);
+        else if (catFocus) setCat(false);
+        else if (podOpen) setPod(false);
         else if (full) setFull(false);
         else host.blur();
         break;
@@ -1362,6 +1542,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // ---- Proximity helpers --------------------------------------------------------------
   const nearCoriolis = () => Math.hypot(dog.x - level.coriolis.x, dog.z - (level.coriolis.z + 2.5)) < 4.2;
   const nearStemma = () => Math.hypot(dog.x - level.stemma.x, dog.z - level.stemma.z) < 3.6;
+  const nearCatBooth = () => Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 4.0;
+  const nearPodBooth = () => Math.hypot(dog.x - level.dopepod.x, dog.z - level.dopepod.z) < 4.0;
 
   // ---- Human AI -----------------------------------------------------------------------
   const humanSay = (t: string, ttl = 2, tone: 'paper' | 'win' | 'loud' = 'paper') => hud.say('human', t, ttl, tone);
@@ -1612,7 +1794,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let wasInPipica = false;
   let pipIdx = 0; // which pipicà she's off the leash in
   const physicsStep = (dt: number) => {
-    const inp = coriolisFocus || stemmaOpen ? { x: 0, z: 0, mag: 0 } : inputDir();
+    const inp = anyBoothOpen() ? { x: 0, z: 0, mag: 0 } : inputDir();
     const wantsRun = (held.has('ShiftLeft') || held.has('ShiftRight')) && inp.mag > 0;
     const freeZoom = offLeash;
     const running = wantsRun && (dog.zoom > 0.02 || freeZoom);
@@ -1809,6 +1991,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       coriolis.renderToCanvas(cCtx, 4, 1);
       coriolisTex.needsUpdate = true;
     }
+    // Live idling UIs across all boardwalk pavilions.
+    const activeBoothId = catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 16
+      ? 'eat-prey-nap'
+      : podOpen
+        ? 'dopepod'
+        : null;
+    boothScreens.update(dt, audio.playhead(), audio.muted, audio.on && audio.musicOn, activeBoothId);
 
     // Pee, streaks, drinking.
     if (dog.peeing > 0) dog.peeing -= dt;
@@ -1945,6 +2134,48 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       tofuM.group.position.set(tofu.x, GROUND_Y, tofu.z);
       tofuM.group.rotation.y = -tofu.heading;
       tofuM.animate(time, tsp, d < 6);
+    }
+    // Booth Tofu outside Eat Prey Nap: tracks the mouse across the display and leaps to pounce.
+    {
+      const ms = catSim.getMouseState();
+      const dBooth = Math.hypot(dog.x - boothTofu.x, dog.z - boothTofu.z);
+      const padBaseY = GROUND_Y + 0.06;
+      const targetX = catFocus
+        ? level.catScreen.x - 1.55
+        : level.catScreen.x + ((ms.visible ? ms.u : 0.5 + Math.sin(time * 0.7) * 0.22) - 0.5) * level.catScreen.w * 0.65;
+      const dxB = targetX - boothTofu.x;
+      boothTofu.x += dxB * Math.min(1, dt * (ms.state === 'dart' ? 7 : 3.4));
+      boothTofu.speed = Math.abs(dxB) * 2.5;
+      if (catFocus) {
+        boothTofu.z = lerp(boothTofu.z, level.boothTofuAnchor.z + 0.35, Math.min(1, dt * 4));
+      } else {
+        boothTofu.z = lerp(boothTofu.z, level.boothTofuAnchor.z - (boothTofu.jumpY > 0 ? 0.22 : 0), Math.min(1, dt * 4));
+      }
+      const lookX = catFocus ? level.catScreen.x : targetX;
+      boothTofu.heading = angLerp(boothTofu.heading, Math.atan2(level.catScreen.z - boothTofu.z, lookX - boothTofu.x), dt * 6);
+      boothTofu.pounceCooldown -= dt;
+      if (!catFocus && boothTofu.jumpY <= 0 && boothTofu.pounceCooldown <= 0 && (ms.state === 'creep' || ms.state === 'freeze' || ms.state === 'dart')) {
+        boothTofu.vy = clamp(2.3 + (1 - ms.v) * 2.4, 2.3, 4.4);
+        boothTofu.pounceCooldown = 1.7 + Math.random() * 1.4;
+        boothTofu.swatted = false;
+      }
+      if (boothTofu.jumpY > 0 || boothTofu.vy > 0) {
+        boothTofu.jumpY += boothTofu.vy * dt;
+        boothTofu.vy -= 14 * dt;
+        if (!boothTofu.swatted && boothTofu.vy < 0.7 && boothTofu.jumpY > 0.22) {
+          boothTofu.swatted = true;
+          const res = catSim.pawAt(ms.u + (Math.random() - 0.5) * 0.14, ms.v + (Math.random() - 0.5) * 0.14, true);
+          if (res === 'catch' && dBooth < 8 && !hud.hasBubble('booth-tofu')) hud.say('booth-tofu', 'Gotcha!', 1.1, 'win');
+          if (dBooth < 9 && Math.random() < 0.35) audio.meow({ x: boothTofu.x, z: boothTofu.z });
+        }
+        if (boothTofu.jumpY <= 0) { boothTofu.jumpY = 0; boothTofu.vy = 0; }
+      }
+      if (!catFocus && dBooth < 4.5 && !hud.hasBubble('booth-tofu') && Math.random() < dt * 0.35) {
+        hud.say('booth-tofu', pickOne(['Mrrp!', 'Pounce!', '…']), 1.1);
+      }
+      boothTofuM.group.position.set(boothTofu.x, padBaseY + boothTofu.jumpY, boothTofu.z);
+      boothTofuM.group.rotation.y = -boothTofu.heading;
+      boothTofuM.animate(time, boothTofu.jumpY > 0.05 ? 4 : boothTofu.speed, ms.state === 'creep' || ms.state === 'dart' || dBooth < 6);
     }
     // The selfie mural: your human can't resist.
     if (!quest.selfie && Math.hypot(human.x - Q.mural.x, human.z - Q.mural.z) < 4 && human.state === 'walk' && !offLeash) {
@@ -2294,13 +2525,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const prompts: { key: string; label: string }[] = [];
     let banner: string | null = null;
     if (coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
+    else if (catFocus) { banner = 'Eat Prey Nap — click/tap screen to pounce, [P] palette, [S] size, [X] step back'; }
+    else if (podOpen) { banner = 'dopepod — Space play/pause, arrows skip, [X] close'; }
     else if (nearCoriolis()) { prompts.push({ key: 'X', label: 'Play the LED wall' }); }
+    else if (nearCatBooth()) { prompts.push({ key: 'X', label: 'Play Eat Prey Nap' }); }
+    else if (nearPodBooth()) { prompts.push({ key: 'X', label: 'Open dopepod' }); }
     else if (nearStemma()) { prompts.push({ key: 'X', label: stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
-    if (found && !coriolisFocus) {
+    if (found && !coriolisFocus && !catFocus && !podOpen) {
       prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro to 2D street' : `Visit ${found.label}` });
       banner = banner ?? `${found.label} · ${found.kind}`;
     }
-    if (!coriolisFocus && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
+    if (!coriolisFocus && !catFocus && !podOpen && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
     if (!dog.carrying && ((!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) || (!questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9))) prompts.push({ key: 'G', label: 'Pick up' });
     { const pl = plaza.prompt(); if (pl) prompts.push({ key: 'G', label: pl }); }
     { const hl = hill.prompt(); if (hl) prompts.push(hl); }
@@ -2459,6 +2694,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     place('dog', dog.x, dog.y + 1.1, dog.z);
     place('kid', Q.kid.x, Q.kid.y + 1.4, Q.kid.z);
     place('tofu', tofu.x, GROUND_Y + 0.7, tofu.z);
+    place('booth-tofu', boothTofu.x, GROUND_Y + 0.72 + boothTofu.jumpY, boothTofu.z);
     for (const dv of devils) place(dv.id, dv.x, GROUND_Y + 2.3, dv.z);
     for (const bd of beachDevils) place(bd.id, bd.x, level.floor(bd.x, bd.z, 0) + 2.3, bd.z);
     place('grocer', Q.grocer.x, RAMBLA_Y + 2.1, Q.grocer.z);
@@ -2480,14 +2716,34 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const segDir = new THREE.Vector3();
   let followYaw = -Math.PI / 2;
 
+  const frameBooth = (sx: number, sy: number, sz: number, spanW: number, minBack = 5.8) => {
+    const vw = host.clientWidth || 1;
+    const vh = host.clientHeight || 1;
+    const aspect = vw / vh;
+    const portrait = vh > vw * 1.05;
+    const compact = vw < 760 || vh < 520;
+    const halfTanY = Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5);
+    const needZ = (spanW * 0.5) / (halfTanY * Math.max(0.32, aspect));
+    const back = Math.max(minBack, needZ * (compact ? 1.12 : 1.0));
+    const visH = 2 * back * halfTanY;
+    const lookDrop = portrait ? visH * 0.16 : compact ? visH * 0.13 : 0;
+    camWantPos.set(sx, Math.max(GROUND_Y + 1.25, sy + (compact ? 0.3 : 0)), sz + back);
+    camWantLook.copy(wallTarget.set(sx, sy - lookDrop, sz));
+    camYaw = 0;
+    return 5;
+  };
+
   const updateCamera = (dt: number, inTunnel: boolean) => {
     camTargetV.set(dog.x, dog.y, dog.z);
     let rate = 4;
     if (coriolisFocus) {
-      camWantPos.set(level.coriolis.x, level.coriolis.y, level.coriolis.z + 6.4);
-      camWantLook.copy(wallTarget.set(level.coriolis.x, level.coriolis.y, level.coriolis.z));
-      camYaw = 0;
-      rate = 5;
+      rate = frameBooth(level.coriolis.x, level.coriolis.y, level.coriolis.z, 4.7, 6.4);
+    } else if (catFocus) {
+      rate = frameBooth(level.catScreen.x, level.catScreen.y, level.catScreen.z, 4.4, 5.4);
+    } else if (podOpen) {
+      rate = frameBooth(level.dopepod.x - 1.0, GROUND_Y + 1.5, level.dopepod.z - 1.5, 4.4, 5.8);
+    } else if (stemmaOpen) {
+      rate = frameBooth(level.stemma.x - 1.2, GROUND_Y + 1.5, level.stemma.z - 1.5, 4.6, 5.8);
     } else if (camMode === 'follow') {
       if (held.has('BracketLeft')) orbitBy(-dt * 1.8);
       if (held.has('BracketRight')) orbitBy(dt * 1.8);
@@ -2668,6 +2924,27 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get bones() { return bones; },
       get chase() { return chase; },
       debug,
+      booths: {
+        get coriolisFocus() { return coriolisFocus; },
+        get stemmaOpen() { return stemmaOpen; },
+        get catFocus() { return catFocus; },
+        get podOpen() { return podOpen; },
+        get boothTofu() { return { ...boothTofu }; },
+        cat: catSim,
+        pod: podSim,
+        open: (id: 'coriolis' | 'stemma' | 'eat-prey-nap' | 'dopepod' | null) => {
+          closeOtherBooths();
+          if (id === 'coriolis') toggleCoriolis();
+          else if (id === 'stemma') setStemma(true);
+          else if (id === 'eat-prey-nap') setCat(true);
+          else if (id === 'dopepod') setPod(true);
+          else syncPanels();
+        },
+        pounce: (u?: number, v?: number) => {
+          const ms = catSim.getMouseState();
+          return triggerCatPounce(u ?? ms.u, v ?? ms.v);
+        },
+      },
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },

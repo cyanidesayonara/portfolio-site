@@ -51,6 +51,8 @@
       ],
       "blocks": [],
       "pavilions": [
+        { "id": "dopepod", "title": "dopepod", "sub": "Podcasts · X", "href": "/projects/dopepod", "color": "#d94ca6", "x": -72, "w": 10, "z0": -19.4, "z1": -12.4, "dark": true },
+        { "id": "eat-prey-nap", "title": "Eat Prey Nap", "sub": "Cat game · X", "href": "/projects/eat-prey-nap", "color": "#f0c44d", "x": -57, "w": 10, "z0": -19.4, "z1": -12.4 },
         { "id": "leash", "title": "Path of Leash Resistance", "sub": "Game", "href": "/projects/path-of-leash-resistance", "color": "#ffb020", "x": -31, "w": 12, "z0": -19.4, "z1": -12.4 },
         { "id": "stemma", "title": "stemma", "sub": "Music studio", "href": "/projects/stemma", "color": "#1fc9b7", "x": -14, "w": 10, "z0": -19.4, "z1": -12.4 },
         { "id": "coriolis", "title": "Coriolis", "sub": "LED gallery", "href": "/projects/coriolis", "color": "#5eea8c", "x": 13.5, "w": 10, "z0": -19.4, "z1": -12.4, "dark": true },

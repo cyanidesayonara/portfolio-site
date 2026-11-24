@@ -140,7 +140,10 @@ function ground(x0: number, x1: number, z0: number, z1: number, y: number, mat: 
 
 const TOWN_Z0 = 33.5;
 
-export interface LevelOpts { coriolisTex: THREE.Texture }
+export interface LevelOpts {
+  coriolisTex: THREE.Texture;
+  boothScreens?: Record<string, THREE.Texture>;
+}
 
 /**
  * Build the level in steps (a generator): it yields between sections so the
@@ -626,7 +629,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // Fingerposts at both ends of the underpass: the way to the projects, the beach and town.
   const W_ = Math.PI, E_ = 0, SEA = -Math.PI / 2, LAND = Math.PI / 2;
   place(makeFingerpost([
-    { title: 'Projects', sub: 'Leash game · stemma', color: '#ffb020', angle: W_ },
+    { title: 'Projects', sub: 'dopepod · Cat · Leash · stemma', color: '#ffb020', angle: W_ },
     { title: 'Projects', sub: 'Coriolis · About · Blog', color: '#1fc9b7', angle: E_ },
     { title: 'Platja', sub: 'Beach · old pier', color: '#3d73c7', angle: SEA - 0.75 },
   ]), -4.3, GROUND_Y, -3.4);
@@ -760,6 +763,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const seafrontLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'seafront')!;
   const pavilions = seafrontLayout.pavilions;
   const PZ0 = pavilions[0].z0, PZ1 = pavilions[0].z1;
+  let catScreenMesh: THREE.Mesh | null = null;
+  let catScreenPos = { x: -58.2, y: GROUND_Y + 1.38, z: PZ1 + 0.13, w: 3.84, h: 2.4 };
   for (const p of pavilions) {
     const g = new THREE.Group();
     const accent = parseInt(p.color.slice(1), 16);
@@ -784,6 +789,25 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       const glass = box(p.w * 0.66, 2.6, 0.06, shopGlassMat);
       glass.position.set(-p.w * 0.12, 1.45, (PZ1 - PZ0) / 2 + 0.04);
       g.add(glass);
+      const bTex = opts.boothScreens?.[p.id];
+      if (bTex) {
+        const sw = p.id === 'stemma' ? 3.04 : p.id === 'eat-prey-nap' ? 3.84 : p.id === 'blog' ? 3.2 : 3.52;
+        const sh = sw / 1.6;
+        const sx = p.id === 'stemma' ? -0.3 : -p.w * 0.12;
+        const sy = p.id === 'eat-prey-nap' ? 1.38 : 1.5;
+        const sz = (PZ1 - PZ0) / 2 + 0.11;
+        const scrFrame = box(sw + 0.16, sh + 0.16, 0.05, M(0x0b1224, 0.45, 0.35));
+        scrFrame.position.set(sx, sy, sz - 0.025);
+        g.add(scrFrame);
+        const scr = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), new THREE.MeshBasicMaterial({ map: bTex }));
+        scr.position.set(sx, sy, sz + 0.01);
+        scr.name = `booth-${p.id}`;
+        g.add(scr);
+        if (p.id === 'eat-prey-nap') {
+          catScreenMesh = scr;
+          catScreenPos = { x: p.x + sx, y: GROUND_Y + sy, z: (PZ0 + PZ1) / 2 + sz + 0.01, w: sw, h: sh };
+        }
+      }
       const door = box(1.2, 2.5, 0.06, M(accent, 0.55));
       door.position.set(p.w * 0.34, 1.3, (PZ1 - PZ0) / 2 + 0.04);
       g.add(door);
@@ -804,6 +828,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // Blog: racks of magazines out front.
   place(makeKiosk(0xe5487a), 40, GROUND_Y, -10.6, 0);
   boxes.push({ x0: 38.7, x1: 41.3, z0: -11.5, z1: -9.7, top: GROUND_Y + 2.8, kind: 'kiosk' });
+  // Eat Prey Nap: low straw-yellow play cushion outside for booth Tofu.
+  const eatPav = pavilions.find((p) => p.id === 'eat-prey-nap')!;
+  const tofuPad = cyl(0.62, 0.68, 0.07, M(0xe3d39d, 0.9), 18);
+  tofuPad.position.set(eatPav.x - 1.2, GROUND_Y + 0.035, PZ1 + 1.1);
+  root.add(tofuPad);
+  // dopepod: warm studio monitor speaker & broadcast mic stand out front.
+  const podPav = pavilions.find((p) => p.id === 'dopepod')!;
+  const podSpk = box(0.58, 0.98, 0.48, M(0x161b29, 0.55));
+  podSpk.position.set(podPav.x - 4.2, GROUND_Y + 0.49, PZ1 + 0.72);
+  root.add(podSpk);
+  const podWoofer = cyl(0.18, 0.18, 0.04, M(0xd94ca6, 0.4), 14);
+  podWoofer.rotation.x = Math.PI / 2;
+  podWoofer.position.set(podPav.x - 4.2, GROUND_Y + 0.58, PZ1 + 0.98);
+  root.add(podWoofer);
+  boxes.push({ x0: podPav.x - 4.5, x1: podPav.x - 3.9, z0: PZ1 + 0.45, z1: PZ1 + 1.0, top: GROUND_Y + 0.98, kind: 'speaker' });
+  const micStand = cyl(0.03, 0.04, 1.35, ironM, 8);
+  micStand.position.set(podPav.x + 2.0, GROUND_Y + 0.68, PZ1 + 0.75);
+  root.add(micStand);
+  const micHead = cyl(0.07, 0.06, 0.16, M(0xd94ca6, 0.35, 0.6), 10);
+  micHead.position.set(podPav.x + 2.0, GROUND_Y + 1.4, PZ1 + 0.75);
+  root.add(micHead);
   // Coriolis: the LED wall on the pavilion's front, facing the promenade.
   const cor = pavilions.find((p) => p.id === 'coriolis')!;
   const wallX = cor.x, wallY = GROUND_Y + 2.3, wallZ = PZ1 + 0.05;
@@ -821,8 +866,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const stemmaBars: THREE.Mesh[] = [];
   const barCols = [0xe5487a, 0xffb020, 0x1fc9b7, 0x8bcb3c];
   for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.08), new THREE.MeshStandardMaterial({ color: barCols[i], emissive: barCols[i], emissiveIntensity: 1 }));
-    m.position.set(stem.x - 3.6 + i * 0.75, GROUND_Y + 0.6, PZ1 + 0.1);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1, 0.08), new THREE.MeshStandardMaterial({ color: barCols[i], emissive: barCols[i], emissiveIntensity: 1 }));
+    m.position.set(stem.x - 3.65 + i * 0.42, GROUND_Y + 0.6, PZ1 + 0.12);
     m.scale.y = 0.2;
     m.userData.dynamic = true;
     root.add(m);
@@ -1246,6 +1291,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     // Along the pavilion fronts (not through them), clear of the blog kiosk and the pier.
     [[-8, -10.9], [14, -11], [36, -10.9]],
     [[-44, -10.9], [-32, -11], [-20.5, -10.9]],
+    [[-80, -10.7], [-66, -10.7], [-53, -10.7]],
     [[-80, -54], [0, -55], [80, -54]],
     [[-48, -12], [-48, -60], [-48, -126]],
     ...PLAZA.pedPaths,
@@ -1264,6 +1310,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     beacon: beacon.lamp,
     coriolis: { x: wallX, y: wallY, z: wallZ, screen },
     stemma: { x: stem.x, z: PZ1 + 1.6 },
+    catScreen: { ...catScreenPos, mesh: catScreenMesh, viewX: eatPav.x - 1.2, viewZ: PZ1 + 1.6 },
+    boothTofuAnchor: { x: eatPav.x - 1.2, z: PZ1 + 1.1 },
+    dopepod: { x: podPav.x, z: PZ1 + 1.6 },
     stemmaBars,
     underpassLight,
     tunnel: { x0: -CUT.tunnelX, x1: CUT.tunnelX, z0: CUT.sea0, z1: CUT.rambla1, cutZ0: CUT.sea1, cutZ1: CUT.rambla0, floor: CUT.floor },

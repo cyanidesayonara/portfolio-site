@@ -209,6 +209,9 @@ export interface UiDictionary {
     fullscreenTitle: string;
     controlsAria: string;
     stopsAria: string;
+    tryBooth: string;
+    closeBooth: string;
+    openPage: string;
     stops: StopSpec[];
     keys: KeySpec[];
   };
@@ -257,6 +260,20 @@ export interface UiDictionary {
     touchBark: string;
     touchDig: string;
     touchMark: string;
+    catAria: string;
+    catSub: string;
+    catCloseAria: string;
+    catPalette: string;
+    catSize: string;
+    catWatch: string;
+    catPounce: string;
+    catCatches: string;
+    podAria: string;
+    podSub: string;
+    podCloseAria: string;
+    podPlay: string;
+    podPrev: string;
+    podNext: string;
     controlsAria: string;
     keys: KeySpec[];
   };
@@ -515,7 +532,12 @@ export const UI: Record<Locale, UiDictionary> = {
       fullscreenTitle: 'Real fullscreen',
       controlsAria: 'Controls',
       stopsAria: 'Stops on the street',
+      tryBooth: 'Try',
+      closeBooth: 'Close',
+      openPage: 'Project page',
       stops: [
+        { id: 'dopepod', label: 'dopepod', short: 'dopepod', kind: 'Podcasts', path: '/projects/dopepod', color: '#d94ca6', ink: '#f4f1ea' },
+        { id: 'eat-prey-nap', label: 'Eat Prey Nap', short: 'Eat Prey Nap', kind: 'Cat game', path: '/projects/eat-prey-nap', color: '#f0c44d', ink: '#0b1430' },
         { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Game', path: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
         { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'Music app', path: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
         { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'LED wall', path: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
@@ -534,6 +556,7 @@ export const UI: Record<Locale, UiDictionary> = {
         { keys: ['F'], label: 'Squat' },
         { keys: ['G'], label: 'Pick up' },
         { keys: ['E'], label: 'Bark' },
+        { keys: ['X'], label: 'Try booth' },
         { keys: ['Enter'], label: 'Go in' },
         { keys: ['Tab'], label: 'Goals' },
         { keys: ['R'], label: 'Restart' },
@@ -586,6 +609,20 @@ export const UI: Record<Locale, UiDictionary> = {
       touchBark: 'Bark',
       touchDig: 'Dig',
       touchMark: 'Mark',
+      catAria: 'Eat Prey Nap booth controls',
+      catSub: 'Tap the booth screen to pounce, or tune colors & size.',
+      catCloseAria: 'Step back from Eat Prey Nap',
+      catPalette: 'Palette',
+      catSize: 'Mouse',
+      catWatch: 'Watch only',
+      catPounce: 'Pounce!',
+      catCatches: 'Catches',
+      podAria: 'dopepod booth controls',
+      podSub: 'Switch podcast shows or skip episodes.',
+      podCloseAria: 'Close dopepod',
+      podPlay: 'Play',
+      podPrev: 'Prev',
+      podNext: 'Next',
       controlsAria: 'Controls',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
@@ -860,7 +897,12 @@ export const UI: Record<Locale, UiDictionary> = {
       fullscreenTitle: 'Pantalla completa real',
       controlsAria: 'Controles',
       stopsAria: 'Paradas de la calle',
+      tryBooth: 'Probar',
+      closeBooth: 'Cerrar',
+      openPage: 'Ficha',
       stops: [
+        { id: 'dopepod', label: 'dopepod', short: 'dopepod', kind: 'Podcasts', path: '/projects/dopepod', color: '#d94ca6', ink: '#f4f1ea' },
+        { id: 'eat-prey-nap', label: 'Eat Prey Nap', short: 'Eat Prey Nap', kind: 'Juego gato', path: '/projects/eat-prey-nap', color: '#f0c44d', ink: '#0b1430' },
         { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Juego', path: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
         { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'App de música', path: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
         { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'Mural LED', path: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
@@ -879,6 +921,7 @@ export const UI: Record<Locale, UiDictionary> = {
         { keys: ['F'], label: 'Agacharse' },
         { keys: ['G'], label: 'Recoger' },
         { keys: ['E'], label: 'Ladrar' },
+        { keys: ['X'], label: 'Probar local' },
         { keys: ['Enter'], label: 'Entrar' },
         { keys: ['Tab'], label: 'Objetivos' },
         { keys: ['R'], label: 'Reiniciar' },
@@ -931,6 +974,20 @@ export const UI: Record<Locale, UiDictionary> = {
       touchBark: 'Ladrar',
       touchDig: 'Cavar',
       touchMark: 'Marcar',
+      catAria: 'Controles de Eat Prey Nap',
+      catSub: 'Toca la pantalla para saltar o ajusta colores y tamaño.',
+      catCloseAria: 'Apartarse de Eat Prey Nap',
+      catPalette: 'Paleta',
+      catSize: 'Ratón',
+      catWatch: 'Solo mirar',
+      catPounce: 'Saltar',
+      catCatches: 'Capturas',
+      podAria: 'Controles de dopepod',
+      podSub: 'Cambia de podcast o salta entre episodios.',
+      podCloseAria: 'Cerrar dopepod',
+      podPlay: 'Reproducir',
+      podPrev: 'Anterior',
+      podNext: 'Siguiente',
       controlsAria: 'Controles',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Mover' },
@@ -1205,7 +1262,12 @@ export const UI: Record<Locale, UiDictionary> = {
       fullscreenTitle: 'Pantalla completa real',
       controlsAria: 'Controls',
       stopsAria: 'Parades del carrer',
+      tryBooth: 'Prova',
+      closeBooth: 'Tanca',
+      openPage: 'Fitxa',
       stops: [
+        { id: 'dopepod', label: 'dopepod', short: 'dopepod', kind: 'Podcasts', path: '/projects/dopepod', color: '#d94ca6', ink: '#f4f1ea' },
+        { id: 'eat-prey-nap', label: 'Eat Prey Nap', short: 'Eat Prey Nap', kind: 'Joc de gat', path: '/projects/eat-prey-nap', color: '#f0c44d', ink: '#0b1430' },
         { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Joc', path: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
         { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'App de música', path: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
         { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'Mural LED', path: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
@@ -1224,6 +1286,7 @@ export const UI: Record<Locale, UiDictionary> = {
         { keys: ['F'], label: 'Ajup-te' },
         { keys: ['G'], label: 'Recull' },
         { keys: ['E'], label: 'Borda' },
+        { keys: ['X'], label: 'Prova parada' },
         { keys: ['Enter'], label: 'Entra' },
         { keys: ['Tab'], label: 'Objectius' },
         { keys: ['R'], label: 'Reinicia' },
@@ -1276,6 +1339,20 @@ export const UI: Record<Locale, UiDictionary> = {
       touchBark: 'Borda',
       touchDig: 'Cava',
       touchMark: 'Marca',
+      catAria: 'Controls d’Eat Prey Nap',
+      catSub: 'Toca la pantalla per saltar o ajusta colors i mida.',
+      catCloseAria: 'Aparta’t d’Eat Prey Nap',
+      catPalette: 'Paleta',
+      catSize: 'Ratolí',
+      catWatch: 'Només mirar',
+      catPounce: 'Salta!',
+      catCatches: 'Captures',
+      podAria: 'Controls de dopepod',
+      podSub: 'Canvia de podcast o salta entre episodis.',
+      podCloseAria: 'Tanca dopepod',
+      podPlay: 'Reprodueix',
+      podPrev: 'Anterior',
+      podNext: 'Següent',
       controlsAria: 'Controls',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Mou-te' },

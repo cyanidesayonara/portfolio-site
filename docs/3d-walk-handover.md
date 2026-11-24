@@ -17,7 +17,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 - **Node:** 22.23.4 or newer. On this Windows machine, use `npx.cmd -y node@22.23.5 node_modules/astro/bin/astro.mjs check` and `... build`.
 - **Preview:** `.claude/launch.json` runs `astro preview` on port 4321. Rebuild `dist/` to see changes, then reload `http://127.0.0.1:4321/walk?walktest`.
 - **`?walktest`** adds a perf readout (fps, worst frame, draw calls, triangles, geometries, build time, district, streaming slice time) and `window.__walk`:
-  - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`, `dogSwimming`, `humanSwimming`.
+  - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`, `dogSwimming`, `humanSwimming`, `booths`.
   - **Driving the game:** `key(code, down)`, `tick(frames)` (runs fixed 60 Hz updates and renders), `teleport(x, z)` (also snaps the camera), `collide(p, r, y)`.
   - **`camera` + `render()`:** aim the camera by hand and render one frame (then `canvas.gl.toDataURL()` in the same task) to inspect distant scenery.
   - **`plaza`:** the Plaça del Mercat runtime (`plazaLife.ts`): `quests()`, `chasing()`, and `debug` (`butcher`, `boti`, `fris`, `paper`, `pigeons`).
@@ -102,6 +102,10 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
   - **Leash whirl direction:** `Leash.poleWinding()` and contact-aware `ends()` (`leash.ts`) pair with `-Math.sign(coil)` unwinding in `startWhirl()` and active-whirl gating on `WhirlDetector` (`game3d.ts`) so the human always unwinds around the pole instead of spinning into tighter wraps.
   - **Saved progress:** `walk3d-progress-v1` (`progress.ts`) persists completed quest, find, hurdle, stray cat, and Home finish keys (`done[]`, compatible with older v1 saves) so repeated favors and the Home door bones cannot be double-counted after reload.
   - **Plaça & hill polish:** added a market clock gable, east flower/produce stall and florist, terracotta planters, fountain/mirador/church-square seated locals, extra pedestrian loops, church threshold and gable cross; wired plaza and hilltop pigeons to the `birds` goal (`plazaLife.ts`, `hillLife.ts`); and raised hillside retaining/cheek wall colliders (`terrain.ts`, `hill.ts`) to prevent jumping onto the grass bank behind the Museu.
+- **Done (booths, idling boardwalk screens, non-blocking mobile HUD & 8/16-bit 2D street):**
+  - **Boardwalk pavilions:** added `Eat Prey Nap` (`x: -57`) and `dopepod` (`x: -72`) pavilions to `data/seafront.json` and `level.ts`; mounted live idling screens across all boardwalk pavilions (`booths.ts`: `EatPreyNapSim`, `DopepodSim`, `createBoardwalkBoothScreens()`), alongside a booth Tofu (`makeTofu()`) at `level.boothTofuAnchor` who stalks and leaps at the mouse on screen and raycast screen clicks.
+  - **Non-blocking mobile booth controllers:** opening any booth (`Coriolis`, `stemma`, `Eat Prey Nap`, `dopepod`) toggles `.panel-open` on the stage (hiding overlapping `.touch`, `.toolbar`, `.prompts`, and `.minimap` layers), docks panels as compact bottom drawers on small viewports, and frames the 3D screen above the drawer via `frameBooth()` camera pull + look offset (`Walk3D.astro`, `game3d.ts`).
+  - **2D street retro polish:** added `dopepod` and `eat-prey-nap` stops (`ui.ts`), dark CRT bezels (`world.ts`), live 8/16-bit shop-window animations plus a pouncing pixel Tofu outside `Eat Prey Nap`, and a compact pixelated mini-booth drawer (`X` / `TRY`) in `StreetMap.astro` and `street/game.ts`.
 
 - **Metro entrance (PR #6):** Santtu would like it deeper in town, where the real station is, once the level spreads out that far; fine where it is for now.
 

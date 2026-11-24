@@ -16,6 +16,10 @@ import {
 } from './world';
 import { StreetSound } from './audio';
 import { trackVisibleViewport } from '../viewport';
+import {
+  EatPreyNapSim, DopepodSim, CAT_PALETTES, CAT_SIZES,
+} from '../walk/booths';
+import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim';
 
 type P = { x: number; y: number };
 type Bubble = { text: string; ttl: number; who: P; lift: number; loud: boolean };
@@ -132,6 +136,174 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   window.addEventListener('pageshow', (e) => { if (e.persisted) boarding = null; });
   let arriving = 0;
   let arrivedBy: Ride = 'train';
+
+  // ---- Retro 8/16-bit mini-booth drawer & animated shopfront sims --------------------
+  type RetroBoothId = 'eat-prey-nap' | 'dopepod' | 'coriolis' | 'stemma';
+  const isRetroId = (id: string): id is RetroBoothId =>
+    id === 'eat-prey-nap' || id === 'dopepod' || id === 'coriolis' || id === 'stemma';
+  const eatSim = new EatPreyNapSim({ width: 160, height: 100, pixelated: true });
+  const podSim = new DopepodSim({ width: 160, height: 100, pixelated: true });
+  const coriolis = new CoriolisSimulator('coriolis');
+  const cCor = document.createElement('canvas');
+  cCor.width = cCor.height = 128;
+  const cCorCtx = cCor.getContext('2d')!;
+  const stemMuted = { vox: false, drums: false, bass: false, keys: false };
+  const streetTofu = { offX: 0, hop: 0, vy: 0, cd: 1.2 };
+  let retroOpen: RetroBoothId | null = null;
+  let retroClock = 0;
+
+  const rbEl = fig.querySelector<HTMLElement>('[data-retro-booth]');
+  const rbTitle = fig.querySelector<HTMLElement>('[data-retro-title]');
+  const rbLink = fig.querySelector<HTMLAnchorElement>('[data-retro-link]');
+  const rbCanvas = fig.querySelector<HTMLCanvasElement>('[data-retro-canvas]');
+  const rbCtrl = fig.querySelector<HTMLElement>('[data-retro-controls]');
+  const rbCtx = rbCanvas?.getContext('2d') ?? null;
+
+  const syncRetroControls = () => {
+    if (!rbCtrl || !retroOpen) return;
+    const stat = rbCtrl.querySelector<HTMLElement>('[data-rb-stat]');
+    if (retroOpen === 'eat-prey-nap') {
+      const ms = eatSim.getMouseState();
+      const palB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="pal"]');
+      const sizeB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="size"]');
+      const watchB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="watch"]');
+      if (palB) palB.textContent = `Pal: ${CAT_PALETTES[ms.palette].name}`;
+      if (sizeB) sizeB.textContent = CAT_SIZES[ms.size].label;
+      watchB?.setAttribute('aria-pressed', String(ms.watchOnly));
+      if (stat) stat.textContent = `Catches: ${ms.catches} · Tap screen to pounce`;
+    } else if (retroOpen === 'dopepod') {
+      const st = podSim.getState();
+      const playB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="play"]');
+      if (playB) {
+        playB.textContent = st.playing ? 'Pause' : 'Play';
+        playB.setAttribute('aria-pressed', String(st.playing));
+      }
+      rbCtrl.querySelectorAll<HTMLButtonElement>('[data-rb^="show-"]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.rb!.slice(5)) === st.showIdx));
+      });
+      if (stat) stat.textContent = `${st.showName} · ${st.episodeTitle}`;
+    } else if (retroOpen === 'stemma') {
+      (['vox', 'drums', 'bass', 'keys'] as const).forEach((k) => {
+        rbCtrl.querySelector<HTMLButtonElement>(`[data-rb="stem-${k}"]`)?.setAttribute('aria-pressed', String(!stemMuted[k]));
+      });
+      const sndB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="sound"]');
+      if (sndB) {
+        sndB.textContent = wantSound ? 'Sound: ON' : 'Sound: OFF';
+        sndB.setAttribute('aria-pressed', String(wantSound));
+      }
+      if (stat) stat.textContent = '8-bit 4-stem deck · click lanes to mute';
+    }
+    renderRetroDrawer();
+  };
+
+  const closeRetroBooth = () => {
+    if (!retroOpen) return;
+    retroOpen = null;
+    coriolis.clearHeld();
+    if (rbEl) rbEl.hidden = true;
+    sayCaption();
+  };
+
+  const openRetroBooth = (id: RetroBoothId) => {
+    retroOpen = id;
+    held.clear();
+    target = null;
+    const stopObj = stops.find((s) => s.id === id);
+    if (rbTitle) rbTitle.textContent = stopObj?.label ?? id;
+    if (rbLink) rbLink.href = links.get(id)?.getAttribute('href') ?? stopObj?.href ?? '#';
+    if (rbCtrl) {
+      if (id === 'eat-prey-nap') {
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="pal">Pal</button>`,
+          `<button type="button" data-rb="size">40 mm</button>`,
+          `<button type="button" data-rb="watch" aria-pressed="false">Watch</button>`,
+          `<button type="button" data-rb="pounce">Pounce</button>`,
+          `<span class="rb-stat" data-rb-stat></span>`,
+        ].join('');
+      } else if (id === 'dopepod') {
+        const showBtns = ['Devcast', 'HUB75', 'stemma', 'Cat']
+          .map((lbl, i) => `<button type="button" data-rb="show-${i}">${lbl}</button>`)
+          .join('');
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="prev">&lt;</button>`,
+          `<button type="button" data-rb="play">Play</button>`,
+          `<button type="button" data-rb="next">&gt;</button>`,
+          showBtns,
+          `<span class="rb-stat" data-rb-stat></span>`,
+        ].join('');
+      } else if (id === 'coriolis') {
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="key-Up">Up</button>`,
+          `<button type="button" data-rb="key-Left">Left</button>`,
+          `<button type="button" data-rb="key-Select">OK</button>`,
+          `<button type="button" data-rb="key-Right">Right</button>`,
+          `<button type="button" data-rb="key-Down">Down</button>`,
+          `<button type="button" data-rb="cmd-Menu">Menu</button>`,
+          `<button type="button" data-rb="cmd-Next">Next</button>`,
+          `<button type="button" data-rb="key-Back">Back</button>`,
+        ].join('');
+      } else {
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="stem-vox" aria-pressed="true">Vox</button>`,
+          `<button type="button" data-rb="stem-drums" aria-pressed="true">Drums</button>`,
+          `<button type="button" data-rb="stem-bass" aria-pressed="true">Bass</button>`,
+          `<button type="button" data-rb="stem-keys" aria-pressed="true">Keys</button>`,
+          `<button type="button" data-rb="sound">Sound</button>`,
+          `<span class="rb-stat" data-rb-stat></span>`,
+        ].join('');
+      }
+    }
+    if (rbEl) rbEl.hidden = false;
+    syncRetroControls();
+    sayCaption();
+  };
+
+  rbEl?.querySelector<HTMLButtonElement>('[data-retro-close]')?.addEventListener('click', () => {
+    closeRetroBooth();
+    fig.focus({ preventScroll: true });
+  });
+  rbCtrl?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-rb]');
+    if (!btn || !retroOpen) return;
+    const act = btn.dataset.rb!;
+    const nowMs = performance.now();
+    if (act === 'pal') { eatSim.cyclePalette(); sound.pickup(); }
+    else if (act === 'size') { eatSim.cycleSize(); sound.pickup(); }
+    else if (act === 'watch') { eatSim.toggleWatchOnly(); sound.hey(); }
+    else if (act === 'pounce') {
+      const ms = eatSim.getMouseState();
+      if (eatSim.pawAt(ms.u, ms.v) === 'catch') sound.pickup(); else sound.hey();
+    } else if (act === 'play') { podSim.togglePlay(); sound.pickup(); }
+    else if (act === 'prev') { podSim.prevEpisode(); sound.hey(); }
+    else if (act === 'next') { podSim.nextEpisode(); sound.hey(); }
+    else if (act.startsWith('show-')) { podSim.selectShow(Number(act.slice(5))); sound.pickup(); }
+    else if (act.startsWith('key-')) {
+      const k = act.slice(4) as SimKey;
+      coriolis.setHeld(k, true);
+      coriolis.key(k, nowMs);
+      setTimeout(() => coriolis.setHeld(k, false), 110);
+      sound.hey();
+    } else if (act.startsWith('cmd-')) {
+      coriolis.command(act.slice(4) as SimCommand, nowMs);
+      sound.pickup();
+    } else if (act.startsWith('stem-')) {
+      const k = act.slice(5) as keyof typeof stemMuted;
+      stemMuted[k] = !stemMuted[k];
+      sound.hey();
+    } else if (act === 'sound') {
+      setSound(!wantSound);
+    }
+    syncRetroControls();
+  });
+  rbCanvas?.addEventListener('pointerdown', (e) => {
+    if (retroOpen !== 'eat-prey-nap') return;
+    const rect = rbCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const pu = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const pv = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+    if (eatSim.pawAt(pu, pv) === 'catch') sound.pickup(); else sound.hey();
+    syncRetroControls();
+  });
 
   // ---- Sizing and the static layer ---------------------------------------------------
   let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0, offY = 0;
@@ -669,6 +841,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       return;
     }
     if (arriving > 0) arriving = Math.max(0, arriving - dt);
+    retroClock += dt;
+    eatSim.update(dt);
+    podSim.update(dt);
+    coriolis.tick(performance.now());
+    // Sidewalk pixel Tofu tracks the mouse inside Eat Prey Nap and hops playfully.
+    {
+      const ms = eatSim.getMouseState();
+      streetTofu.offX += ((ms.u - 0.5) * 44 - streetTofu.offX) * Math.min(1, dt * 4);
+      streetTofu.cd -= dt;
+      if (streetTofu.hop <= 0 && streetTofu.cd <= 0 && (ms.state === 'creep' || ms.state === 'dart')) {
+        streetTofu.vy = 78;
+        streetTofu.cd = 1.6 + Math.random() * 1.3;
+      }
+      if (streetTofu.hop > 0 || streetTofu.vy > 0) {
+        streetTofu.hop += streetTofu.vy * dt;
+        streetTofu.vy -= 260 * dt;
+        if (streetTofu.hop <= 0) { streetTofu.hop = 0; streetTofu.vy = 0; }
+      }
+    }
     updatePlayer(dt);
     updatePeds(dt);
     updatePigeons(dt);
@@ -705,6 +896,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (near && playing) {
       if (near.stop.id === 'station') text = coarse ? 'Tap GO IN or Estació again to board the train to 3D.' : 'Press Enter at Estació to board the train to the 3D walk.';
       else if (near.stop.id === 'metro') text = coarse ? 'Tap GO IN or the stairs again to take the metro to 3D.' : 'Press Enter at the stairs to take the metro to the 3D walk.';
+      else if (isRetroId(near.stop.id)) text = coarse ? `Tap TRY for the retro booth or GO IN for ${near.stop.label}.` : `Press X to try ${near.stop.label}, or Enter to open the project page.`;
       else text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
     } else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'Walk Millie up to a shop door to go in. Arrow keys work too.';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
@@ -1028,6 +1220,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (near) {
       if (near.stop.id === 'station') return coarse ? 'Tap GO IN: Board train to 3D' : 'Enter: ride train to 3D seafront';
       if (near.stop.id === 'metro') return coarse ? 'Tap GO IN: Metro down to 3D' : 'Enter: take the metro to 3D';
+      if (isRetroId(near.stop.id)) return coarse ? `TRY: ${near.stop.label} · GO IN: page` : `X: try ${near.stop.label} · Enter: go in`;
       return coarse ? `Tap GO IN or sign: ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
     }
     if (nearBone) return coarse ? 'GRAB: pick up the bone' : 'G: pick up the bone';
@@ -1140,9 +1333,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
 
     // Touch buttons
-    if (coarse) for (const b of buttons()) {
+    if (coarse && !retroOpen) for (const b of buttons()) {
       const on = (b.id === 'run' && touchSprint !== null) || (b.id === 'dig' && touchDig !== null) || (b.id === 'pee' && touchSquat !== null);
-      const accent = b.id === 'grab' || b.id === 'enter';
+      const accent = b.id === 'grab' || b.id === 'enter' || b.id === 'try';
       c.fillStyle = on ? '#8bcb3c' : accent ? 'rgba(255, 176, 32, 0.94)' : HUD_BG;
       c.beginPath();
       c.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -1153,7 +1346,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.fillStyle = on || accent ? '#0b1430' : '#f4f1ea';
       c.font = `800 9px ${FONT}`;
       c.textAlign = 'center';
-      const plain = b.id === 'bark' || b.id === 'dig' || b.id === 'enter';
+      const plain = b.id === 'bark' || b.id === 'dig' || b.id === 'enter' || b.id === 'try';
       c.fillText(b.label, b.x, b.y + (plain ? 0.5 : 8));
     }
     c.textAlign = 'left';
@@ -1169,7 +1362,14 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       { id: 'run', label: 'RUN', x: x(3), y, r },
     ];
     if (nearBone) list.push({ id: 'grab', label: 'GRAB', x: x(0), y: y - step, r });
-    if (near) list.push({ id: 'enter', label: 'GO IN', x: x(nearBone ? 1 : 0), y: y - step, r });
+    if (near) {
+      let col = nearBone ? 1 : 0;
+      list.push({ id: 'enter', label: 'GO IN', x: x(col), y: y - step, r });
+      if (isRetroId(near.stop.id)) {
+        const tryLbl = (fig.dataset.tryBooth ?? 'TRY').toUpperCase();
+        list.push({ id: 'try', label: tryLbl.slice(0, 5), x: x(col + 1), y: y - step, r });
+      }
+    }
     return list;
   }
 
@@ -1330,6 +1530,190 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.restore();
   }
 
+  function drawRetroDisplays(x0: number, x1: number) {
+    const t = retroClock;
+    c.save();
+    c.imageSmoothingEnabled = false;
+    const snap2 = (v: number) => Math.round(v / 2) * 2;
+    let corDrawn = false;
+    for (const l of world.stops) {
+      if (l.type !== 'shop' || l.x + l.w < x0 - 20 || l.x > x1 + 20) continue;
+      const id = l.stop.id;
+      const w1x = l.x + 18, w2x = l.x + l.w / 2 + 16, wy = 90, ww = l.w / 2 - 34, wh = 24;
+      if (id === 'eat-prey-nap') {
+        const ms = eatSim.getMouseState();
+        const pal = CAT_PALETTES[ms.palette];
+        c.fillStyle = pal.bg;
+        c.fillRect(w1x, wy, ww, wh);
+        c.fillStyle = pal.mound;
+        for (const [mx, my] of [[0.2, 0.72], [0.8, 0.3], [0.52, 0.22]]) {
+          c.fillRect(snap2(w1x + mx * (ww - 8)), snap2(wy + my * (wh - 4)), 6, 4);
+        }
+        if (ms.visible) {
+          c.fillStyle = pal.mouse;
+          c.fillRect(snap2(w1x + 4 + ms.u * (ww - 10)), snap2(wy + 3 + ms.v * (wh - 8)), 6, 4);
+        }
+        c.fillStyle = pal.bg;
+        c.fillRect(w2x, wy, ww, wh);
+        c.fillStyle = pal.mouse;
+        c.fillRect(w2x + 8, wy + 6, 10, 8);
+        c.fillRect(w2x + 8, wy + 16, 10, 4);
+        c.fillStyle = '#d9403a';
+        for (let k = 0; k < Math.min(4, ms.catches + 1); k++) c.fillRect(w2x + 24 + k * 8, wy + 10, 4, 4);
+
+        // 16-bit calico Tofu waiting on the pavement, eyes locked on the screen & hopping up.
+        const tx = snap2(l.x + 56 + streetTofu.offX);
+        const hopY = Math.round(streetTofu.hop * 0.4);
+        shadowAt(tx, FACADE + 5, 7, 3);
+        const ty = FACADE + 4 - hopY;
+        const wag = Math.sin(t * 7) * 3;
+        c.fillStyle = '#f6efe2';
+        c.fillRect(tx - 6, ty - 6, 12, 8);
+        c.fillStyle = '#d97236';
+        c.fillRect(tx - 5, ty - 5, 4, 4);
+        c.fillRect(tx - 6, ty - 8, 3, 3);
+        c.fillStyle = '#1b1d24';
+        c.fillRect(tx + 1, ty - 6, 4, 3);
+        c.fillRect(tx + 3, ty - 8, 3, 3);
+        c.fillStyle = '#b8e04c';
+        c.fillRect(tx - 3, ty - 4, 2, 2);
+        c.fillRect(tx + 1, ty - 4, 2, 2);
+        c.fillStyle = '#d97236';
+        c.fillRect(tx - 1, ty + 2, 2, 4);
+        c.fillStyle = '#1b1d24';
+        c.fillRect(snap2(tx - 1 + wag * 0.6), ty + 5, 2, 3);
+      } else if (id === 'dopepod') {
+        const st = podSim.getState();
+        c.fillStyle = '#0f162b';
+        c.fillRect(w1x, wy, ww, wh);
+        c.fillStyle = st.accent;
+        c.fillRect(w1x + 4, wy + 4, 16, 16);
+        c.fillStyle = '#14203d';
+        for (let b = 0; b < 4; b++) {
+          const bh = 4 + Math.round(Math.abs(Math.sin(t * (st.playing ? 7 : 2) + b * 1.1)) * 10);
+          c.fillRect(w1x + 6 + b * 3, wy + 20 - bh, 2, bh);
+        }
+        c.fillStyle = '#f4f1ea';
+        c.fillRect(w1x + 24, wy + 6, 30, 3);
+        c.fillStyle = st.accent;
+        c.fillRect(w1x + 24, wy + 13, 6 + Math.round(((t * 14) % 24)), 3);
+
+        c.fillStyle = '#0f162b';
+        c.fillRect(w2x, wy, ww, wh);
+        for (let r = 0; r < 3; r++) {
+          c.fillStyle = r === (st.episodeIdx % 3) ? st.accent : '#2a3860';
+          c.fillRect(w2x + 4, wy + 4 + r * 6, ww - 8, 4);
+        }
+      } else if (id === 'coriolis') {
+        if (!corDrawn) {
+          coriolis.renderToCanvas(cCorCtx, 1, 0);
+          corDrawn = true;
+        }
+        c.fillStyle = '#07090e';
+        c.fillRect(w1x, wy, ww, wh);
+        c.drawImage(cCor, 0, 0, 128, 128, w1x + Math.floor((ww - 24) / 2), wy, 24, 24);
+        c.fillStyle = '#07090e';
+        c.fillRect(w2x, wy, ww, wh);
+        for (let k = 0; k < 6; k++) {
+          const h = 4 + Math.round(Math.abs(Math.sin(t * 4 + k)) * 16);
+          c.fillStyle = k % 2 ? '#5eea8c' : '#1fc9b7';
+          c.fillRect(w2x + 6 + k * 8, wy + wh - 2 - h, 5, h);
+        }
+      } else if (id === 'stemma') {
+        const cols = ['#e5487a', '#ffb020', '#1fc9b7', '#8bcb3c'];
+        const keys = ['vox', 'drums', 'bass', 'keys'] as const;
+        for (const bx of [w1x, w2x]) {
+          c.fillStyle = '#0b1430';
+          c.fillRect(bx, wy, ww, wh);
+          for (let i = 0; i < 4; i++) {
+            const on = !stemMuted[keys[i]];
+            const segs = on ? 1 + Math.round(Math.abs(Math.sin(t * 5 + i * 1.4 + (bx === w2x ? 1.7 : 0))) * 4) : 1;
+            c.fillStyle = on ? cols[i] : '#2c3850';
+            for (let s = 0; s < segs; s++) {
+              c.fillRect(bx + 6 + i * 13, wy + wh - 4 - s * 4, 9, 2);
+            }
+          }
+        }
+      } else if (id === 'leash') {
+        c.fillStyle = '#cfc5b3';
+        c.fillRect(w1x, wy, ww, wh);
+        const mx = snap2(w1x + 12 + ((t * 18) % (ww - 24)));
+        c.fillStyle = '#d9403a';
+        c.fillRect(Math.max(w1x + 4, mx - 12), wy + 13, 12, 2);
+        c.fillStyle = '#1fc9b7';
+        c.fillRect(Math.max(w1x + 2, mx - 14), wy + 8, 5, 10);
+        c.fillStyle = '#ffb020';
+        c.fillRect(mx, wy + 12, 6, 4);
+        c.fillStyle = '#0b1430';
+        c.fillRect(w2x, wy, ww, wh);
+        c.fillStyle = '#ffb020';
+        c.fillRect(w2x + 6, wy + 6, 18, 4);
+        c.fillStyle = '#f4f1ea';
+        c.fillRect(w2x + 6, wy + 14, 42, 4);
+      } else {
+        const col = id === 'blog' ? '#e5487a' : id === 'about' ? '#8bcb3c' : '#3d73c7';
+        for (const [bi, bx] of [w1x, w2x].entries()) {
+          c.fillStyle = '#0f162b';
+          c.fillRect(bx, wy, ww, wh);
+          c.fillStyle = col;
+          c.fillRect(bx + 4, wy + 4, ww - 8, 4);
+          c.fillStyle = '#b7c2df';
+          const slide = Math.round(((t * 12 + bi * 14) % 20));
+          c.fillRect(bx + 4, wy + 11, ww - 12 - (slide % 14), 3);
+          c.fillRect(bx + 4, wy + 17, Math.max(12, ww - 20 + (slide % 8)), 3);
+        }
+      }
+    }
+    c.restore();
+  }
+
+  function renderRetroDrawer() {
+    if (!retroOpen || !rbCtx) return;
+    rbCtx.imageSmoothingEnabled = false;
+    if (retroOpen === 'eat-prey-nap') {
+      eatSim.draw();
+      rbCtx.drawImage(eatSim.canvas, 0, 0);
+      const stat = rbCtrl?.querySelector<HTMLElement>('[data-rb-stat]');
+      if (stat) {
+        const ms = eatSim.getMouseState();
+        const txt = `Catches: ${ms.catches} · Tap screen to pounce`;
+        if (stat.textContent !== txt) stat.textContent = txt;
+      }
+    } else if (retroOpen === 'dopepod') {
+      podSim.draw();
+      rbCtx.drawImage(podSim.canvas, 0, 0);
+    } else if (retroOpen === 'coriolis') {
+      coriolis.renderToCanvas(cCorCtx, 1, 0);
+      rbCtx.fillStyle = '#050814';
+      rbCtx.fillRect(0, 0, 160, 100);
+      rbCtx.drawImage(cCor, 0, 0, 128, 128, 30, 0, 100, 100);
+    } else {
+      rbCtx.fillStyle = '#0b1430';
+      rbCtx.fillRect(0, 0, 160, 100);
+      rbCtx.fillStyle = '#182447';
+      rbCtx.fillRect(0, 0, 160, 18);
+      rbCtx.fillStyle = '#1fc9b7';
+      rbCtx.fillRect(0, 16, 160, 2);
+      rbCtx.fillStyle = '#f4f1ea';
+      rbCtx.font = '700 9px ui-monospace, monospace';
+      rbCtx.fillText('STEMMA 8-BIT DECK', 6, 11);
+      const cols = ['#e5487a', '#ffb020', '#1fc9b7', '#8bcb3c'];
+      const keys = ['vox', 'drums', 'bass', 'keys'] as const;
+      const names = ['VOX', 'DRM', 'BAS', 'KEY'];
+      for (let i = 0; i < 4; i++) {
+        const y = 24 + i * 18;
+        const on = !stemMuted[keys[i]];
+        rbCtx.fillStyle = on ? cols[i] : '#3a4a75';
+        rbCtx.fillText(names[i], 6, y + 10);
+        for (let s = 0; s < 16; s++) {
+          const active = on && ((s + Math.floor(retroClock * 10 + i * 3)) % 5 !== 0);
+          rbCtx.fillStyle = active ? cols[i] : '#1c2a4d';
+          rbCtx.fillRect(34 + s * 7, y + 3, 5, 10);
+        }
+      }
+    }
+  }
+
   function draw() {
     if (!cssW) return;
     const night = isNight();
@@ -1345,6 +1729,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.drawImage(bg, camX * bgScale, 0, viewW * bgScale, WH * bgScale, 0, Math.round(offY * dpr), canvas!.width, Math.round(WH * scale * dpr));
     c.setTransform(dpr * scale, 0, 0, dpr * scale, -camX * dpr * scale, offY * dpr);
     const x0 = camX, x1 = camX + viewW;
+    drawRetroDisplays(x0, x1);
 
     c.fillStyle = 'rgba(214, 178, 60, 0.35)';
     for (const s of stains) {
@@ -1444,6 +1829,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     for (const b of bubbles) drawBubble(b);
     drawHud();
     drawTransitDoors();
+    renderRetroDrawer();
   }
 
   // ---- Loop and events ---------------------------------------------------------------
@@ -1563,11 +1949,43 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   // The real game's default bindings (autoload/game.gd, the default layout).
   const HOLD = new Set(['ShiftLeft', 'ShiftRight', 'BracketRight', 'Space', 'Enter', 'NumpadEnter', 'KeyF', 'End']);
   fig.addEventListener('keydown', (e) => {
-    if (e.target !== fig) return;
+    const inDrawer = !!retroOpen && !!rbEl?.contains(e.target as Node);
+    if (e.target !== fig && !inDrawer) return;
     const code = e.code;
     if (code === 'Escape') {
+      if (retroOpen) { closeRetroBooth(); return; }
       if (fig.classList.contains('immersive')) { toggleFullscreen(); return; }
       fig.blur();
+      return;
+    }
+    if (!e.repeat && code === 'KeyX') {
+      if (retroOpen) { closeRetroBooth(); return; }
+      if (near && isRetroId(near.stop.id)) { takeLeash(); openRetroBooth(near.stop.id); return; }
+    }
+    if (retroOpen) {
+      e.preventDefault();
+      if (retroOpen === 'coriolis') {
+        const ck: Record<string, SimKey> = {
+          ArrowUp: 'Up', KeyW: 'Up', ArrowDown: 'Down', KeyS: 'Down',
+          ArrowLeft: 'Left', KeyA: 'Left', ArrowRight: 'Right', KeyD: 'Right',
+          Enter: 'Select', NumpadEnter: 'Select', Backspace: 'Back',
+        };
+        const nowMs = performance.now();
+        if (!e.repeat && code === 'KeyM') { coriolis.command('Menu', nowMs); return; }
+        if (!e.repeat && code === 'Space') { coriolis.command('Next', nowMs); return; }
+        if (ck[code]) {
+          coriolis.setHeld(ck[code], true);
+          coriolis.key(ck[code], nowMs);
+          setTimeout(() => coriolis.setHeld(ck[code], false), 110);
+        }
+      } else if (!e.repeat && retroOpen === 'eat-prey-nap' && (code === 'Space' || code === 'Enter')) {
+        const ms = eatSim.getMouseState();
+        if (eatSim.pawAt(ms.u, ms.v) === 'catch') sound.pickup();
+        syncRetroControls();
+      } else if (!e.repeat && retroOpen === 'dopepod' && code === 'Space') {
+        podSim.togglePlay();
+        syncRetroControls();
+      }
       return;
     }
     if (code === 'Tab') {
@@ -1634,6 +2052,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         else if (b.id === 'pee') doPee();
         else if (b.id === 'grab') doPickup();
         else if (b.id === 'enter') goIn();
+        else if (b.id === 'try' && near && isRetroId(near.stop.id)) openRetroBooth(near.stop.id);
         else doBark();
         return;
       }
@@ -1741,6 +2160,13 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       ball, world,
       bones,
       get near() { return near?.stop.id ?? null; },
+      get retroBooth() { return retroOpen; },
+      openBooth(id: RetroBoothId | null) {
+        if (!id) closeRetroBooth();
+        else openRetroBooth(id);
+      },
+      eatSim,
+      podSim,
       get view() { return { camX, scale, offY }; },
       get target() { return target; },
       buttons: () => buttons(),

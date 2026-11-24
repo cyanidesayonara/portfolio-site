@@ -81,18 +81,53 @@ const localePrefix = locale === 'en' ? '' : `/${locale}`;
 
     <aside class="panel coriolis-panel" data-coriolis-panel aria-label={ui.coriolisAria}>
       <header><div><b>Coriolis</b><span>{ui.coriolisSub}</span></div><button type="button" class="x" data-c-exit aria-label={ui.coriolisCloseAria}>×</button></header>
-      <div class="remote">
-        <button type="button" data-c-key="Up" aria-label={ui.upAria}>▲</button>
-        <button type="button" data-c-key="Left" aria-label={ui.leftAria}>◀</button>
-        <button type="button" data-c-key="Select">{ui.okLabel}</button>
-        <button type="button" data-c-key="Right" aria-label={ui.rightAria}>▶</button>
-        <button type="button" data-c-key="Down" aria-label={ui.downAria}>▼</button>
+      <div class="coriolis-controls">
+        <div class="remote">
+          <button type="button" data-c-key="Up" aria-label={ui.upAria}>▲</button>
+          <button type="button" data-c-key="Left" aria-label={ui.leftAria}>◀</button>
+          <button type="button" data-c-key="Select">{ui.okLabel}</button>
+          <button type="button" data-c-key="Right" aria-label={ui.rightAria}>▶</button>
+          <button type="button" data-c-key="Down" aria-label={ui.downAria}>▼</button>
+        </div>
+        <div class="cmds">
+          <button type="button" data-c-cmd="Menu">{ui.coriolisLauncher}</button>
+          <button type="button" data-c-cmd="Settings">{ui.coriolisSettings}</button>
+          <button type="button" data-c-cmd="Next">{ui.coriolisNext}</button>
+          <button type="button" data-c-key="Back">{ui.coriolisBack}</button>
+        </div>
       </div>
-      <div class="cmds">
-        <button type="button" data-c-cmd="Menu">{ui.coriolisLauncher}</button>
-        <button type="button" data-c-cmd="Settings">{ui.coriolisSettings}</button>
-        <button type="button" data-c-cmd="Next">{ui.coriolisNext}</button>
-        <button type="button" data-c-key="Back">{ui.coriolisBack}</button>
+    </aside>
+
+    <aside class="panel cat-panel" data-cat-panel aria-label={ui.catAria}>
+      <header>
+        <div><b>Eat Prey Nap</b><span>{ui.catSub}</span></div>
+        <button type="button" class="x" data-cat-close aria-label={ui.catCloseAria}>×</button>
+      </header>
+      <div class="cat-controls">
+        <button type="button" data-cat-palette>{ui.catPalette}: <b data-cat-pal-label>Straw</b></button>
+        <button type="button" data-cat-size>{ui.catSize}: <b data-cat-size-label>40 mm</b></button>
+        <button type="button" data-cat-watch aria-pressed="false">{ui.catWatch}</button>
+        <button type="button" class="accent" data-cat-pounce>{ui.catPounce}</button>
+        <span class="cat-score">{ui.catCatches}: <b data-cat-score>0</b></span>
+      </div>
+    </aside>
+
+    <aside class="panel pod-panel" data-pod-panel aria-label={ui.podAria}>
+      <header>
+        <div><b>dopepod</b><span>{ui.podSub}</span></div>
+        <button type="button" class="x" data-pod-close aria-label={ui.podCloseAria}>×</button>
+      </header>
+      <p class="pod-now" data-pod-now>Boardwalk Devcast · 51 walks and a Verlet leash</p>
+      <div class="pod-transport">
+        <button type="button" data-pod-prev>{ui.podPrev}</button>
+        <button type="button" class="play" data-pod-play aria-pressed="false">{ui.podPlay}</button>
+        <button type="button" data-pod-next>{ui.podNext}</button>
+      </div>
+      <div class="pod-shows">
+        <button type="button" data-pod-show="0" aria-pressed="true">Devcast</button>
+        <button type="button" data-pod-show="1" aria-pressed="false">HUB75</button>
+        <button type="button" data-pod-show="2" aria-pressed="false">stemma</button>
+        <button type="button" data-pod-show="3" aria-pressed="false">Cat Lab</button>
       </div>
     </aside>
 
@@ -854,6 +889,14 @@ const localePrefix = locale === 'en' ? '' : `/${locale}`;
   }
   .panel:global(.open) { opacity: 1; transform: none; pointer-events: auto; }
   .coriolis-panel { box-shadow: inset 0 4px 0 var(--led), 0 4px 10px rgba(0, 0, 0, 0.35); width: min(300px, calc(100% - 24px)); }
+  .cat-panel { box-shadow: inset 0 4px 0 #f0c44d, 0 4px 10px rgba(0, 0, 0, 0.35); width: min(380px, calc(100% - 24px)); }
+  .pod-panel { box-shadow: inset 0 4px 0 #d94ca6, 0 4px 10px rgba(0, 0, 0, 0.35); width: min(390px, calc(100% - 24px)); }
+  .walk3d:global(.panel-open) .touch,
+  .walk3d:global(.panel-open) .toolbar,
+  .walk3d:global(.panel-open) .stage :global(.prompts),
+  .walk3d:global(.panel-open) .stage :global(.minimap:not(.big)) {
+    display: none;
+  }
   .panel header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
   .panel header b { display: block; font: 800 18px var(--font-display); }
   .panel header span { font-size: 13px; color: #c9cfdf; }
@@ -928,6 +971,52 @@ const localePrefix = locale === 'en' ? '' : `/${locale}`;
   }
   .cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
   .cmds button { min-height: 32px; }
+  .cat-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .cat-controls button,
+  .pod-transport button,
+  .pod-shows button {
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: inherit;
+    font: 700 12px var(--font-body);
+    cursor: pointer;
+  }
+  .cat-controls button[aria-pressed='true'],
+  .pod-shows button[aria-pressed='true'] {
+    background: rgba(240, 196, 77, 0.25);
+    box-shadow: inset 0 0 0 1px #f0c44d;
+  }
+  .pod-shows button[aria-pressed='true'] {
+    background: rgba(217, 76, 166, 0.28);
+    box-shadow: inset 0 0 0 1px #d94ca6;
+  }
+  .cat-controls button.accent {
+    background: #f0c44d;
+    color: #0b1430;
+  }
+  .cat-score {
+    margin-left: auto;
+    font: 700 12px var(--font-body);
+    color: #f0c44d;
+  }
+  .pod-now {
+    margin: 0 0 8px;
+    font: 600 12px var(--font-body);
+    color: #f4f1ea;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pod-transport { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 6px; }
+  .pod-transport button.play[aria-pressed='true'] {
+    background: #d94ca6;
+    color: #f4f1ea;
+  }
+  .pod-shows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 6px; }
+  .pod-shows button { min-height: 28px; padding: 4px 6px; font-size: 11px; }
 
   /* ---- Touch ---- */
   .touch {
@@ -1085,5 +1174,66 @@ const localePrefix = locale === 'en' ? '' : `/${locale}`;
   @media (max-height: 520px) {
     .walk3d:global(.has-touch) .stage :global(.minimap:not(.big)) { width: 92px; height: 92px; top: 48px; bottom: auto; }
     .walk3d:global(.has-touch) .stage :global(.minimap:not(.big) .mm-key kbd) { display: none; }
+  }
+  @media (max-width: 720px), (max-height: 520px) {
+    .walk3d:global(.panel-open) .stage :global(.banner),
+    .walk3d:global(.panel-open) .stage :global(.toasts) { display: none; }
+    .panel,
+    .coriolis-panel,
+    .cat-panel,
+    .pod-panel {
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      width: auto;
+      max-height: 38%;
+      overflow: hidden;
+      padding: 8px 10px;
+      border-radius: 12px;
+    }
+    .panel header { align-items: center; margin-bottom: 6px; }
+    .panel header b { font-size: 14px; }
+    .panel header span { display: none; }
+    .panel .x { width: 26px; height: 26px; font-size: 16px; }
+    .coriolis-controls {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+    .remote {
+      grid-template-columns: repeat(3, 34px);
+      grid-template-rows: repeat(3, 28px);
+      gap: 3px;
+    }
+    .remote button { font-size: 11px; }
+    .cmds {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+      margin-top: 0;
+    }
+    .cmds button { min-height: 30px; font-size: 11px; padding: 0 6px; }
+    .songs {
+      grid-auto-flow: column;
+      grid-auto-columns: 152px;
+      overflow-x: auto;
+      max-height: none;
+      margin-bottom: 6px;
+    }
+    .songs :global(button) { padding: 4px 8px; overflow: hidden; }
+    .songs :global(button b) { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .songs :global(button span) { font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stems button { min-height: 28px; font-size: 11px; gap: 4px; }
+    .lanes { height: 40px; margin-top: 6px; }
+    .credit { display: none; }
+    .cat-controls { gap: 4px; }
+    .cat-controls button,
+    .pod-transport button,
+    .pod-shows button { min-height: 28px; padding: 4px 8px; font-size: 11px; }
+    .pod-now { margin-bottom: 5px; font-size: 11px; }
+    .pod-shows { margin-top: 5px; }
+  }
+  @media (max-height: 520px) {
+    .lanes { display: none; }
   }
 </style>
