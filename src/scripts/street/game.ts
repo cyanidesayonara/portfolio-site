@@ -10,24 +10,29 @@
   screens a tap walks there and on-screen buttons run, dig, pee and bark.
 */
 import {
-  WH, FACADE, WALK_TOP, LANE, CAR_LANES, FAR_EDGE,
+  WH, FACADE, WALK_TOP, LANE, CAR_LANES, FAR_CURB, FAR_EDGE,
   buildWorld, drawStatic, drawTops, drawMetroTop, drawNightLights, doorX, doorY,
   type Stop, type StopLot, type Circle,
 } from './world';
 import { StreetSound } from './audio';
 import { trackVisibleViewport } from '../viewport';
+import {
+  EatPreyNapSim, DopepodSim, CAT_PALETTES, CAT_SIZES,
+} from '../walk/booths';
+import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim';
 
 type P = { x: number; y: number };
 type Bubble = { text: string; ttl: number; who: P; lift: number; loud: boolean };
 type Ped = {
-  x: number; y: number; ly: number; dir: 1 | -1; speed: number; pause: number; said: boolean;
-  coat: string; hair: string; prop: 'phone' | 'coffee' | 'bag' | 'dog';
+  x: number; y: number; ly: number; side: 'north' | 'south'; dir: 1 | -1; speed: number; pause: number; said: boolean;
+  coat: string; hair: string; prop: 'phone' | 'coffee' | 'bag' | 'dog' | 'jogger';
   pet?: { x: number; y: number; heading: number; color: string; greeted: boolean };
 };
 type Pigeon = { x: number; y: number; hx: number; hy: number; flying: boolean; vx: number; vy: number; t: number; hop: number };
 type Vehicle = { kind: 'bike' | 'car'; x: number; y: number; dir: 1 | -1; speed: number; max: number; color: string; alerted: number; wobble: number };
 type Stain = { x: number; y: number; r: number };
-type Fx = { kind: 'ring' | 'dust' | 'splash' | 'heart'; x: number; y: number; vx: number; vy: number; t: number; max: number };
+type Fx = { kind: 'ring' | 'dust' | 'splash' | 'heart' | 'crumb'; x: number; y: number; vx: number; vy: number; t: number; max: number };
+type Confetti = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; w: number; h: number; color: string; t: number; max: number };
 
 const ROPE_N = 18;
 const ROPE_BASE = 130;
@@ -82,18 +87,22 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   let leash = ROPE_BASE;
   let heyT = 0;
   let pee = 0.6, zoom = 1, barkCd = 0, marked = 0;
-  const goals = { mark: false, pigeons: false, dog: false, bones: false, free: false };
+  const goals = { mark: false, pigeons: false, dog: false, bones: false, bakery: false, booth: false, free: false };
   let offLeash = false, offT = 0, clippedInPark = false;
   let nature = 35, natureCalls = false;
   const poops: { x: number; y: number; t: number }[] = [];
   const ball = { x: world.park.x + 210, y: 110, vx: 0, vy: 0 };
+  const croissant = { x: world.croissant.x, y: world.croissant.y, got: false };
+  const alleyCat = { x: world.alleyCat.x, y: world.alleyCat.y, startled: 0, hop: 0, vy: 0 };
   let nearBone: { x: number; y: number; got: boolean } | null = null;
+  let nearCroissant = false;
   let nearDrink = false;
   let touchDig: number | null = null, touchSquat: number | null = null;
   const bones = world.bones.map((b) => ({ ...b, got: false }));
   let bonesGot = 0;
   let toast: { text: string; t: number } | null = null;
   let allDone = false;
+  let celebrateT = 0;
   let goalsOpen: boolean | null = null;
   let goalsRect = { x: 0, y: 0, w: 0, h: 0 };
   const sound = new StreetSound();
@@ -102,16 +111,23 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const stains: Stain[] = [];
   const bubbles: Bubble[] = [];
   const fx: Fx[] = [];
-  const peds: Ped[] = [];
+  const confetti: Confetti[] = [];
   const spawnFx = (kind: Fx['kind'], x: number, y: number, vx = 0, vy = 0, max = 0.45) => {
-    if (fx.length >= 40) fx.shift();
+    if (fx.length >= 80) fx.shift();
     fx.push({ kind, x, y, vx, vy, t: 0, max });
   };
+  const peds: Ped[] = [];
   const vehicles: Vehicle[] = [];
   const pigeons: Pigeon[] = [];
   world.benches.slice(0, 3).forEach((b, bi) => {
     for (let i = 0; i < 4; i++) {
       const hx = b.x + 6 + i * 12 + (bi % 2) * 4, hy = 190 + ((i * 7) % 9);
+      pigeons.push({ x: hx, y: hy, hx, hy, flying: false, vx: 0, vy: 0, t: 0, hop: Math.random() * 3 });
+    }
+  });
+  world.farBenches.slice(0, 2).forEach((b, bi) => {
+    for (let i = 0; i < 3; i++) {
+      const hx = b.x + 8 + i * 13 + (bi % 2) * 3, hy = 376 + ((i * 5) % 10);
       pigeons.push({ x: hx, y: hy, hx, hy, flying: false, vx: 0, vy: 0, t: 0, hop: Math.random() * 3 });
     }
   });
@@ -132,6 +148,176 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   window.addEventListener('pageshow', (e) => { if (e.persisted) boarding = null; });
   let arriving = 0;
   let arrivedBy: Ride = 'train';
+
+  // ---- Retro 8/16-bit mini-booth drawer & animated shopfront sims --------------------
+  type RetroBoothId = 'eat-prey-nap' | 'dopepod' | 'coriolis' | 'stemma';
+  const isRetroId = (id: string): id is RetroBoothId =>
+    id === 'eat-prey-nap' || id === 'dopepod' || id === 'coriolis' || id === 'stemma';
+  const eatSim = new EatPreyNapSim({ width: 160, height: 100, pixelated: true });
+  const podSim = new DopepodSim({ width: 160, height: 100, pixelated: true });
+  const coriolis = new CoriolisSimulator('coriolis');
+  const cCor = document.createElement('canvas');
+  cCor.width = cCor.height = 128;
+  const cCorCtx = cCor.getContext('2d')!;
+  const stemMuted = { vox: false, drums: false, bass: false, keys: false };
+  const streetTofu = { offX: 0, hop: 0, vy: 0, cd: 1.2 };
+  let retroOpen: RetroBoothId | null = null;
+  let retroClock = 0;
+
+  const rbEl = fig.querySelector<HTMLElement>('[data-retro-booth]');
+  const rbTitle = fig.querySelector<HTMLElement>('[data-retro-title]');
+  const rbLink = fig.querySelector<HTMLAnchorElement>('[data-retro-link]');
+  const rbCanvas = fig.querySelector<HTMLCanvasElement>('[data-retro-canvas]');
+  const rbCtrl = fig.querySelector<HTMLElement>('[data-retro-controls]');
+  const rbCtx = rbCanvas?.getContext('2d') ?? null;
+
+  const syncRetroControls = () => {
+    if (!rbCtrl || !retroOpen) return;
+    const stat = rbCtrl.querySelector<HTMLElement>('[data-rb-stat]');
+    if (retroOpen === 'eat-prey-nap') {
+      const ms = eatSim.getMouseState();
+      const palB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="pal"]');
+      const sizeB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="size"]');
+      const watchB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="watch"]');
+      if (palB) palB.textContent = `Pal: ${CAT_PALETTES[ms.palette].name}`;
+      if (sizeB) sizeB.textContent = CAT_SIZES[ms.size].label;
+      watchB?.setAttribute('aria-pressed', String(ms.watchOnly));
+      if (stat) stat.textContent = `Catches: ${ms.catches} · Tap screen to pounce`;
+    } else if (retroOpen === 'dopepod') {
+      const st = podSim.getState();
+      const playB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="play"]');
+      if (playB) {
+        playB.textContent = st.playing ? 'Pause' : 'Play';
+        playB.setAttribute('aria-pressed', String(st.playing));
+      }
+      rbCtrl.querySelectorAll<HTMLButtonElement>('[data-rb^="show-"]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.rb!.slice(5)) === st.showIdx));
+      });
+      if (stat) stat.textContent = `${st.showName} · ${st.episodeTitle}`;
+    } else if (retroOpen === 'stemma') {
+      (['vox', 'drums', 'bass', 'keys'] as const).forEach((k) => {
+        rbCtrl.querySelector<HTMLButtonElement>(`[data-rb="stem-${k}"]`)?.setAttribute('aria-pressed', String(!stemMuted[k]));
+      });
+      const sndB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="sound"]');
+      if (sndB) {
+        sndB.textContent = wantSound ? 'Sound: ON' : 'Sound: OFF';
+        sndB.setAttribute('aria-pressed', String(wantSound));
+      }
+      if (stat) stat.textContent = '8-bit 4-stem deck · click lanes to mute';
+    }
+    renderRetroDrawer();
+  };
+
+  const closeRetroBooth = () => {
+    if (!retroOpen) return;
+    retroOpen = null;
+    coriolis.clearHeld();
+    if (rbEl) rbEl.hidden = true;
+    sayCaption();
+  };
+
+  const openRetroBooth = (id: RetroBoothId) => {
+    takeLeash();
+    retroOpen = id;
+    held.clear();
+    target = null;
+    complete('booth', 'try an app booth');
+    const stopObj = stops.find((s) => s.id === id);
+    if (rbTitle) rbTitle.textContent = stopObj?.label ?? id;
+    if (rbLink) rbLink.href = links.get(id)?.getAttribute('href') ?? stopObj?.href ?? '#';
+    if (rbCtrl) {
+      if (id === 'eat-prey-nap') {
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="pal">Pal</button>`,
+          `<button type="button" data-rb="size">40 mm</button>`,
+          `<button type="button" data-rb="watch" aria-pressed="false">Watch</button>`,
+          `<button type="button" data-rb="pounce">Pounce</button>`,
+          `<span class="rb-stat" data-rb-stat></span>`,
+        ].join('');
+      } else if (id === 'dopepod') {
+        const showBtns = ['Devcast', 'HUB75', 'stemma', 'Cat']
+          .map((lbl, i) => `<button type="button" data-rb="show-${i}">${lbl}</button>`)
+          .join('');
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="prev">&lt;</button>`,
+          `<button type="button" data-rb="play">Play</button>`,
+          `<button type="button" data-rb="next">&gt;</button>`,
+          showBtns,
+          `<span class="rb-stat" data-rb-stat></span>`,
+        ].join('');
+      } else if (id === 'coriolis') {
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="key-Up">Up</button>`,
+          `<button type="button" data-rb="key-Left">Left</button>`,
+          `<button type="button" data-rb="key-Select">OK</button>`,
+          `<button type="button" data-rb="key-Right">Right</button>`,
+          `<button type="button" data-rb="key-Down">Down</button>`,
+          `<button type="button" data-rb="cmd-Menu">Menu</button>`,
+          `<button type="button" data-rb="cmd-Next">Next</button>`,
+          `<button type="button" data-rb="key-Back">Back</button>`,
+        ].join('');
+      } else {
+        rbCtrl.innerHTML = [
+          `<button type="button" data-rb="stem-vox" aria-pressed="true">Vox</button>`,
+          `<button type="button" data-rb="stem-drums" aria-pressed="true">Drums</button>`,
+          `<button type="button" data-rb="stem-bass" aria-pressed="true">Bass</button>`,
+          `<button type="button" data-rb="stem-keys" aria-pressed="true">Keys</button>`,
+          `<button type="button" data-rb="sound">Sound</button>`,
+          `<span class="rb-stat" data-rb-stat></span>`,
+        ].join('');
+      }
+    }
+    if (rbEl) rbEl.hidden = false;
+    syncRetroControls();
+    sayCaption();
+  };
+
+  rbEl?.querySelector<HTMLButtonElement>('[data-retro-close]')?.addEventListener('click', () => {
+    closeRetroBooth();
+    fig.focus({ preventScroll: true });
+  });
+  rbCtrl?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-rb]');
+    if (!btn || !retroOpen) return;
+    const act = btn.dataset.rb!;
+    const nowMs = performance.now();
+    if (act === 'pal') { eatSim.cyclePalette(); sound.pickup(); }
+    else if (act === 'size') { eatSim.cycleSize(); sound.pickup(); }
+    else if (act === 'watch') { eatSim.toggleWatchOnly(); sound.hey(); }
+    else if (act === 'pounce') {
+      const ms = eatSim.getMouseState();
+      if (eatSim.pawAt(ms.u, ms.v) === 'catch') sound.pickup(); else sound.hey();
+    } else if (act === 'play') { podSim.togglePlay(); sound.pickup(); }
+    else if (act === 'prev') { podSim.prevEpisode(); sound.hey(); }
+    else if (act === 'next') { podSim.nextEpisode(); sound.hey(); }
+    else if (act.startsWith('show-')) { podSim.selectShow(Number(act.slice(5))); sound.pickup(); }
+    else if (act.startsWith('key-')) {
+      const k = act.slice(4) as SimKey;
+      coriolis.setHeld(k, true);
+      coriolis.key(k, nowMs);
+      setTimeout(() => coriolis.setHeld(k, false), 110);
+      sound.hey();
+    } else if (act.startsWith('cmd-')) {
+      coriolis.command(act.slice(4) as SimCommand, nowMs);
+      sound.pickup();
+    } else if (act.startsWith('stem-')) {
+      const k = act.slice(5) as keyof typeof stemMuted;
+      stemMuted[k] = !stemMuted[k];
+      sound.hey();
+    } else if (act === 'sound') {
+      setSound(!wantSound);
+    }
+    syncRetroControls();
+  });
+  rbCanvas?.addEventListener('pointerdown', (e) => {
+    if (retroOpen !== 'eat-prey-nap') return;
+    const rect = rbCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const pu = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const pv = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+    if (eatSim.pawAt(pu, pv) === 'catch') sound.pickup(); else sound.hey();
+    syncRetroControls();
+  });
 
   // ---- Sizing and the static layer ---------------------------------------------------
   let cssW = 0, cssH = 0, dpr = 1, scale = 1, viewW = 0, offY = 0;
@@ -190,19 +376,43 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (Object.values(goals).every(Boolean)) finale();
   }
 
-  // Every goal done: a little celebration, then point her at the train to the 3D walk.
+  // Every goal done: confetti celebration, fanfare jingle, and a nudge toward Estació / Metro.
   function finale() {
     allDone = true;
-    say(human, 'Best walk ever!', 24, true, 2.4);
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      spawnFx('heart', dog.x + Math.cos(a) * 10, dog.y - 12 + Math.sin(a) * 6, Math.cos(a) * 34, -26 + Math.sin(a) * 14, 1.3);
+    celebrateT = 5.5;
+    sound.fanfare();
+    say(dog, 'BEST WALK!', 22, true, 2.8);
+    say(human, 'GOODEST GIRL!', 28, true, 2.8);
+    for (const p of peds) {
+      if (p.x > camX && p.x < camX + viewW) say(p, pick(['Yay!', 'Bravo!', 'Good girl!']), 24, false, 1.8);
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      spawnFx('heart', dog.x + Math.cos(a) * 10, dog.y - 12 + Math.sin(a) * 6, Math.cos(a) * 38, -28 + Math.sin(a) * 14, 1.4);
+    }
+    const confCols = ['#ffb020', '#1fc9b7', '#e5487a', '#8bcb3c', '#f4f1ea', '#5eea8c'];
+    const wScreen = cssW || 800;
+    confetti.length = 0;
+    for (let i = 0; i < 65 && confetti.length < 80; i++) {
+      confetti.push({
+        x: Math.random() * wScreen,
+        y: -12 - Math.random() * 80,
+        vx: (Math.random() - 0.5) * 90,
+        vy: 65 + Math.random() * 95,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 9,
+        w: 5 + Math.random() * 4,
+        h: 3 + Math.random() * 3,
+        color: confCols[i % confCols.length],
+        t: 0,
+        max: 4.5 + Math.random() * 1.4,
+      });
     }
     window.setTimeout(() => {
       if (!playing) return;
       sound.stationChime();
-      toast = { text: 'Best walk ever! Every goal done', t: 4 };
-    }, 1600);
+      toast = { text: 'Best walk ever! Next stop: Estació or Metro to 3D', t: 4.5 };
+    }, 2200);
   }
 
   // ---- Talking -----------------------------------------------------------------------
@@ -261,6 +471,19 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
 
   function doPickup() {
+    if (nearCroissant) {
+      croissant.got = true;
+      nearCroissant = false;
+      zoom = 1;
+      sound.pickup();
+      for (let i = 0; i < 6; i++) {
+        spawnFx('crumb', croissant.x, croissant.y - 3, (Math.random() - 0.5) * 36, -16 - Math.random() * 20, 0.5);
+      }
+      say(dog, 'CRUNCH!', 20, true, 1.3);
+      say(human, 'Hey! Drop that!', 26, false, 1.8);
+      complete('bakery', 'snag the croissant');
+      return;
+    }
     if (!nearBone) return;
     nearBone.got = true;
     nearBone = null;
@@ -285,9 +508,13 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     leash = ROPE_BASE; heyT = 0; pee = 0.6; zoom = 1; marked = 0; bonesGot = 0;
     offLeash = false; clippedInPark = false; nature = 35; natureCalls = false;
     for (const k of Object.keys(goals) as (keyof typeof goals)[]) goals[k] = false;
-    allDone = false;
     for (const sp of world.peeSpots) sp.marked = false;
     for (const b of bones) b.got = false;
+    croissant.got = false;
+    Object.assign(alleyCat, { startled: 0, hop: 0, vy: 0 });
+    allDone = false;
+    celebrateT = 0;
+    confetti.length = 0;
     stains.length = 0; poops.length = 0; bubbles.length = 0; fx.length = 0; target = null;
     boarding = null; arriving = 0;
     Object.assign(ball, { x: world.park.x + 210, y: 110, vx: 0, vy: 0 });
@@ -323,6 +550,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
 
   // ---- Simulation ----------------------------------------------------------------------
+  // Intentionally kept separate from walk/leash.ts (meter-scale Verlet + pole stick-slip
+  // + whirl) so the 2D home widget stays small and preserves its pixel-space game feel.
   function solveRope() {
     for (let i = 1; i < ROPE_N; i++) {
       const p = rope[i];
@@ -399,6 +628,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     pushOut(dog, DOG_R);
     nearBone = null;
     for (const b of bones) if (!b.got && Math.hypot(b.x - dog.x, b.y - dog.y) < DOG_R + 16) nearBone = b;
+    nearCroissant = !croissant.got && Math.hypot(croissant.x - dog.x, croissant.y - dog.y) < DOG_R + 18;
     if (offLeash) dog.x = Math.max(dog.x, world.park.x + 14);
     // Drinking refills the pee meter; nothing else does.
     const drink = world.drinks.find((d) => Math.hypot(d.x - dog.x, d.y - dog.y) < DOG_R + (d.kind === 'fountain' ? 16 : 10));
@@ -515,14 +745,17 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   function updatePeds(dt: number) {
     pedTimer -= dt;
-    if (pedTimer <= 0 && peds.length < 3) {
-      pedTimer = 3 + Math.random() * 4;
+    if (pedTimer <= 0 && peds.length < 5) {
+      pedTimer = 1.6 + Math.random() * 2.4;
       const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+      const southCount = peds.filter((p) => p.side === 'south').length;
+      const side: 'north' | 'south' = southCount < 2 || Math.random() < 0.5 ? 'south' : 'north';
       const x = clamp(dir === 1 ? camX - 30 : camX + viewW + 30, 20, W - 20);
-      const prop = pick<Ped['prop']>(['phone', 'coffee', 'bag', 'dog', 'phone']);
-      const ly = dir === 1 ? 153 : 148;
-      const p: Ped = { x, y: ly, ly, dir, speed: 26 + Math.random() * 14, pause: 0, said: false, coat: pick(COATS), hair: pick(HAIRS), prop };
-      if (prop === 'dog') p.pet = { x: x - dir * 22, y: p.y + 12, heading: dir === 1 ? 0 : Math.PI, color: pick(['#c98b4a', '#f4f1ea', '#8a6a4a', '#d9c3a0']), greeted: false };
+      const prop = pick<Ped['prop']>(['phone', 'coffee', 'bag', 'dog', 'jogger', 'phone']);
+      const ly = side === 'north' ? (dir === 1 ? 153 : 148) : (dir === 1 ? 378 : 370);
+      const speed = prop === 'jogger' ? 54 + Math.random() * 14 : 26 + Math.random() * 14;
+      const p: Ped = { x, y: ly, ly, side, dir, speed, pause: 0, said: false, coat: pick(COATS), hair: pick(HAIRS), prop };
+      if (prop === 'dog') p.pet = { x: x - dir * 22, y: p.y + (side === 'north' ? 12 : -10), heading: dir === 1 ? 0 : Math.PI, color: pick(['#c98b4a', '#f4f1ea', '#8a6a4a', '#d9c3a0']), greeted: false };
       peds.push(p);
     }
     for (let i = peds.length - 1; i >= 0; i--) {
@@ -544,7 +777,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
           spawnFx('heart', (dog.x + pet.x) / 2, Math.min(dog.y, pet.y) - 10, 0, -18, 1.0);
           complete('dog', 'say hi to another dog');
         }
-        const tx = p.x - p.dir * 22, ty = p.y + 12;
+        const tx = p.x - p.dir * 22, ty = p.y + (p.side === 'north' ? 12 : -10);
         const wantX = pet.greeted && p.pause > 0 ? dog.x - Math.cos(dog.heading) * 14 : tx;
         const wantY = pet.greeted && p.pause > 0 ? dog.y : ty;
         const ddx = wantX - pet.x, ddy = wantY - pet.y, dd = Math.hypot(ddx, ddy);
@@ -575,8 +808,12 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = r + PED_R;
         if (d < min && d > 1e-4) { p.x = o.x + (dx / d) * min; p.y = o.y + (dy / d) * min; }
       }
-      p.y += (p.ly - p.y) * Math.min(1, dt * 1.5);
-      p.y = clamp(p.y, WALK_TOP + PED_R, 210 - PED_R);
+      let laneY = p.ly;
+      if (p.side === 'south' && world.metro && p.x > world.metro.x - 16 && p.x < world.metro.x + world.metro.w + 16) {
+        laneY = FAR_EDGE - PED_R - 2;
+      }
+      p.y += (laneY - p.y) * Math.min(1, dt * 2.5);
+      p.y = p.side === 'north' ? clamp(p.y, WALK_TOP + PED_R, 210 - PED_R) : clamp(p.y, FAR_CURB + PED_R, FAR_EDGE - PED_R);
       if (p.x < -40 || p.x > W + 40 || p.x < camX - 200 || p.x > camX + viewW + 200) peds.splice(i, 1);
     }
   }
@@ -669,10 +906,54 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       return;
     }
     if (arriving > 0) arriving = Math.max(0, arriving - dt);
+    retroClock += dt;
+    eatSim.update(dt);
+    podSim.update(dt);
+    coriolis.tick(performance.now());
+    // Sidewalk pixel Tofu tracks the mouse inside Eat Prey Nap and hops playfully.
+    {
+      const ms = eatSim.getMouseState();
+      streetTofu.offX += ((ms.u - 0.5) * 44 - streetTofu.offX) * Math.min(1, dt * 4);
+      streetTofu.cd -= dt;
+      if (streetTofu.hop <= 0 && streetTofu.cd <= 0 && (ms.state === 'creep' || ms.state === 'dart')) {
+        streetTofu.vy = 78;
+        streetTofu.cd = 1.6 + Math.random() * 1.3;
+      }
+      if (streetTofu.hop > 0 || streetTofu.vy > 0) {
+        streetTofu.hop += streetTofu.vy * dt;
+        streetTofu.vy -= 260 * dt;
+        if (streetTofu.hop <= 0) { streetTofu.hop = 0; streetTofu.vy = 0; }
+      }
+    }
     updatePlayer(dt);
     updatePeds(dt);
     updatePigeons(dt);
     updateTraffic(dt);
+    // South alley cat startled by close approaches or loud barks.
+    {
+      const dCat = Math.hypot(dog.x - alleyCat.x, dog.y - alleyCat.y);
+      if (alleyCat.startled <= 0 && (dCat < 42 || (barkCd > 0.35 && dCat < 120))) {
+        alleyCat.startled = 3.8;
+        alleyCat.vy = 92;
+        say(alleyCat, Math.random() < 0.5 ? 'Mrrp!' : 'Hiss!', 18, false, 1.2);
+      }
+      if (alleyCat.startled > 0) alleyCat.startled = Math.max(0, alleyCat.startled - dt);
+      if (alleyCat.hop > 0 || alleyCat.vy > 0) {
+        alleyCat.hop += alleyCat.vy * dt;
+        alleyCat.vy -= 280 * dt;
+        if (alleyCat.hop <= 0) { alleyCat.hop = 0; alleyCat.vy = 0; }
+      }
+    }
+    if (celebrateT > 0) celebrateT = Math.max(0, celebrateT - dt);
+    for (let i = confetti.length - 1; i >= 0; i--) {
+      const cf = confetti[i];
+      cf.vy += 120 * dt;
+      cf.vx *= 1 - dt * 0.35;
+      cf.x += cf.vx * dt;
+      cf.y += cf.vy * dt;
+      cf.rot += cf.vr * dt;
+      if ((cf.t += dt) >= cf.max || cf.y > cssH + 30) confetti.splice(i, 1);
+    }
     for (let i = fx.length - 1; i >= 0; i--) {
       const f = fx[i];
       f.x += f.vx * dt; f.y += f.vy * dt;
@@ -705,6 +986,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (near && playing) {
       if (near.stop.id === 'station') text = coarse ? 'Tap GO IN or Estació again to board the train to 3D.' : 'Press Enter at Estació to board the train to the 3D walk.';
       else if (near.stop.id === 'metro') text = coarse ? 'Tap GO IN or the stairs again to take the metro to 3D.' : 'Press Enter at the stairs to take the metro to the 3D walk.';
+      else if (isRetroId(near.stop.id)) text = coarse ? `Tap TRY for the retro booth or GO IN for ${near.stop.label}.` : `Press X to try ${near.stop.label}, or Enter to open the project page.`;
       else text = coarse ? `Tap ${near.stop.label} again to go in.` : `Press Enter to go into ${near.stop.label}.`;
     } else if (playing) text = coarse ? 'Tap to walk, tap a shop to visit it. RUN and DIG are held; PEE marks a spot (POOP when nature calls), BARK scatters the pigeons, GRAB picks up.' : 'Walk Millie up to a shop door to go in. Arrow keys work too.';
     else text = coarse ? 'Tap the street to take Millie for a walk.' : 'Click the street to take Millie for a walk.';
@@ -764,6 +1046,12 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     } else if (prop === 'bag') {
       c.fillStyle = '#e8dcc6';
       c.fillRect(-r * 0.2, r * 0.75, r * 0.7, r * 0.45);
+    } else if (prop === 'jogger') {
+      c.strokeStyle = '#ff5733';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(-r * 0.04, 0, r * 0.44, -1.1, 1.1);
+      c.stroke();
     }
     c.restore();
   }
@@ -1019,6 +1307,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       ['Scatter the pigeons', goals.pigeons],
       ['Say hi to another dog', goals.dog],
       [`Find 5 bones${goals.bones ? '' : ` (${Math.min(bonesGot, 5)}/5)`}`, goals.bones],
+      ['Snag the south-side croissant', goals.bakery],
+      ['Try an app booth (X)', goals.booth],
       ['Run free in the park', goals.free],
     ];
   }
@@ -1028,8 +1318,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (near) {
       if (near.stop.id === 'station') return coarse ? 'Tap GO IN: Board train to 3D' : 'Enter: ride train to 3D seafront';
       if (near.stop.id === 'metro') return coarse ? 'Tap GO IN: Metro down to 3D' : 'Enter: take the metro to 3D';
+      if (isRetroId(near.stop.id)) return coarse ? `TRY: ${near.stop.label} · GO IN: page` : `X: try ${near.stop.label} · Enter: go in`;
       return coarse ? `Tap GO IN or sign: ${near.stop.label}` : `Enter: go into ${near.stop.label}`;
     }
+    if (nearCroissant) return coarse ? 'GRAB: snag the croissant' : 'G: snag the croissant';
     if (nearBone) return coarse ? 'GRAB: pick up the bone' : 'G: pick up the bone';
     if (natureCalls) return coarse ? 'Nature calls! Hold POOP' : 'Nature calls! Hold F';
     if (pee < 0.25 && !nearDrink) return 'Thirsty! Find a water bowl';
@@ -1095,10 +1387,17 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.scale(k, k);
     goalsRect = { x: gx, y: gy, w: gw * k, h: gh * k };
     hudPanel(0, 0, gw, gh);
-    c.fillStyle = '#f4f1ea';
+    if (allDone) {
+      c.strokeStyle = '#ffb020';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.roundRect(1, 1, gw - 2, gh - 2, 7);
+      c.stroke();
+    }
+    c.fillStyle = allDone ? '#ffb020' : '#f4f1ea';
     c.font = `800 11px ${FONT}`;
     c.textAlign = 'left';
-    c.fillText(`GOALS ${done}/${items.length}`, 10, 13.5);
+    c.fillText(allDone ? `ALL ${items.length}/${items.length} DONE!` : `GOALS ${done}/${items.length}`, 10, 13.5);
     keyBadge(gw - 8, 13, coarse ? (goalsOpen ? '–' : '+') : 'TAB');
     if (goalsOpen) {
       c.font = `600 10px ${BODY}`;
@@ -1140,9 +1439,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
 
     // Touch buttons
-    if (coarse) for (const b of buttons()) {
+    if (coarse && !retroOpen) for (const b of buttons()) {
       const on = (b.id === 'run' && touchSprint !== null) || (b.id === 'dig' && touchDig !== null) || (b.id === 'pee' && touchSquat !== null);
-      const accent = b.id === 'grab' || b.id === 'enter';
+      const accent = b.id === 'grab' || b.id === 'enter' || b.id === 'try';
       c.fillStyle = on ? '#8bcb3c' : accent ? 'rgba(255, 176, 32, 0.94)' : HUD_BG;
       c.beginPath();
       c.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -1153,8 +1452,69 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       c.fillStyle = on || accent ? '#0b1430' : '#f4f1ea';
       c.font = `800 9px ${FONT}`;
       c.textAlign = 'center';
-      const plain = b.id === 'bark' || b.id === 'dig' || b.id === 'enter';
+      const plain = b.id === 'bark' || b.id === 'dig' || b.id === 'enter' || b.id === 'try';
       c.fillText(b.label, b.x, b.y + (plain ? 0.5 : 8));
+    }
+
+    // Confetti & bold celebration card when all quests complete
+    if (confetti.length) {
+      for (const cf of confetti) {
+        const a = 1 - clamp((cf.t - (cf.max - 0.8)) / 0.8, 0, 1);
+        c.save();
+        c.globalAlpha = a;
+        c.translate(cf.x, cf.y);
+        c.rotate(cf.rot);
+        c.fillStyle = cf.color;
+        c.fillRect(-cf.w / 2, -cf.h / 2, cf.w, cf.h);
+        c.restore();
+      }
+    }
+    if (celebrateT > 0) {
+      const elapsed = 5.5 - celebrateT;
+      const pop = 1 - Math.pow(1 - clamp(elapsed / 0.28, 0, 1), 3);
+      const fade = clamp(celebrateT / 0.6, 0, 1);
+      const cw = Math.min(cssW - 24, small ? 310 : 410);
+      const ch = small ? 64 : 74;
+      const cx = cssW / 2;
+      const cy = small ? 98 + ch / 2 : 52 + ch / 2;
+      c.save();
+      c.globalAlpha = fade;
+      c.translate(cx, cy);
+      c.scale(0.84 + 0.16 * pop, 0.84 + 0.16 * pop);
+      c.fillStyle = 'rgba(11, 20, 48, 0.95)';
+      c.beginPath();
+      c.roundRect(-cw / 2, -ch / 2, cw, ch, 14);
+      c.fill();
+      c.strokeStyle = '#ffb020';
+      c.lineWidth = 2.5;
+      c.stroke();
+      c.strokeStyle = '#5eea8c';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.roundRect(-cw / 2 + 5, -ch / 2 + 5, cw - 10, ch - 10, 10);
+      c.stroke();
+      // Star emblem on left
+      const sx = -cw / 2 + (small ? 26 : 34);
+      c.fillStyle = '#ffb020';
+      c.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? (small ? 11 : 13) : (small ? 5 : 6);
+        const ang = (i * Math.PI) / 5 - Math.PI / 2;
+        if (i === 0) c.moveTo(sx + Math.cos(ang) * r, Math.sin(ang) * r);
+        else c.lineTo(sx + Math.cos(ang) * r, Math.sin(ang) * r);
+      }
+      c.closePath();
+      c.fill();
+      c.textAlign = 'left';
+      c.textBaseline = 'middle';
+      const tx = sx + (small ? 20 : 24);
+      c.fillStyle = '#ffb020';
+      c.font = `800 ${small ? 14 : 17}px ${FONT}`;
+      c.fillText('ALL 7 GOALS COMPLETE!', tx, -10, cw - (tx + cw / 2) - 14);
+      c.fillStyle = '#f4f1ea';
+      c.font = `600 ${small ? 10.5 : 12}px ${BODY}`;
+      c.fillText('Best walk ever! Next stop: Estació or Metro to 3D', tx, 12, cw - (tx + cw / 2) - 14);
+      c.restore();
     }
     c.textAlign = 'left';
   }
@@ -1168,12 +1528,76 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       { id: 'dig', label: 'DIG', x: x(2), y, r },
       { id: 'run', label: 'RUN', x: x(3), y, r },
     ];
-    if (nearBone) list.push({ id: 'grab', label: 'GRAB', x: x(0), y: y - step, r });
-    if (near) list.push({ id: 'enter', label: 'GO IN', x: x(nearBone ? 1 : 0), y: y - step, r });
+    const grabActive = !!nearBone || nearCroissant;
+    if (grabActive) list.push({ id: 'grab', label: 'GRAB', x: x(0), y: y - step, r });
+    if (near) {
+      const col = grabActive ? 1 : 0;
+      list.push({ id: 'enter', label: 'GO IN', x: x(col), y: y - step, r });
+      if (isRetroId(near.stop.id)) {
+        const tryLbl = (fig.dataset.tryBooth ?? 'TRY').toUpperCase();
+        list.push({ id: 'try', label: tryLbl.slice(0, 5), x: x(col + 1), y: y - step, r });
+      }
+    }
     return list;
   }
 
   function drawParkThings(x0: number, x1: number) {
+    if (!croissant.got && croissant.x > x0 - 20 && croissant.x < x1 + 20) {
+      const t = performance.now() / 1000;
+      shadowAt(croissant.x, croissant.y + 2, 7, 3);
+      c.save();
+      c.translate(croissant.x, croissant.y);
+      c.fillStyle = '#e69f28';
+      c.beginPath();
+      c.ellipse(0, 0, 7, 4.2, -0.2, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#f8cb62';
+      c.beginPath();
+      c.ellipse(0, -1, 4.5, 2.5, -0.2, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = 'rgba(255, 250, 220, 0.75)';
+      c.lineWidth = 1;
+      for (const wx of [-3, 3]) {
+        const wave = Math.sin(t * 4 + wx) * 1.5;
+        c.beginPath();
+        c.moveTo(wx, -5);
+        c.quadraticCurveTo(wx + wave, -9, wx - wave * 0.5, -13);
+        c.stroke();
+      }
+      c.restore();
+    }
+    if (alleyCat.x > x0 - 30 && alleyCat.x < x1 + 30) {
+      const t = performance.now() / 1000;
+      const arch = alleyCat.startled > 0;
+      const cy = alleyCat.y - alleyCat.hop * 0.4;
+      shadowAt(alleyCat.x, alleyCat.y + 2, 6, 3);
+      c.save();
+      c.translate(alleyCat.x, cy);
+      c.strokeStyle = '#9c4618';
+      c.lineWidth = 2;
+      c.lineCap = 'round';
+      c.beginPath();
+      const wag = Math.sin(t * (arch ? 14 : 4)) * 3;
+      c.moveTo(5, arch ? -2 : 0);
+      c.quadraticCurveTo(10, -4 + wag * 0.5, 11, -8 + wag);
+      c.stroke();
+      c.fillStyle = '#d97236';
+      c.beginPath();
+      c.ellipse(0, arch ? -2 : 0, arch ? 5 : 6.5, arch ? 4.5 : 3.5, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#9c4618';
+      c.fillRect(-3, -2, 2, 4);
+      c.fillRect(0, -2, 2, 4);
+      c.fillStyle = '#d97236';
+      c.beginPath();
+      c.arc(-5, arch ? -3 : -1, 3.6, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.moveTo(-7.5, -4); c.lineTo(-6, -8); c.lineTo(-4.5, -4);
+      c.moveTo(-4, -4); c.lineTo(-2.5, -8); c.lineTo(-1.5, -4);
+      c.fill();
+      c.restore();
+    }
     for (const p of poops) {
       if (p.x < x0 - 10 || p.x > x1 + 10) continue;
       c.fillStyle = '#6b4a32';
@@ -1232,6 +1656,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         c.beginPath();
         c.arc(f.x, f.y, 2 + p * 3, 0, Math.PI * 2);
         c.fill();
+      } else if (f.kind === 'crumb') {
+        c.fillStyle = '#f0b840';
+        c.fillRect(f.x - 1.5, f.y - 1.5, 3, 3);
       } else if (f.kind === 'splash') {
         c.fillStyle = '#6ec6e8';
         c.beginPath();
@@ -1330,6 +1757,205 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.restore();
   }
 
+  function drawRetroDisplays(x0: number, x1: number) {
+    const t = retroClock;
+    c.save();
+    c.imageSmoothingEnabled = false;
+    const snap2 = (v: number) => Math.round(v / 2) * 2;
+    let corDrawn = false;
+    for (const l of world.stops) {
+      if (l.type !== 'shop' || l.x + l.w < x0 - 20 || l.x > x1 + 20) continue;
+      const id = l.stop.id;
+      const w1x = l.x + 18, w2x = l.x + l.w / 2 + 16, wy = 90, ww = l.w / 2 - 34, wh = 24;
+      if (id === 'eat-prey-nap') {
+        const ms = eatSim.getMouseState();
+        const pal = CAT_PALETTES[ms.palette];
+        c.fillStyle = pal.bg;
+        c.fillRect(w1x, wy, ww, wh);
+        c.fillStyle = pal.mound;
+        for (const [mx, my] of [[0.2, 0.72], [0.8, 0.3], [0.52, 0.22]]) {
+          c.fillRect(snap2(w1x + mx * (ww - 8)), snap2(wy + my * (wh - 4)), 6, 4);
+        }
+        if (ms.visible) {
+          c.fillStyle = pal.mouse;
+          c.fillRect(snap2(w1x + 4 + ms.u * (ww - 10)), snap2(wy + 3 + ms.v * (wh - 8)), 6, 4);
+        }
+        c.fillStyle = pal.bg;
+        c.fillRect(w2x, wy, ww, wh);
+        c.fillStyle = pal.mouse;
+        c.fillRect(w2x + 8, wy + 6, 10, 8);
+        c.fillRect(w2x + 8, wy + 16, 10, 4);
+        c.fillStyle = '#d9403a';
+        for (let k = 0; k < Math.min(4, ms.catches + 1); k++) c.fillRect(w2x + 24 + k * 8, wy + 10, 4, 4);
+
+        // 16-bit calico Tofu waiting on the pavement, eyes locked on the screen & hopping up.
+        const tx = snap2(l.x + 56 + streetTofu.offX);
+        const hopY = Math.round(streetTofu.hop * 0.4);
+        shadowAt(tx, FACADE + 5, 7, 3);
+        const ty = FACADE + 4 - hopY;
+        const wag = Math.sin(t * 7) * 3;
+        c.fillStyle = '#f6efe2';
+        c.fillRect(tx - 6, ty - 6, 12, 8);
+        c.fillStyle = '#d97236';
+        c.fillRect(tx - 5, ty - 5, 4, 4);
+        c.fillRect(tx - 6, ty - 8, 3, 3);
+        c.fillStyle = '#1b1d24';
+        c.fillRect(tx + 1, ty - 6, 4, 3);
+        c.fillRect(tx + 3, ty - 8, 3, 3);
+        c.fillStyle = '#b8e04c';
+        c.fillRect(tx - 3, ty - 4, 2, 2);
+        c.fillRect(tx + 1, ty - 4, 2, 2);
+        c.fillStyle = '#d97236';
+        c.fillRect(tx - 1, ty + 2, 2, 4);
+        c.fillStyle = '#1b1d24';
+        c.fillRect(snap2(tx - 1 + wag * 0.6), ty + 5, 2, 3);
+      } else if (id === 'dopepod') {
+        const st = podSim.getState();
+        c.fillStyle = '#0f162b';
+        c.fillRect(w1x, wy, ww, wh);
+        c.fillStyle = st.accent;
+        c.fillRect(w1x + 4, wy + 4, 16, 16);
+        c.fillStyle = '#14203d';
+        for (let b = 0; b < 4; b++) {
+          const bh = 4 + Math.round(Math.abs(Math.sin(t * (st.playing ? 7 : 2) + b * 1.1)) * 10);
+          c.fillRect(w1x + 6 + b * 3, wy + 20 - bh, 2, bh);
+        }
+        c.fillStyle = '#f4f1ea';
+        c.fillRect(w1x + 24, wy + 6, 30, 3);
+        c.fillStyle = st.accent;
+        c.fillRect(w1x + 24, wy + 13, 6 + Math.round(((t * 14) % 24)), 3);
+
+        c.fillStyle = '#0f162b';
+        c.fillRect(w2x, wy, ww, wh);
+        for (let r = 0; r < 3; r++) {
+          c.fillStyle = r === (st.episodeIdx % 3) ? st.accent : '#2a3860';
+          c.fillRect(w2x + 4, wy + 4 + r * 6, ww - 8, 4);
+        }
+      } else if (id === 'coriolis') {
+        if (!corDrawn) {
+          coriolis.renderToCanvas(cCorCtx, 1, 0);
+          corDrawn = true;
+        }
+        c.fillStyle = '#07090e';
+        c.fillRect(w1x, wy, ww, wh);
+        c.drawImage(cCor, 0, 0, 128, 128, w1x + Math.floor((ww - 24) / 2), wy, 24, 24);
+        c.fillStyle = '#07090e';
+        c.fillRect(w2x, wy, ww, wh);
+        for (let k = 0; k < 6; k++) {
+          const h = 4 + Math.round(Math.abs(Math.sin(t * 4 + k)) * 16);
+          c.fillStyle = k % 2 ? '#5eea8c' : '#1fc9b7';
+          c.fillRect(w2x + 6 + k * 8, wy + wh - 2 - h, 5, h);
+        }
+      } else if (id === 'stemma') {
+        const cols = ['#e5487a', '#ffb020', '#1fc9b7', '#8bcb3c'];
+        const keys = ['vox', 'drums', 'bass', 'keys'] as const;
+        for (const bx of [w1x, w2x]) {
+          c.fillStyle = '#0b1430';
+          c.fillRect(bx, wy, ww, wh);
+          for (let i = 0; i < 4; i++) {
+            const on = !stemMuted[keys[i]];
+            const segs = on ? 1 + Math.round(Math.abs(Math.sin(t * 5 + i * 1.4 + (bx === w2x ? 1.7 : 0))) * 4) : 1;
+            c.fillStyle = on ? cols[i] : '#2c3850';
+            for (let s = 0; s < segs; s++) {
+              c.fillRect(bx + 6 + i * 13, wy + wh - 4 - s * 4, 9, 2);
+            }
+          }
+        }
+      } else if (id === 'leash') {
+        c.fillStyle = '#cfc5b3';
+        c.fillRect(w1x, wy, ww, wh);
+        const mx = snap2(w1x + 12 + ((t * 18) % (ww - 24)));
+        c.fillStyle = '#d9403a';
+        c.fillRect(Math.max(w1x + 4, mx - 12), wy + 13, 12, 2);
+        c.fillStyle = '#1fc9b7';
+        c.fillRect(Math.max(w1x + 2, mx - 14), wy + 8, 5, 10);
+        c.fillStyle = '#ffb020';
+        c.fillRect(mx, wy + 12, 6, 4);
+        c.fillStyle = '#0b1430';
+        c.fillRect(w2x, wy, ww, wh);
+        c.fillStyle = '#ffb020';
+        c.fillRect(w2x + 6, wy + 6, 18, 4);
+        c.fillStyle = '#f4f1ea';
+        c.fillRect(w2x + 6, wy + 14, 42, 4);
+      } else {
+        const col = id === 'blog' ? '#e5487a' : id === 'about' ? '#8bcb3c' : '#3d73c7';
+        for (const [bi, bx] of [w1x, w2x].entries()) {
+          c.fillStyle = '#0f162b';
+          c.fillRect(bx, wy, ww, wh);
+          c.fillStyle = col;
+          c.fillRect(bx + 4, wy + 4, ww - 8, 4);
+          c.fillStyle = '#b7c2df';
+          const slide = Math.round(((t * 12 + bi * 14) % 20));
+          c.fillRect(bx + 4, wy + 11, ww - 12 - (slide % 14), 3);
+          c.fillRect(bx + 4, wy + 17, Math.max(12, ww - 20 + (slide % 8)), 3);
+        }
+      }
+    }
+    c.restore();
+  }
+
+  function renderRetroDrawer() {
+    if (!retroOpen || !rbCtx) return;
+    rbCtx.imageSmoothingEnabled = false;
+    if (retroOpen === 'eat-prey-nap') {
+      eatSim.draw();
+      rbCtx.drawImage(eatSim.canvas, 0, 0);
+      const stat = rbCtrl?.querySelector<HTMLElement>('[data-rb-stat]');
+      if (stat) {
+        const ms = eatSim.getMouseState();
+        const txt = `Catches: ${ms.catches} · Tap screen to pounce`;
+        if (stat.textContent !== txt) stat.textContent = txt;
+      }
+    } else if (retroOpen === 'dopepod') {
+      podSim.draw();
+      rbCtx.drawImage(podSim.canvas, 0, 0);
+      const st = podSim.getState();
+      const stat = rbCtrl?.querySelector<HTMLElement>('[data-rb-stat]');
+      const statTxt = `${st.showName} · ${st.episodeTitle}`;
+      if (stat && stat.textContent !== statTxt) {
+        stat.textContent = statTxt;
+        rbCtrl?.querySelectorAll<HTMLButtonElement>('[data-rb^="show-"]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(Number(b.dataset.rb!.slice(5)) === st.showIdx));
+        });
+      }
+      const playB = rbCtrl?.querySelector<HTMLButtonElement>('[data-rb="play"]');
+      const playTxt = st.playing ? 'Pause' : 'Play';
+      if (playB && playB.textContent !== playTxt) {
+        playB.textContent = playTxt;
+        playB.setAttribute('aria-pressed', String(st.playing));
+      }
+    } else if (retroOpen === 'coriolis') {
+      coriolis.renderToCanvas(cCorCtx, 1, 0);
+      rbCtx.fillStyle = '#050814';
+      rbCtx.fillRect(0, 0, 160, 100);
+      rbCtx.drawImage(cCor, 0, 0, 128, 128, 30, 0, 100, 100);
+    } else {
+      rbCtx.fillStyle = '#0b1430';
+      rbCtx.fillRect(0, 0, 160, 100);
+      rbCtx.fillStyle = '#182447';
+      rbCtx.fillRect(0, 0, 160, 18);
+      rbCtx.fillStyle = '#1fc9b7';
+      rbCtx.fillRect(0, 16, 160, 2);
+      rbCtx.fillStyle = '#f4f1ea';
+      rbCtx.font = '700 9px ui-monospace, monospace';
+      rbCtx.fillText('STEMMA 8-BIT DECK', 6, 11);
+      const cols = ['#e5487a', '#ffb020', '#1fc9b7', '#8bcb3c'];
+      const keys = ['vox', 'drums', 'bass', 'keys'] as const;
+      const names = ['VOX', 'DRM', 'BAS', 'KEY'];
+      for (let i = 0; i < 4; i++) {
+        const y = 24 + i * 18;
+        const on = !stemMuted[keys[i]];
+        rbCtx.fillStyle = on ? cols[i] : '#3a4a75';
+        rbCtx.fillText(names[i], 6, y + 10);
+        for (let s = 0; s < 16; s++) {
+          const active = on && ((s + Math.floor(retroClock * 10 + i * 3)) % 5 !== 0);
+          rbCtx.fillStyle = active ? cols[i] : '#1c2a4d';
+          rbCtx.fillRect(34 + s * 7, y + 3, 5, 10);
+        }
+      }
+    }
+  }
+
   function draw() {
     if (!cssW) return;
     const night = isNight();
@@ -1345,6 +1971,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     c.drawImage(bg, camX * bgScale, 0, viewW * bgScale, WH * bgScale, 0, Math.round(offY * dpr), canvas!.width, Math.round(WH * scale * dpr));
     c.setTransform(dpr * scale, 0, 0, dpr * scale, -camX * dpr * scale, offY * dpr);
     const x0 = camX, x1 = camX + viewW;
+    drawRetroDisplays(x0, x1);
 
     c.fillStyle = 'rgba(214, 178, 60, 0.35)';
     for (const s of stains) {
@@ -1444,6 +2071,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     for (const b of bubbles) drawBubble(b);
     drawHud();
     drawTransitDoors();
+    renderRetroDrawer();
   }
 
   // ---- Loop and events ---------------------------------------------------------------
@@ -1470,7 +2098,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     else sound.disable();
     if (soundBtn) {
       soundBtn.setAttribute('aria-pressed', String(on));
-      soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+      soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     }
   }
   // Two fullscreen modes: "window" fills the browser window (works everywhere),
@@ -1538,7 +2166,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   if (soundBtn) {
     soundBtn.setAttribute('aria-pressed', String(wantSound));
-    soundBtn.textContent = wantSound ? 'Sound on' : 'Sound off';
+    soundBtn.textContent = wantSound ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     soundBtn.addEventListener('click', () => setSound(!wantSound));
   }
   fig.querySelector<HTMLButtonElement>('[data-restart]')?.addEventListener('click', () => { takeLeash(); restart(); });
@@ -1563,11 +2191,43 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   // The real game's default bindings (autoload/game.gd, the default layout).
   const HOLD = new Set(['ShiftLeft', 'ShiftRight', 'BracketRight', 'Space', 'Enter', 'NumpadEnter', 'KeyF', 'End']);
   fig.addEventListener('keydown', (e) => {
-    if (e.target !== fig) return;
+    const inDrawer = !!retroOpen && !!rbEl?.contains(e.target as Node);
+    if (e.target !== fig && !inDrawer) return;
     const code = e.code;
     if (code === 'Escape') {
+      if (retroOpen) { closeRetroBooth(); return; }
       if (fig.classList.contains('immersive')) { toggleFullscreen(); return; }
       fig.blur();
+      return;
+    }
+    if (!e.repeat && code === 'KeyX') {
+      if (retroOpen) { closeRetroBooth(); return; }
+      if (near && isRetroId(near.stop.id)) { takeLeash(); openRetroBooth(near.stop.id); return; }
+    }
+    if (retroOpen) {
+      e.preventDefault();
+      if (retroOpen === 'coriolis') {
+        const ck: Record<string, SimKey> = {
+          ArrowUp: 'Up', KeyW: 'Up', ArrowDown: 'Down', KeyS: 'Down',
+          ArrowLeft: 'Left', KeyA: 'Left', ArrowRight: 'Right', KeyD: 'Right',
+          Enter: 'Select', NumpadEnter: 'Select', Backspace: 'Back',
+        };
+        const nowMs = performance.now();
+        if (!e.repeat && code === 'KeyM') { coriolis.command('Menu', nowMs); return; }
+        if (!e.repeat && code === 'Space') { coriolis.command('Next', nowMs); return; }
+        if (ck[code]) {
+          coriolis.setHeld(ck[code], true);
+          coriolis.key(ck[code], nowMs);
+          setTimeout(() => coriolis.setHeld(ck[code], false), 110);
+        }
+      } else if (!e.repeat && retroOpen === 'eat-prey-nap' && (code === 'Space' || code === 'Enter')) {
+        const ms = eatSim.getMouseState();
+        if (eatSim.pawAt(ms.u, ms.v) === 'catch') sound.pickup();
+        syncRetroControls();
+      } else if (!e.repeat && retroOpen === 'dopepod' && code === 'Space') {
+        podSim.togglePlay();
+        syncRetroControls();
+      }
       return;
     }
     if (code === 'Tab') {
@@ -1634,6 +2294,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         else if (b.id === 'pee') doPee();
         else if (b.id === 'grab') doPickup();
         else if (b.id === 'enter') goIn();
+        else if (b.id === 'try' && near && isRetroId(near.stop.id)) openRetroBooth(near.stop.id);
         else doBark();
         return;
       }
@@ -1739,8 +2400,24 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       set nature(v: number) { nature = v; },
       get poops() { return poops.length; },
       ball, world,
-      bones,
+      bones, croissant, alleyCat,
+      get celebrateT() { return celebrateT; },
+      completeAll() {
+        playing = true;
+        marked = 5;
+        bonesGot = 5;
+        croissant.got = true;
+        for (const k of Object.keys(goals) as (keyof typeof goals)[]) goals[k] = true;
+        finale();
+      },
       get near() { return near?.stop.id ?? null; },
+      get retroBooth() { return retroOpen; },
+      openBooth(id: RetroBoothId | null) {
+        if (!id) closeRetroBooth();
+        else openRetroBooth(id);
+      },
+      eatSim,
+      podSim,
       get view() { return { camX, scale, offY }; },
       get target() { return target; },
       buttons: () => buttons(),

@@ -1,21 +1,25 @@
 ---
-import type { CollectionEntry } from 'astro:content';
+import type { LocalizedEntry } from '../i18n/content';
+import { localePath, type Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
 
 interface Props {
-  prev: CollectionEntry<'projects'>;
-  next: CollectionEntry<'projects'>;
+  prev: LocalizedEntry<'projects'>;
+  next: LocalizedEntry<'projects'>;
+  locale?: Locale;
 }
-const { prev, next } = Astro.props;
+const { prev, next, locale = 'en' } = Astro.props;
+const ui = getUi(locale);
 ---
 
-<nav class="pager" aria-label="More projects">
-  <a class="prev" href={`/projects/${prev.id}`} rel="prev">
-    <span class="dir">Previous project</span>
-    <span class="name">{prev.data.title}</span>
+<nav class="pager" aria-label={ui.common.moreProjectsAria}>
+  <a class="prev" href={localePath(locale, `/projects/${prev.slug}`)} rel="prev">
+    <span class="dir">{ui.common.previousProject}</span>
+    <span class="name">{prev.entry.data.title}</span>
   </a>
-  <a class="next" href={`/projects/${next.id}`} rel="next">
-    <span class="dir">Next project</span>
-    <span class="name">{next.data.title}</span>
+  <a class="next" href={localePath(locale, `/projects/${next.slug}`)} rel="next">
+    <span class="dir">{ui.common.nextProject}</span>
+    <span class="name">{next.entry.data.title}</span>
   </a>
 </nav>
 

@@ -1,0 +1,118 @@
+---
+import Base from '../../layouts/Base.astro';
+import projectMeta from '../../data/project-meta.json';
+import { BCP47, type Locale } from '../../i18n/utils';
+import { getUi } from '../../i18n/ui';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const ui = getUi(locale).howIBuild;
+const fmtNum = new Intl.NumberFormat(BCP47[locale]);
+const leash = projectMeta.projects['path-of-leash-resistance'];
+const liveValues = [leash.commits, leash.mergedPrs, leash.testFiles, leash.mainWalks];
+const stats = ui.stats.map((s, idx) => ({
+  value: typeof liveValues[idx] === 'number' ? fmtNum.format(liveValues[idx]) : s.value,
+  label: s.label,
+}));
+---
+
+<Base title={ui.title} description={ui.description} locale={locale}>
+  <section class="wrap head">
+    <span class="eyebrow">{ui.eyebrow}</span>
+    <h1>{ui.heading}</h1>
+    <p class="lede">{ui.lede}</p>
+  </section>
+
+  <section class="wrap" aria-label={ui.statsAria}>
+    <ul class="stats">
+      {
+        stats.map((s) => (
+          <li>
+            <strong>{s.value}</strong>
+            <span>{s.label}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="note">{ui.statsNote}</p>
+  </section>
+
+  <section class="wrap section">
+    <div class="prose">
+      <h2>{ui.s1Heading}</h2>
+      <p>
+        {ui.s1BodyBeforeP}<code>PROJECT.md</code>{ui.s1BodyMiddle}<code>AGENTS.md</code>{ui.s1BodyAfterA}
+      </p>
+
+      <h2>{ui.s2Heading}</h2>
+      <p>{ui.s2P1}</p>
+      <p>{ui.s2P2}</p>
+
+      <h2>{ui.s3Heading}</h2>
+      <p>{ui.s3Lead}</p>
+      <ul>
+        {ui.s3ListBeforeCode.map((item) => <li>{item}</li>)}
+        <li>
+          <em>{ui.s3FeelCardTerm}</em>{ui.s3FeelCardRest}
+        </li>
+        <li>{ui.s3Changelog}</li>
+      </ul>
+
+      <h2>{ui.s4Heading}</h2>
+      <p>{ui.s4Body}</p>
+
+      <h2>{ui.s5Heading}</h2>
+      <p>{ui.s5Body}</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-block: clamp(32px, 6vw, 64px) 48px;
+  }
+  h1 {
+    font-size: clamp(48px, 7vw, 88px);
+  }
+  .lede {
+    max-width: 680px;
+    font-size: 20px;
+    color: var(--ink-2);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .stats li {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 28px;
+    background: var(--feature-bg);
+    color: var(--feature-ink);
+    border-radius: var(--radius-l);
+  }
+  .stats strong {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 5vw, 56px);
+    line-height: 1;
+    color: var(--saffron);
+  }
+  .stats span {
+    color: var(--feature-ink-2);
+  }
+  .note {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+</style>

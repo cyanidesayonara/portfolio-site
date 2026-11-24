@@ -25,6 +25,7 @@ export type Circle = {
   r: number;
   what: 'lamp' | 'tree' | 'hydrant' | 'bin' | 'bollard' | 'table' | 'fountain';
   marked?: boolean;
+  color?: string;
 };
 export type Box = { shape: 'box'; x: number; y: number; w: number; h: number; what: 'bench' | 'planter' | 'railing' };
 export type Solid = Circle | Box;
@@ -35,10 +36,13 @@ export type World = {
   solids: Solid[];
   peeSpots: Circle[];
   benches: Box[];
+  farBenches: Box[];
   crossings: number[];
-  windows: { x: number; y: number; w: number; h: number }[];
+  windows: { x: number; y: number; w: number; h: number; shop?: boolean }[];
   bones: { x: number; y: number }[];
   drinks: { x: number; y: number; kind: 'bowl' | 'fountain' }[];
+  croissant: { x: number; y: number };
+  alleyCat: { x: number; y: number };
   park: StopLot;
   metro: Extract<Lot, { type: 'metro' }> | null;
   width: number;
@@ -115,7 +119,7 @@ export function buildWorld(stops: Stop[]): World {
   const shops = stopLots.filter((l) => l.type === 'shop');
 
   const solids: Solid[] = [];
-  const crossings = [600, 1480].filter((c) => c < park.x - 80);
+  const crossings = [600, 1480, 2120].filter((c) => c < park.x - 80);
   const nearCrossing = (px: number) => crossings.some((c) => px > c - 40 && px < c + 100);
 
   // The curb line: lampposts and trees, with bins and hydrants between.
@@ -126,13 +130,23 @@ export function buildWorld(stops: Stop[]): World {
     else if (i % 4 === 0) solids.push({ shape: 'circle', x: px + 80, y: 198, r: 6, what: 'bin' });
   }
   for (const c of crossings) {
-    for (const bx of [c - 14, c + 70]) solids.push({ shape: 'circle', x: bx, y: 208, r: 3.5, what: 'bollard' });
+    for (const bx of [c - 14, c + 70]) {
+      solids.push({ shape: 'circle', x: bx, y: 208, r: 3.5, what: 'bollard' });
+      solids.push({ shape: 'circle', x: bx, y: 352, r: 3.5, what: 'bollard' });
+    }
   }
-  // The far curb: lamps and trees, kept clear of the crossings and the metro.
+  const nearSouthObs = (px: number, pad = 42) =>
+    crossings.some((c) => px > c - pad && px < c + 56 + pad) ||
+    (metro !== null && px > metro.x - 56 && px < metro.x + metro.w + 40);
+  // The far curb: lamps, trees, hydrants, and bins kept clear of crossings and metro.
   for (let px = 195, i = 0; px < width - 40; px += 170, i++) {
-    if (nearCrossing(px)) continue;
-    if (metro && px > metro.x - 50 && px < metro.x + metro.w + 30) continue;
-    solids.push(i % 2 === 0 ? { shape: 'circle', x: px, y: 362, r: 4.5, what: 'lamp' } : { shape: 'circle', x: px, y: 366, r: 7, what: 'tree' });
+    if (!nearCrossing(px) && !(metro && px > metro.x - 50 && px < metro.x + metro.w + 30)) {
+      solids.push(i % 2 === 0 ? { shape: 'circle', x: px, y: 362, r: 4.5, what: 'lamp' } : { shape: 'circle', x: px, y: 366, r: 7, what: 'tree' });
+    }
+    const sx = px + 82;
+    if (sx < width - 50 && !nearSouthObs(sx, 36) && i % 3 !== 1) {
+      solids.push({ shape: 'circle', x: sx, y: 359, r: i % 3 === 0 ? 5 : 6, what: i % 3 === 0 ? 'hydrant' : 'bin' });
+    }
   }
   if (metro) {
     // Railings around three sides of the stairwell; the west end is open.
@@ -157,6 +171,31 @@ export function buildWorld(stops: Stop[]): World {
     solids.push({ shape: 'box', x: l.x + 8, y: 126, w: 26, h: 12, what: 'planter' });
   });
 
+  // South sidewalk benches, planters, terrace parasols, croissant & alley cat spot.
+  const farBenches: Box[] = [];
+  for (const bx of [315, 735, 1135, 1745]) {
+    if (bx + 60 < width && !nearSouthObs(bx + 24, 48)) {
+      farBenches.push({ shape: 'box', x: bx, y: 398, w: 48, h: 12, what: 'bench' });
+    }
+  }
+  solids.push(...farBenches);
+  for (const px of [275, 920, 1345, 1815]) {
+    if (px + 30 < width && !nearSouthObs(px + 13, 36)) {
+      solids.push({ shape: 'box', x: px, y: 403, w: 26, h: 12, what: 'planter' });
+    }
+  }
+  const southTerraces: [number, string][] = [
+    [420, '#e5487a'],
+    [466, '#ffb020'],
+    [1232, '#1fc9b7'],
+    [1278, '#ffb020'],
+  ];
+  for (const [tx, color] of southTerraces) {
+    if (!nearSouthObs(tx, 34)) solids.push({ shape: 'circle', x: tx, y: 386, r: 8, what: 'table', color });
+  }
+  const croissant = { x: 820, y: 398 };
+  const alleyCat = { x: 1085, y: 404 };
+
   // A café terrace outside the About café.
   const cafe = shops.find((l) => l.stop.id === 'about');
   if (cafe) {
@@ -172,22 +211,25 @@ export function buildWorld(stops: Stop[]): World {
     (s): s is Circle => s.shape === 'circle' && ['lamp', 'tree', 'hydrant', 'bin', 'bollard'].includes(s.what),
   );
 
-  // Bones to find: along the shopfronts, one out in the road, one in the park.
+  // Bones to find: along the shopfronts, one in the road, two on the south side, one in the park.
   const bones: { x: number; y: number }[] = [];
   for (let bx = 250; bx < park.x - 60; bx += 340) bones.push({ x: bx, y: 141 });
-  bones.push({ x: crossings[0] + 160, y: 300 }, { x: park.x + 120, y: 70 });
+  bones.push({ x: crossings[0] + 160, y: 300 }, { x: 505, y: 392 }, { x: 1350, y: 392 }, { x: park.x + 120, y: 70 });
 
-  // Somewhere to drink: water bowls outside the café and the kiosk, and a
-  // cast-iron drinking fountain in the park.
+  // Somewhere to drink: bowls outside About, Blog, and the south-side bakery, plus the park fountain.
   const drinks: { x: number; y: number; kind: 'bowl' | 'fountain' }[] = [];
   for (const id of ['about', 'blog']) {
     const l = shops.find((x) => x.stop.id === id);
     if (l) drinks.push({ x: l.x + l.w / 2 + 30, y: 133, kind: 'bowl' });
   }
+  drinks.push({ x: 872, y: 407, kind: 'bowl' });
   drinks.push({ x: park.x + 70, y: 196, kind: 'fountain' });
   solids.push({ shape: 'circle', x: park.x + 70, y: 196, r: 6, what: 'fountain' });
 
-  return { lots, stops: stopLots, solids, peeSpots, benches, crossings, windows: [], bones, drinks, park, metro, width };
+  return {
+    lots, stops: stopLots, solids, peeSpots, benches, farBenches, crossings,
+    windows: [], bones, drinks, croissant, alleyCat, park, metro, width,
+  };
 }
 
 // ---- Static layer --------------------------------------------------------------
@@ -318,10 +360,40 @@ function drawFarSide(c: CanvasRenderingContext2D, w: World) {
       }
     }
   }
-  // The next block, seen from above: terracotta roofs behind a cream parapet,
-  // in varied widths so it does not mirror the near side.
+  // Peeking storefront awnings & floral crates along the south sidewalk edge.
+  const awnings: { x: number; w: number; c: string; label: string }[] = [
+    { x: 392, w: 112, c: '#e5487a', label: 'GELATERIA' },
+    { x: 785, w: 108, c: '#ffb020', label: 'FORN' },
+    { x: 1045, w: 86, c: '#8bcb3c', label: 'FLORS' },
+    { x: 1205, w: 110, c: '#1fc9b7', label: 'BAR' },
+  ];
+  for (const aw of awnings) {
+    if (aw.x + aw.w >= w.width) continue;
+    for (let k = 0; k < 8; k++) {
+      c.fillStyle = k % 2 ? '#f4f1ea' : aw.c;
+      c.fillRect(aw.x + (aw.w / 8) * k, FAR_EDGE - 7, aw.w / 8, 7);
+    }
+    c.fillStyle = '#0b1430';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `800 6.5px ${FONT}`;
+    c.fillText(aw.label, aw.x + aw.w / 2, FAR_EDGE - 3.5);
+  }
+  // Floral crates outside Flors
+  for (const fx of [1052, 1098]) {
+    c.fillStyle = '#8a5a3c';
+    c.fillRect(fx, FAR_EDGE - 12, 18, 5);
+    c.fillStyle = '#e5487a';
+    c.fillRect(fx + 2, FAR_EDGE - 11, 4, 3);
+    c.fillStyle = '#ffb020';
+    c.fillRect(fx + 8, FAR_EDGE - 11, 4, 3);
+    c.fillStyle = '#8bcb3c';
+    c.fillRect(fx + 13, FAR_EDGE - 11, 3, 3);
+  }
+  // The next block, seen from above: terracotta roofs with skylights, chimneys & greenery.
   const rand = rng(11);
   const roofs = ['#b2563a', '#a87561', '#c2997a', '#9a8a78', '#b88566'];
+  const laundryCols = ['#f4f1ea', '#ffb020', '#1fc9b7', '#e5487a'];
   for (let x = 0, i = 0; x < w.width; i++) {
     const bw = 110 + Math.floor(rand() * 90);
     c.fillStyle = roofs[i % roofs.length];
@@ -330,6 +402,40 @@ function drawFarSide(c: CanvasRenderingContext2D, w: World) {
     for (let ty = FAR_EDGE + 8; ty < WH; ty += 6) c.fillRect(x, ty, bw, 1.5);
     c.fillStyle = '#e9ddc2';
     c.fillRect(x, FAR_EDGE, bw, 3);
+    // Rooftop details: skylight, chimney pot, AC unit, or potted plant + washing line.
+    if (i % 3 === 0 && bw > 120) {
+      c.fillStyle = '#6ec6e8';
+      c.fillRect(x + 24, FAR_EDGE + 7, 20, 10);
+      c.strokeStyle = '#e9ddc2';
+      c.lineWidth = 1;
+      c.strokeRect(x + 24, FAR_EDGE + 7, 20, 10);
+    } else if (i % 3 === 1) {
+      c.fillStyle = '#b0674a';
+      c.fillRect(x + bw - 34, FAR_EDGE + 6, 10, 9);
+      c.fillStyle = '#5f9e4a';
+      c.beginPath();
+      c.arc(x + 20, FAR_EDGE + 11, 5, 0, Math.PI * 2);
+      c.fill();
+    } else {
+      c.fillStyle = '#d4d8df';
+      c.fillRect(x + 18, FAR_EDGE + 8, 12, 8);
+      c.fillStyle = '#6d7484';
+      c.beginPath();
+      c.arc(x + 24, FAR_EDGE + 12, 3, 0, Math.PI * 2);
+      c.fill();
+    }
+    if (i % 2 === 1 && bw > 125) {
+      c.strokeStyle = 'rgba(244, 241, 234, 0.7)';
+      c.lineWidth = 0.8;
+      c.beginPath();
+      c.moveTo(x + 52, FAR_EDGE + 7);
+      c.quadraticCurveTo(x + 76, FAR_EDGE + 14, x + 100, FAR_EDGE + 7);
+      c.stroke();
+      for (let l = 0; l < 4; l++) {
+        c.fillStyle = laundryCols[(i + l) % laundryCols.length];
+        c.fillRect(x + 58 + l * 10, FAR_EDGE + 8 + (l === 1 || l === 2 ? 2 : 0), 6, 6);
+      }
+    }
     c.fillStyle = 'rgba(0,0,0,0.12)';
     c.fillRect(x + bw - 2, FAR_EDGE, 2, WH - FAR_EDGE);
     x += bw;
@@ -542,16 +648,14 @@ function drawShop(c: CanvasRenderingContext2D, w: World, l: Extract<Lot, { type:
   }
   c.fillStyle = 'rgba(0,0,0,0.15)';
   c.fillRect(l.x + 4, 47, aw, 2);
-  // Display windows with something in them
+  // Retro dark glass bezels: live 8/16-bit animations draw inside each frame in game.ts.
   for (const wx of [l.x + 18, l.x + l.w / 2 + 16]) {
     const ww = l.w / 2 - 34;
-    c.fillStyle = 'rgba(255,255,255,0.6)';
+    c.fillStyle = '#14203d';
+    c.fillRect(wx - 2, 88, ww + 4, 28);
+    c.fillStyle = '#0b1430';
     c.fillRect(wx, 90, ww, 24);
-    w.windows.push({ x: wx, y: 90, w: ww, h: 24 });
-    c.fillStyle = accent;
-    c.globalAlpha = 0.55;
-    for (let k = 0; k < 3; k++) c.fillRect(wx + 6 + k * (ww / 3), 102, ww / 3 - 10, 10);
-    c.globalAlpha = 1;
+    w.windows.push({ x: wx, y: 90, w: ww, h: 24, shop: true });
   }
   c.fillStyle = '#2a2f3d';
   c.fillRect(l.x + l.w / 2 - 11, 88, 22, FACADE - 88);
@@ -806,7 +910,7 @@ export function drawTops(c: CanvasRenderingContext2D, w: World, x0: number, x1: 
     } else if (s.what === 'table') {
       // A striped parasol
       for (let k = 0; k < 8; k++) {
-        c.fillStyle = k % 2 ? '#f4f1ea' : '#8bcb3c';
+        c.fillStyle = k % 2 ? '#f4f1ea' : s.color ?? '#8bcb3c';
         c.beginPath();
         c.moveTo(s.x, s.y - 4);
         c.arc(s.x, s.y - 4, 22, (k * Math.PI) / 4, ((k + 1) * Math.PI) / 4);
@@ -817,9 +921,9 @@ export function drawTops(c: CanvasRenderingContext2D, w: World, x0: number, x1: 
 }
 
 export function drawNightLights(c: CanvasRenderingContext2D, w: World, x0: number, x1: number) {
-  c.fillStyle = 'rgba(255, 214, 130, 0.85)';
   for (const win of w.windows) {
     if (win.x + win.w < x0 || win.x > x1) continue;
+    c.fillStyle = win.shop ? 'rgba(255, 214, 130, 0.16)' : 'rgba(255, 214, 130, 0.85)';
     c.fillRect(win.x, win.y, win.w, win.h);
   }
   c.globalCompositeOperation = 'lighter';

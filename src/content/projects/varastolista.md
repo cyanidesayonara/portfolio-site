@@ -4,7 +4,7 @@ tagline: Inventory management for a hospital district's spare parts warehouse.
 summary: A Django app that replaced paper records for the Hospital District of Helsinki's warehouse, with QR scanning and Excel import and export.
 kind: Web app
 stack: [Python, Django, jQuery, PostgreSQL, Docker]
-cover: /img/projects/varastolista.png
+cover: /img/projects/varastolista.webp
 coverAlt: The Varastolista inventory interface
 links:
   - label: Source on GitHub

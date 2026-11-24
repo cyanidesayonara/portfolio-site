@@ -27,8 +27,9 @@ export interface StraysCtx {
   dog: { x: number; y: number; z: number; vx: number; vz: number };
   floor: (x: number, z: number, y: number) => number;
   collide: (p: P, r: number, feetY: number) => void;
-  /** How many different cats have been sent running so far (this page load). */
+  /** How many different cats have been sent running so far. */
   onScared: (count: number) => void;
+  onDone?: (key: string) => void;
 }
 
 /** Home spots on the hill: lower square, mid terrace, mirador, church square. */
@@ -66,6 +67,7 @@ export function createStrays(ctx: StraysCtx) {
     audio.meow({ x: c.x, z: c.z });
     if (!scared.has(c.i)) {
       scared.add(c.i);
+      ctx.onDone?.(`cat:${c.i}`);
       ctx.onScared(scared.size);
     }
   };
@@ -115,9 +117,16 @@ export function createStrays(ctx: StraysCtx) {
     for (const c of cats) if (Math.hypot(c.x - dog.x, c.z - dog.z) < 6) bolt(c);
   };
 
+  const restore = (doneKeys: ReadonlySet<string>) => {
+    for (let i = 0; i < SPOTS.length; i++) {
+      if (doneKeys.has(`cat:${i}`)) scared.add(i);
+    }
+  };
+
   return {
     update,
     bark,
+    restore,
     debug: { cats, get scared() { return scared.size; } },
   };
 }

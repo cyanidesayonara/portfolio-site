@@ -41,7 +41,9 @@ export const PLAZA = {
   waiter: { x: -9.2, z: 128.6 },
   market: { x0: -14, x1: 14, z0: 139, z1: 151 },
   stall: { x0: -10, x1: -4, z0: 136.2, z1: 137.6 },
+  flowerStall: { x0: 4, x1: 10, z0: 136.2, z1: 137.6 },
   butcher: { x: -7, z: 138.4 },
+  florist: { x: 7, z: 138.4 },
   /** Where Millie stands to snatch the botifarra off the counter. */
   grab: { x: -7, z: 135.5 },
   pipica: PIP,
@@ -55,6 +57,7 @@ export const PLAZA = {
     [[-1.4, 99], [-8, 108], [-9, 120], [-2, 135], [-17, 141], [-17, 157.6], [-50, 157.8]],
     [[50, 158.4], [17, 158.2], [17, 141], [3, 136], [9, 120], [8, 108], [1.4, 99]],
     [[-58, 157.2], [-20, 157.4], [20, 157.2], [58, 157.4]],
+    [[-8, 133], [0, 135], [5.5, 134], [5.5, 124], [-7, 124]],
   ] as [number, number][][],
 };
 
@@ -150,13 +153,26 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   }
   builder.addBox(-2.4, Y, MK.z0 - 0.06, 2.4, Y + 4.2, MK.z0 + 0.02, 0x1d2433); // doorway
   builder.addBox(-2.8, Y + 4.2, MK.z0 - 0.14, 2.8, Y + 4.6, MK.z0, stone);
+  // Market entrance clock gable and warm lantern sconces flanking the portal.
+  builder.addBox(-1.6, Y + 8.9, MK.z0 - 0.25, 1.6, Y + 10.6, MK.z0 + 0.1, stone);
+  builder.addBox(-0.85, Y + 9.15, MK.z0 - 0.3, 0.85, Y + 10.35, MK.z0 - 0.22, 0xf4efe4);
+  builder.addBox(-1.8, Y + 10.6, MK.z0 - 0.32, 1.8, Y + 10.85, MK.z0 + 0.15, zinc);
+  // Square planters flanking the market door and the square entrance.
+  const potMat = M(0xb2563a, 0.85);
+  const bushMat = M(0x4e8c40, 0.85, 0, { flatShading: true });
+  const bushGeo = new THREE.IcosahedronGeometry(0.36, 1);
+  for (const [px, pz] of [[-3.3, MK.z0 - 0.5], [3.3, MK.z0 - 0.5], [-5.2, 102.2], [5.2, 102.2]]) {
+    place(cyl(0.28, 0.21, 0.42, potMat, 10), px, Y + 0.21, pz);
+    place(new THREE.Mesh(bushGeo, bushMat), px, Y + 0.62, pz);
+    addBox({ x0: px - 0.35, x1: px + 0.35, z0: pz - 0.35, z1: pz + 0.35, top: Y + 1.0, kind: 'planter' });
+  }
   for (const x of [MK.x0, MK.x1 - 0.5]) builder.addBox(x, Y, MK.z0 - 0.15, x + 0.5, Y + 8.4, MK.z0 + 0.2, stone); // corner pilasters
   addBox({ x0: MK.x0, x1: MK.x1, z0: MK.z0, z1: MK.z1, top: Y + 11, kind: 'building' });
   const sign = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.2, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('MERCAT', 'Market hall', '#e5487a', { aspect: 6 }), roughness: 0.7 }));
   place(sign, 0, Y + 7.6, MK.z0 - 0.12);
   yield;
 
-  // ---- The butcher's stall out front: a striped counter under an awning ----
+  // ---- The butcher's stall (west) and produce/flower stall (east) out front ----
   const S = PLAZA.stall;
   builder.addBox(S.x0, Y, S.z0, S.x1, Y + 0.95, S.z1, 0xf4f1ea);
   for (let x = S.x0; x < S.x1 - 0.1; x += 0.6) builder.addBox(x, Y + 0.1, S.z0 - 0.01, x + 0.3, Y + 0.85, S.z0, 0xc23b32);
@@ -175,6 +191,24 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   const stallSign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.55, 0.06), new THREE.MeshStandardMaterial({ map: signTexture('Carnisseria', 'Butcher', '#c23b32', { aspect: 3.2 / 0.55 }), roughness: 0.7 }));
   place(stallSign, (S.x0 + S.x1) / 2, Y + 2.95, S.z0 - 0.5);
   addBox({ x0: S.x0, x1: S.x1, z0: S.z0, z1: S.z1, top: Y + 1.0, kind: 'stall' });
+  yield;
+
+  // East stall: flowers and market produce under a green-and-cream awning.
+  const FST = PLAZA.flowerStall;
+  builder.addBox(FST.x0, Y, FST.z0, FST.x1, Y + 0.9, FST.z1, 0x8c7362);
+  builder.addBox(FST.x0 - 0.1, Y + 0.9, FST.z0 - 0.1, FST.x1 + 0.1, Y + 0.98, FST.z1 + 0.1, 0xd8cdb8);
+  for (const x of [FST.x0 + 0.05, FST.x1 - 0.12]) builder.addBox(x, Y, FST.z1 + 0.6, x + 0.07, Y + 2.6, FST.z1 + 0.67, 0x3d3d45);
+  for (let i = 0; i < 10; i++) {
+    const x0 = FST.x0 - 0.3 + i * 0.66;
+    builder.addBox(x0, Y + 2.55, FST.z0 - 0.5, x0 + 0.66, Y + 2.62, FST.z1 + 0.7, i % 2 ? 0xf4f1ea : 0x2f6b4f);
+  }
+  const bloomCols = [0xe5487a, 0xffb020, 0x8bcb3c, 0xf28a1e, 0xe8d45c];
+  for (let i = 0; i < 5; i++) {
+    const cx = FST.x0 + 0.6 + i * 1.2;
+    builder.addBox(cx - 0.38, Y + 0.98, FST.z0 + 0.15, cx + 0.38, Y + 1.24, FST.z1 - 0.15, 0x7a5a3c);
+    builder.addBox(cx - 0.32, Y + 1.24, FST.z0 + 0.2, cx + 0.32, Y + 1.44, FST.z1 - 0.2, bloomCols[i]);
+  }
+  addBox({ x0: FST.x0, x1: FST.x1, z0: FST.z0, z1: FST.z1, top: Y + 1.0, kind: 'stall' });
   yield;
 
   // ---- The fountain: a stone basin, a column and a spouting bowl ----

@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import Walk3D from '../Walk3D.astro';
+import songs from '../../../public/audio/stemma/songs.json';
+import type { Locale } from '../../i18n/utils';
+import { getUi } from '../../i18n/ui';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const ui = getUi(locale).walkPage;
+
+// CC BY tracks need their credit wherever they can play.
+const credits = songs.songs.map((s) => ({
+  title: s.title,
+  who: s.credit_as ?? s.artist,
+  licence: s.licence,
+  licenceUrl: s.licence_url,
+  source: s.source,
+}));
+---
+
+<Base title={ui.title} description={ui.description} image="/img/projects/leash-street.jpg" locale={locale}>
+  <section class="wrap head">
+    <h1>{ui.heading}</h1>
+    <span class="eyebrow">{ui.eyebrow}</span>
+  </section>
+
+  <section class="wrap game">
+    <Walk3D locale={locale} />
+    <p class="lede">{ui.lede}</p>
+    <p class="credits">
+      {ui.creditsPrefix}
+      {credits.map((c, i) => (
+        <>
+          {i > 0 && ' · '}
+          “<a href={c.source} rel="noopener">{c.title}</a>” {ui.creditBy} {c.who} (<a href={c.licenceUrl} rel="noopener">{c.licence}</a>)
+        </>
+      ))}
+    </p>
+  </section>
+</Base>
+
+<style>
+  .head {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 14px;
+    padding-block: 6px 10px;
+  }
+  .head .eyebrow {
+    margin: 0;
+  }
+  h1 {
+    font-size: clamp(24px, 3vw, 34px);
+    margin: 0;
+  }
+  .lede {
+    margin-top: 14px;
+    max-width: 780px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .game {
+    margin-bottom: 56px;
+  }
+  .credits {
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+</style>

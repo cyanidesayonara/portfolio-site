@@ -6,8 +6,12 @@
 */
 import * as THREE from 'three';
 import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim';
-import { WalkAudio, STEM_GROUPS, type StemGroup, type SongMeta } from './audio';
-import { Hud, type GoalRow } from './hud';
+import { WalkAudio, STEM_GROUPS } from './audio';
+import { Hud } from './hud';
+import { createParticles } from './particles';
+import { createSkySystem } from './sky';
+import { createGoalSystem } from './goals';
+import { createBoothPanels } from './boothPanels';
 import { Leash, applyTug, capStretch, WhirlDetector, type Obstacle } from './leash';
 import { buildLevelSteps, runSliced, LEVEL_STEPS, PIPICA, WATER_Y, RAMBLA_Y, GROUND_Y, TRAIN_Y, TRAIN_Z, type Level } from './level';
 import { Streamer, type District } from './world';
@@ -25,11 +29,15 @@ import { HILL } from './hill';
 import { bakeStatic, collapseRig } from './bake';
 import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
-import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
+import { SKY } from './theme';
 import { createTransitOverlay, playDepartureDoors } from './transit';
 import { trackVisibleViewport } from '../viewport';
-import { AREAS, AREA_BONUS, areaOfDistrict, loadProgress, saveProgress, clearProgress } from './progress';
+import { areaOfDistrict } from './progress';
 import { createStrays } from './strays';
+import {
+  EatPreyNapSim, DopepodSim, createBoardwalkBoothScreens,
+} from './booths';
+import projectMeta from '../../data/project-meta.json';
 
 type CamMode = 'street' | 'follow' | 'overhead';
 
@@ -57,8 +65,9 @@ const DOG_R = 0.3;
 const HUMAN_R = 0.3;
 const WALK = 3.0, RUN = 5.6, HUMAN_WALK = 1.35;
 const STEP_UP = 0.35;
-// Swimming: Millie floats with her back just under the surface once the water is deeper than this.
-const SWIM_DEPTH = 0.42, SWIM_SINK = 0.4, HUMAN_WADE = 0.95;
+// Swimming: both characters float/swim once the water gets deep enough.
+const SWIM_DEPTH = 0.42, SWIM_SINK = 0.38;
+const HUMAN_SWIM_DEPTH = 0.78, HUMAN_SWIM_SINK = 0.68, HUMAN_SWIM_SPEED = 1.15;
 
 export interface WalkOptions { home?: boolean }
 
@@ -94,47 +103,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // Far enough for the hills and the skyline (horizon.ts, up to ~1.5 km out).
   const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.15, 1800);
 
-  // Sky dome with a vertical gradient, plus stars and a moon for the night.
-  const skyUniforms = { top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() } };
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(600, 24, 12),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyUniforms,
-      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: 'uniform vec3 top; uniform vec3 horizon; varying vec3 vP; void main(){ float h = clamp(vP.y*1.6, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.7)), 1.0); }',
-    }),
-  );
-  sky.renderOrder = -1; // always first: it writes no depth, so everything draws over it
-  scene.add(sky);
-  const starGeo = new THREE.BufferGeometry();
-  const starPos: number[] = [];
-  for (let i = 0; i < 500; i++) {
-    const a = Math.random() * Math.PI * 2, e = Math.random() * 0.9 + 0.08;
-    starPos.push(Math.cos(a) * Math.cos(e) * 500, Math.sin(e) * 500, Math.sin(a) * Math.cos(e) * 500);
-  }
-  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85 }));
-  scene.add(stars);
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf4efe0, fog: false }));
-  moon.position.set(-120, 140, -420);
-  scene.add(moon);
+  const skySys = createSkySystem(scene, renderer, root);
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x888888, 1);
-  scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 2);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 120;
-  sun.shadow.camera.left = -34;
-  sun.shadow.camera.right = 34;
-  sun.shadow.camera.top = 34;
-  sun.shadow.camera.bottom = -34;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.03;
-  scene.add(sun, sun.target);
-
-  // ---- Coriolis LED wall texture ------------------------------------------------------
+  // ---- Coriolis & boardwalk booth screens ---------------------------------------------
   const cCanvas = document.createElement('canvas');
   cCanvas.width = cCanvas.height = 512;
   const cCtx = cCanvas.getContext('2d')!;
@@ -142,6 +113,15 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const coriolisTex = new THREE.CanvasTexture(cCanvas);
   coriolisTex.colorSpace = THREE.SRGBColorSpace;
   coriolisTex.magFilter = THREE.NearestFilter;
+  const catSim = new EatPreyNapSim();
+  const podSim = new DopepodSim();
+  const polrMeta = projectMeta.projects['path-of-leash-resistance'];
+  const boothScreens = createBoardwalkBoothScreens({
+    catSim,
+    podSim,
+    commits: polrMeta?.commits ?? 2242,
+    mainWalks: polrMeta?.mainWalks ?? 51,
+  });
 
   // Build in slices behind a loading bar (or commuter train cutscene), then bake what's
   // near the start. The rest bakes in the background while you play (the Streamer).
@@ -150,7 +130,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const viaMetro = searchParams.get('via') === 'metro';
   const walktest = searchParams.has('walktest');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const transit = createTransitOverlay(host, { viaTrain, viaMetro, night: isNightTheme(), reduced: reducedMotion, walktest });
+  const transit = createTransitOverlay(host, { viaTrain, viaMetro, night: skySys.getMode() === 'night', reduced: reducedMotion, walktest });
   const buildT0 = performance.now();
   let stepsDone = 0;
   // Longest single step (the page can't respond during one): what to split next.
@@ -169,7 +149,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       yield r.value;
     }
   };
-  const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex })), () => {
+  const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex, boothScreens: boothScreens.textures })), () => {
     transit.setProgress(Math.min(70, (stepsDone / LEVEL_STEPS) * 70));
   }, 14);
   const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : viaMetro ? level.metro.dog : level.start.dog;
@@ -243,10 +223,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let hurdlesGot = 0;
   let townDone = 0;
   let combo: null | { links: string[]; pts: number; t: number } = null;
-  let coriolisFocus = false;
-  let stemmaOpen = false;
   let camMode: CamMode = 'street';
-  let skyMode: SkyMode = isNightTheme() ? 'night' : 'day';
   let nearStop: Level['stops'][number] | null = null;
   let time = 0;
   let slowmo = 0;
@@ -254,91 +231,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let fireworksT = 0;
   const markedSpots = new Set<object>();
 
-  const goals: GoalRow[] = [
-    { id: 'mark', label: 'Mark 5 spots (Q)', done: false, count: 0, target: 5, area: 'any' },
-    { id: 'birds', label: 'Scatter the gulls or pigeons (E)', done: false, area: 'any' },
-    { id: 'whirl', label: 'Fling your human with a pole whirl', done: false, area: 'any' },
-    { id: 'finds', label: 'Dig up 3 finds on the beach (Space)', done: false, count: 0, target: 3, area: 'seafront' },
-    { id: 'hurdles', label: 'Clear the 3 hurdles in the pipicà (V)', done: false, count: 0, target: 3, area: 'seafront' },
-    { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false, area: 'seafront' },
-    { id: 'stemma', label: 'Change the music at stemma (X)', done: false, area: 'seafront' },
-    { id: 'pier', label: 'Walk to the end of the pier', done: false, area: 'seafront' },
-    { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false, area: 'seafront' },
-    { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
-    { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
-    { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
-    { id: 'plaza', label: 'Help out on Plaça del Mercat', done: false, count: 0, target: 3, area: 'plaza' },
-    { id: 'butcher', label: 'Get away with the butcher’s botifarra', done: false, area: 'plaza' },
-    { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2, area: 'hill' },
-    { id: 'cats', label: 'Send 3 old-town cats running', done: false, count: 0, target: 3, area: 'hill' },
-    { id: 'hill_top', label: 'Climb to the hilltop church and head home', done: false, area: 'hill' },
-  ];
-  const goal = (id: string) => goals.find((g) => g.id === id)!;
   // Progress is saved in this browser (progress.ts); ?walktest starts clean
   // and never saves unless ?walksave is added too.
   const saving = !walktest || searchParams.has('walksave');
-  let progressDirty = false;
-  let resetting = false;
-  // Counts reported by the game are per page load; saved counts are added on top.
-  const countBase: Record<string, number> = {};
-  let area = 'seafront';
-  const showGoals = () => hud.setGoals(goals, AREAS, area);
-  const completeGoal = (id: string) => {
-    const g = goal(id);
-    if (g.done) return;
-    g.done = true;
-    if (g.target) g.count = g.target;
-    hud.toast('Goal complete', g.label.replace(/ \([^)]*\)$/, ''), '#8bcb3c');
-    audio.goal();
-    // Every goal in an area done: a bonus, once.
-    const a = AREAS.find((x) => x.id === g.area);
-    if (a && a.id !== 'any' && goals.filter((x) => x.area === a.id).every((x) => x.done)) {
-      setTimeout(() => {
-        bones += AREA_BONUS;
-        hud.shout(`${a.label.toUpperCase()} DONE +${AREA_BONUS}`, 'good');
-        progressDirty = true;
-      }, 1200);
-    }
-    showGoals();
-    progressDirty = true;
-    if (goals.every((x) => x.done)) setTimeout(() => hud.shout('BEST WALK EVER', 'loud'), 900);
-  };
-  const bumpGoal = (id: string, n: number) => {
-    const g = goal(id);
-    if (g.done) return;
-    const c = Math.max(g.count ?? 0, (countBase[id] ?? 0) + n);
-    if (c === g.count) return;
-    g.count = c;
-    progressDirty = true;
-    if (g.target && c >= g.target) completeGoal(id);
-    else showGoals();
-  };
-  const saved = saving ? loadProgress() : null;
-  if (saved) {
-    for (const g of goals) {
-      const sg = saved.goals[g.id];
-      if (!sg) continue;
-      g.done = !!sg.done;
-      if (g.target) g.count = g.done ? g.target : Math.min(g.target, sg.count ?? 0);
-      if (g.count) countBase[g.id] = g.count;
-    }
-    bones = Math.max(0, saved.bones | 0);
-  }
-  showGoals();
-  if (saving) {
-    const flush = () => { if (progressDirty && !resetting) { progressDirty = false; saveProgress(goals, bones); } };
-    let lastBones = bones;
-    setInterval(() => { if (bones !== lastBones) { lastBones = bones; progressDirty = true; } flush(); }, 3000);
-    window.addEventListener('pagehide', () => { progressDirty = true; flush(); });
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { progressDirty = true; flush(); } });
-  }
-  hud.onResetProgress = () => {
-    if (!window.confirm('Reset your saved walk progress? Goals and bones start over.')) return;
-    resetting = true;
-    clearProgress();
-    progressDirty = false;
-    location.reload();
-  };
+  const goalSys = createGoalSystem({
+    hud,
+    audio,
+    saving,
+    getBones: () => bones,
+    addBones: (n) => { bones += n; },
+    setBones: (n) => { bones = n; },
+  });
+  const { goals, goal, doneKeys, saved, completeGoal, bumpGoal, markDone } = goalSys;
 
   const addBones = (n: number, why?: string) => {
     bones += n;
@@ -351,27 +255,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     combo.t = 4;
   };
 
-  // ---- Particles ----------------------------------------------------------------------
-  const partGeo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
-  const partMats = new Map<number, THREE.MeshBasicMaterial>();
-  const particles: { m: THREE.Mesh; vx: number; vy: number; vz: number; t: number; g: number }[] = [];
-  const burst = (x: number, y: number, z: number, color: number, n = 10, spd = 3, up = 3, life = 0.7, g = 9) => {
-    let mat = partMats.get(color);
-    if (!mat) { mat = new THREE.MeshBasicMaterial({ color }); partMats.set(color, mat); }
-    for (let i = 0; i < n; i++) {
-      if (particles.length > 400) break;
-      const m = new THREE.Mesh(partGeo, mat);
-      m.position.set(x, y, z);
-      scene.add(m);
-      const a = Math.random() * Math.PI * 2, s = spd * (0.4 + Math.random() * 0.8);
-      particles.push({ m, vx: Math.cos(a) * s, vy: up * (0.5 + Math.random()), vz: Math.sin(a) * s, t: life * (0.6 + Math.random() * 0.6), g });
-    }
-  };
-
-  // Pee marks (shared geometry/material, recycled).
-  const stainGeo = new THREE.CircleGeometry(0.3, 14);
-  const stainMat = new THREE.MeshBasicMaterial({ color: 0xd6b23c, transparent: true, opacity: 0.4, depthWrite: false });
-  const stains: THREE.Mesh[] = [];
+  const particleSys = createParticles(scene);
+  const { burst, addStain } = particleSys;
 
   // ---- Collectibles ---------------------------------------------------------------------
   const boneSpots: [number, number][] = [[0, 186], [14, 187], [0, 211], [12, 224], [10, 108], [-17, 148], [40, 158.4], [1.5, 48], [-20, 53], [22, 71], [-14, 89], [30, 88.8], [-40, 24], [40, 29], [60, 20], [-60, -5], [70, -3], [-48, -60], [-48, -100], [70, -27], [0, -40], [-1, 9]];
@@ -390,6 +275,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (quest[k]) return;
     quest[k] = true;
     townDone++;
+    markDone(`town:${k}`);
     addBones(reward, msg);
     bumpGoal('town', townDone);
   };
@@ -405,6 +291,23 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const tofuM = makeTofu();
   scene.add(collapseRig(tofuM.group));
   const tofu = { i: 0, x: Q.tofu.spots[0][0], z: Q.tofu.spots[0][1], darting: false, heading: 0, alert: 0, home: false };
+  // A second Tofu lounges by the Eat Prey Nap boardwalk booth, batting at the mouse on screen.
+  const boothTofuM = makeTofu();
+  scene.add(collapseRig(boothTofuM.group));
+  const boothTofu = {
+    x: level.boothTofuAnchor.x,
+    z: level.boothTofuAnchor.z,
+    jumpY: 0,
+    vy: 0,
+    heading: -Math.PI / 2,
+    pounceCooldown: 0.9,
+    swatted: false,
+    speed: 0,
+  };
+  boothTofuM.group.position.set(boothTofu.x, GROUND_Y, boothTofu.z);
+  boothTofuM.group.rotation.y = -boothTofu.heading;
+  const raycaster = new THREE.Raycaster();
+  const tapNdc = new THREE.Vector2();
   // Fruit crate outside the fruiteria.
   const crate = makeFruitCrate();
   crate.group.position.set(Q.crate.x, RAMBLA_Y, Q.crate.z);
@@ -447,6 +350,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // Plaça del Mercat: its people, quests and the butcher (plazaLife.ts).
   const plaza = createPlazaLife({
     scene, level, hud, audio, dog, human, addBones, completeGoal, bumpGoal, burst,
+    onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
     chaseFree: () => !chase && chaseCooldown <= 0 && !offLeash,
@@ -456,6 +360,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // Dalt de la Vila: hilltop people, church bell, mirador and generic home door (hillLife.ts).
   const hill = createHillLife({
     scene, hud, audio, dog, addBones, completeGoal, bumpGoal, burst,
+    onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
   });
@@ -466,7 +371,34 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     floor: (x, z, y) => level.floor(x, z, y),
     collide: (p, r, y) => collide(p, r, y),
     onScared: (n) => bumpGoal('cats', n),
+    onDone: markDone,
   });
+  if (doneKeys.size) {
+    for (const k of ['ball', 'tofu', 'crate', 'bakery', 'selfie'] as const) {
+      if (!doneKeys.has(`town:${k}`)) continue;
+      quest[k] = true;
+      townDone++;
+    }
+    if (quest.ball) { questBall.done = true; questBall.m.visible = false; }
+    if (quest.tofu) {
+      const last = Q.tofu.spots[Q.tofu.spots.length - 1];
+      tofu.i = Q.tofu.spots.length - 1;
+      tofu.x = last[0]; tofu.z = last[1]; tofu.home = true;
+      tofuM.group.position.set(tofu.x, GROUND_Y, tofu.z);
+    }
+    if (quest.crate) crate.oranges.forEach((o) => { o.visible = false; });
+    level.mounds.forEach((m, i) => {
+      if (!doneKeys.has(`find:${i}`)) return;
+      m.dug = true; m.loot.visible = true; (m.mesh as THREE.Mesh).scale.y = 0.12; findsGot++;
+    });
+    level.hurdles.forEach((h, i) => {
+      if (!doneKeys.has(`hurdle:${i}`)) return;
+      h.cleared = true; hurdlesGot++;
+    });
+    plaza.restore(doneKeys);
+    hill.restore(doneKeys);
+    strays.restore(doneKeys);
+  }
   // Cyclists on the Rambla bike lane.
   interface Rider { g: THREE.Group; wheels: THREE.Object3D[]; rider: PersonModel; x: number; z: number; dir: number; speed: number; max: number; rang: number; light: THREE.MeshStandardMaterial }
   const riders: Rider[] = [];
@@ -619,51 +551,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     return { m, x: 66 + i * 6, z: -27, tx: 70, tz: -28, heading: 0, speed: 0, t: rand(0, 3) };
   });
 
-  // ---- Rain ---------------------------------------------------------------------------
-  const RAIN = 900;
-  const rainGeo = new THREE.BufferGeometry();
-  const rainArr = new Float32Array(RAIN * 6);
-  for (let i = 0; i < RAIN; i++) {
-    const x = rand(-25, 25), y = rand(0, 18), z = rand(-25, 25);
-    rainArr.set([x, y, z, x + 0.05, y - 0.7, z], i * 6);
-  }
-  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainArr, 3));
-  const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xb8c6d6, transparent: true, opacity: 0.55 }));
-  rain.visible = false;
-  scene.add(rain);
-
   // Fireworks for the Dimoni.
   const fireworks: { x: number; y: number; z: number; t: number; color: number }[] = [];
 
-  // ---- Sky & theme --------------------------------------------------------------------
-  const applySky = (mode: SkyMode) => {
-    skyMode = mode;
-    const s = SKY[mode];
-    skyUniforms.top.value.setHex(s.skyTop);
-    skyUniforms.horizon.value.setHex(s.skyHorizon);
-    scene.fog = new THREE.Fog(s.fog, s.fogNear, s.fogFar);
-    sun.color.setHex(s.sunColor);
-    sun.intensity = s.sunIntensity;
-    hemi.color.setHex(s.hemiSky);
-    hemi.groundColor.setHex(s.hemiGround);
-    hemi.intensity = s.hemiIntensity;
-    renderer.toneMappingExposure = s.exposure;
-    level.waterMat.color.setHex(s.sea);
-    level.lampGlass.forEach((m) => { m.emissiveIntensity = s.lampsOn ? 2.6 : 0.05; });
-    level.litWindowMat.emissiveIntensity = mode === 'night' ? 1.3 : mode === 'rain' ? 0.5 : 0;
-    level.underpassLight.intensity = mode === 'day' ? 6 : 10;
-    stars.visible = mode === 'night';
-    moon.visible = mode === 'night';
-    rain.visible = mode === 'rain';
-    if (humanM.phoneScreen) humanM.phoneScreen.emissiveIntensity = mode === 'night' ? 1.6 : 0.6;
-    riders.forEach((r) => { r.light.emissiveIntensity = s.lampsOn ? 2 : 0.2; });
-    // Wet paving shines in the rain.
-    level.wetMats.forEach((m) => { m.roughness = mode === 'rain' ? 0.35 : 0.92; });
-    root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sky === mode)));
-  };
-  applySky(skyMode);
-  onThemeChange((night) => {
-    applySky(night ? 'night' : skyMode === 'rain' && !night ? 'rain' : 'day');
+  skySys.bindTargets({
+    waterMat: level.waterMat,
+    lampGlass: level.lampGlass,
+    litWindowMat: level.litWindowMat,
+    underpassLight: level.underpassLight,
+    wetMats: level.wetMats,
+    phoneScreen: humanM.phoneScreen,
+    riderLights: riders.map((r) => r.light),
   });
 
   // ---- Helpers ------------------------------------------------------------------------
@@ -704,11 +602,16 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       }
     }
   };
-  // Millie's floor: the seabed, or the swimming height where it's deep.
+  // Millie's and her human's floors: seabed, or swimming height where it's deep.
   let dogSwimming = false;
+  let humanSwimming = false;
   const dogFloor = (x: number, z: number, y: number) => {
     const f = level.floor(x, z, y);
     return f < WATER_Y - SWIM_DEPTH && level.surface(x, z, y) === 'water' ? WATER_Y - SWIM_SINK : f;
+  };
+  const humanFloor = (x: number, z: number, y: number) => {
+    const f = level.floor(x, z, y);
+    return f < WATER_Y - HUMAN_SWIM_DEPTH && level.surface(x, z, y) === 'water' ? WATER_Y - HUMAN_SWIM_SINK : f;
   };
   const blockLedge = (p: { x: number; z: number }, x0: number, z0: number, feetY: number) => {
     if (level.floor(p.x, p.z, feetY) <= feetY + STEP_UP) return;
@@ -729,7 +632,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // which matters after a teleport, a fling or a re-clip).
   const handXZ = () => {
     const c = Math.cos(human.heading), s = Math.sin(human.heading);
-    return { x: human.x + 0.3 * c + 0.25 * s, z: human.z + 0.3 * s - 0.25 * c };
+    const fwd = humanSwimming ? 0.72 : 0.3;
+    return { x: human.x + fwd * c + 0.25 * s, z: human.z + fwd * s - 0.25 * c };
   };
 
   // ---- Input --------------------------------------------------------------------------
@@ -751,14 +655,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   // ---- Actions ------------------------------------------------------------------------
   const doJump = () => {
-    if (!dog.onGround || coriolisFocus || dogSwimming) return;
+    if (!dog.onGround || panels.coriolisFocus || panels.catFocus || panels.podOpen || dogSwimming) return;
     dog.vy = 6.5;
     dog.onGround = false;
     audio.jump();
   };
 
   const doMark = () => {
-    if (dog.peeing > 0 || !dog.onGround) return;
+    if (dog.peeing > 0 || !dog.onGround || dogSwimming) return;
     if (pee < 0.2) { hud.banner('Out of pee — drink at a fountain', 'news'); return; }
     pee = Math.max(0, pee - 0.25);
     dog.peeing = 0.8;
@@ -771,11 +675,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
     const sx = best ? lerp(best.x, dog.x, 0.55) : dog.x - Math.cos(dog.heading) * 0.35;
     const sz = best ? lerp(best.z, dog.z, 0.55) : dog.z - Math.sin(dog.heading) * 0.35;
-    const st = stains.length > 40 ? stains.shift()! : new THREE.Mesh(stainGeo, stainMat);
-    st.rotation.x = -Math.PI / 2;
-    st.position.set(sx, level.floor(sx, sz, dog.y) + 0.02, sz);
-    scene.add(st);
-    stains.push(st);
+    addStain(sx, level.floor(sx, sz, dog.y) + 0.02, sz);
     if (best && !markedSpots.has(best)) {
       markedSpots.add(best);
       marked++;
@@ -861,116 +761,44 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
   };
 
-  const toggleCoriolis = () => {
-    coriolisFocus = !coriolisFocus;
-    coriolis.clearHeld();
-    q('[data-coriolis-panel]')?.classList.toggle('open', coriolisFocus);
-    if (coriolisFocus) {
-      setStemma(false);
-      completeGoal('coriolis');
-    }
-  };
-
-  // ---- stemma panel -------------------------------------------------------------------
-  const stemmaPanel = q<HTMLElement>('[data-stemma-panel]');
-  const songList = q<HTMLElement>('[data-song-list]');
-  const lanesCanvas = q<HTMLCanvasElement>('[data-stem-lanes]');
-  const creditEl = q<HTMLElement>('[data-song-credit]');
-  const renderSongs = () => {
-    if (!songList) return;
-    songList.innerHTML = audio.songs
-      .map((s) => `<li><button type="button" data-song="${s.id}" aria-pressed="${s.id === audio.songId}"><b>${s.title}</b><span>${s.credit_as ?? s.artist}</span></button></li>`)
-      .join('');
-    songList.querySelectorAll<HTMLButtonElement>('[data-song]').forEach((b) => {
-      b.addEventListener('click', () => {
-        if (!audio.on) setSound(true);
-        void audio.playSong(b.dataset.song!);
-        completeGoal('stemma');
-      });
-    });
-  };
-  const renderCredit = (s: SongMeta | undefined) => {
-    if (!creditEl || !s) return;
-    const who = s.credit_as ?? s.artist;
-    creditEl.innerHTML = `“${s.title}” by ${who}. <a href="${s.source}" rel="noopener" target="_blank">Source</a> · <a href="${s.licence_url}" rel="noopener" target="_blank">${s.licence}</a>. Stems separated by stemma.`;
-  };
-  audio.onSongChange = (s) => { renderSongs(); renderCredit(s); };
-  // N (or the toolbar button): skip to the next song, turning sound on if it was off.
-  const nextSong = async () => {
-    const list = await audio.loadIndex();
-    if (!list.length) return;
-    const i = list.findIndex((x) => x.id === audio.songId);
-    const nx = list[(i + 1) % list.length];
-    // Exactly one request for the new song: the jukebox lets the latest one win.
-    audio.songId = nx.id;
-    if (!audio.on) { audio.musicOn = true; setSound(true); } // enabling plays songId
-    else if (!audio.musicOn) audio.setMusicOn(true);
-    else void audio.playSong(nx.id);
-    hud.toast('Now playing', `${nx.title} by ${nx.credit_as ?? nx.artist}`);
-  };
-  q('[data-next-song]')?.addEventListener('click', () => { void nextSong(); host.focus({ preventScroll: true }); });
-  const drawLanes = () => {
-    if (!lanesCanvas || !stemmaOpen) return;
-    const s = audio.song();
-    if (!s) return;
-    const g = lanesCanvas.getContext('2d')!;
-    const w = lanesCanvas.width, h = lanesCanvas.height, lh = h / 4;
-    g.clearRect(0, 0, w, h);
-    const cols: Record<StemGroup, string> = { vocals: '#e5487a', drums: '#ffb020', bass: '#1fc9b7', other: '#8bcb3c' };
-    const ph = audio.playhead();
-    STEM_GROUPS.forEach((grp, li) => {
-      // Peaks are 0–100; guitar and piano fold into "other".
-      const src = grp === 'other' ? ['other', 'guitar', 'piano'].map((k) => s.peaks[k]).filter(Boolean) : [s.peaks[grp] ?? []];
-      const peaks = (src[0] ?? []).map((_, i) => Math.min(1, Math.max(...src.map((p) => p[i] ?? 0)) / 100));
-      const muted = audio.muted[grp];
-      g.fillStyle = muted ? 'rgba(255,255,255,0.12)' : cols[grp];
-      const n = peaks.length;
-      for (let i = 0; i < n; i++) {
-        const v = peaks[i] * (lh * 0.42);
-        const x = (i / n) * w;
-        g.globalAlpha = i / n < ph ? 1 : 0.45;
-        g.fillRect(x, li * lh + lh / 2 - v, Math.max(1, w / n - 1), v * 2);
-      }
-      g.globalAlpha = 1;
-    });
-    g.fillStyle = '#f4f1ea';
-    g.fillRect(ph * w - 1, 0, 2, h);
-  };
-  root.querySelectorAll<HTMLButtonElement>('[data-stem]').forEach((b) => {
-    b.addEventListener('click', () => {
-      if (!audio.on) setSound(true);
-      const muted = audio.toggleStem(b.dataset.stem as StemGroup);
-      b.setAttribute('aria-pressed', String(!muted));
-      completeGoal('stemma');
-    });
-  });
-  const setStemma = (open: boolean) => {
-    stemmaOpen = open;
-    stemmaPanel?.classList.toggle('open', open);
-    if (open) {
-      if (!audio.on) setSound(true);
-      void audio.loadIndex().then(() => { renderSongs(); renderCredit(audio.song()); });
-    }
-  };
-  q('[data-stemma-close]')?.addEventListener('click', () => setStemma(false));
-
-  // ---- Toolbar ------------------------------------------------------------------------
+  // ---- Toolbar & boardwalk booth panels -----------------------------------------------
   const soundBtn = q<HTMLButtonElement>('[data-sound]');
   const setSound = (on: boolean) => {
     if (on) audio.enable(); else audio.disable();
     if (soundBtn) {
       soundBtn.setAttribute('aria-pressed', String(on));
-      soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+      soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     }
   };
+  const panels = createBoothPanels({
+    root,
+    host,
+    hud,
+    audio,
+    coriolis,
+    catSim,
+    podSim,
+    completeGoal,
+    setSound,
+    onCatPounce: () => { boothTofu.vy = Math.max(boothTofu.vy, 2.8); },
+    getTimeMs: () => time * 1000,
+  });
   soundBtn?.addEventListener('click', () => setSound(!audio.on));
   const camBtn = q<HTMLButtonElement>('[data-camera]');
+  const camLabel = (m: CamMode) => {
+    if (!camBtn) return '';
+    return m === 'street'
+      ? (camBtn.dataset.camStreet ?? 'Cam: Street')
+      : m === 'follow'
+        ? (camBtn.dataset.camFollow ?? 'Cam: Follow')
+        : (camBtn.dataset.camOverhead ?? 'Cam: Overhead');
+  };
   const cycleCam = () => {
     camMode = camMode === 'street' ? 'follow' : camMode === 'follow' ? 'overhead' : 'street';
-    if (camBtn) camBtn.textContent = `Cam: ${camMode === 'street' ? 'Street' : camMode === 'follow' ? 'Follow' : 'Overhead'}`;
+    if (camBtn) camBtn.textContent = camLabel(camMode);
   };
   camBtn?.addEventListener('click', cycleCam);
-  const setCamMode = (m: CamMode) => { if (camMode !== m) { camMode = m; if (camBtn) camBtn.textContent = `Cam: ${m === 'street' ? 'Street' : m === 'follow' ? 'Follow' : 'Overhead'}`; } };
+  const setCamMode = (m: CamMode) => { if (camMode !== m) { camMode = m; if (camBtn) camBtn.textContent = camLabel(m); } };
 
   // Camera controls: wheel / − = zoom in any mode; drag / [ ] orbit (switching to follow).
   let camZoom = 1, camPitch = 1, camHandsOff = 0;
@@ -1022,17 +850,32 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    if (panels.catFocus || panels.coriolisFocus) return;
     if (!drag.moved) { drag.moved = true; try { renderer.domElement.setPointerCapture(e.pointerId); } catch {} }
     drag.x = e.clientX; drag.y = e.clientY;
     orbitBy(dx * 0.006, dy * 0.006);
   });
   const endDrag = (e: PointerEvent) => {
     if (touches.delete(e.pointerId) && touches.size < 2) pinchDist = 0;
-    if (drag && e.pointerId === drag.id) drag = null;
+    if (drag && e.pointerId === drag.id) {
+      const wasTap = !drag.moved && e.type === 'pointerup';
+      drag = null;
+      if (wasTap && level.catScreen.mesh && (panels.catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 9)) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          tapNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          tapNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(tapNdc, camera);
+          const hits = raycaster.intersectObject(level.catScreen.mesh, false);
+          if (hits.length && hits[0].uv) {
+            panels.triggerCatPounce(hits[0].uv.x, 1 - hits[0].uv.y);
+          }
+        }
+      }
+    }
   };
   host.addEventListener('pointerup', endDrag);
   host.addEventListener('pointercancel', endDrag);
-  root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => applySky(b.dataset.sky as SkyMode)));
 
   // Two fullscreen modes: "window" fills the browser window (works everywhere,
   // keeps the tabs and address bar), "screen" also asks for real fullscreen.
@@ -1102,19 +945,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     host.addEventListener('pointerdown', upgrade, true);
   };
 
-  q('[data-c-exit]')?.addEventListener('click', () => { if (coriolisFocus) toggleCoriolis(); });
-  root.querySelectorAll<HTMLButtonElement>('[data-c-key]').forEach((b) => b.addEventListener('click', () => {
-    const k = b.dataset.cKey as SimKey;
-    coriolis.setHeld(k, true);
-    coriolis.key(k, time * 1000);
-    setTimeout(() => coriolis.setHeld(k, false), 120);
-  }));
-  root.querySelectorAll<HTMLButtonElement>('[data-c-cmd]').forEach((b) => b.addEventListener('click', () => coriolis.command(b.dataset.cCmd as SimCommand, time * 1000)));
+
 
   // ---- Keyboard (only while the stage has focus) --------------------------------------
   const resetWalk = () => {
-    dog.x = level.start.dog.x; dog.z = level.start.dog.z; dog.y = RAMBLA_Y; dog.vx = dog.vz = dog.vy = 0; dog.onGround = true;
-    human.x = level.start.human.x; human.z = level.start.human.z; human.y = RAMBLA_Y; human.vx = human.vz = 0;
+    dog.x = level.start.dog.x; dog.z = level.start.dog.z; dog.y = RAMBLA_Y; dog.vx = dog.vz = dog.vy = 0; dog.onGround = true; dogSwimming = false;
+    human.x = level.start.human.x; human.z = level.start.human.z; human.y = RAMBLA_Y; human.vx = human.vz = 0; humanSwimming = false;
     human.state = 'walk'; whirl = null; offLeash = false; dog.carrying = null; ball.held = false; questBall.held = false;
     leash.reset(dog, handXZ());
     camSnap = true;
@@ -1129,13 +965,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     departing = false;
     host.querySelectorAll('.loading.depart').forEach((el) => el.remove());
   });
+  const localePrefix = root.dataset.localePrefix ?? '';
+  const withLocale = (href: string) =>
+    localePrefix && href.startsWith('/') && !href.startsWith(`${localePrefix}/`) && href !== localePrefix
+      ? `${localePrefix}${href}`
+      : href;
   const goToStop = (stop: Level['stops'][number]) => {
     if (departing) return;
     if (stop.id === 'station') {
       departing = true;
       releaseAll();
       audio.trainHorn();
-      const dest = new URL(stop.href || '/?via=train', location.origin);
+      const dest = new URL(withLocale(stop.href || '/?via=train'), location.origin);
       if (audio.on) dest.searchParams.set('sound', '1');
       if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
       void playDepartureDoors(host, 'Boarding R1 · Back to 2D street…', reducedMotion).then(() => {
@@ -1148,7 +989,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       departing = true;
       releaseAll();
       audio.chime();
-      const dest = new URL(stop.href || '/?via=metro', location.origin);
+      const dest = new URL(withLocale(stop.href || '/?via=metro'), location.origin);
       if (audio.on) dest.searchParams.set('sound', '1');
       if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
       void playDepartureDoors(host, 'Metro L2 · Back to 2D street…', reducedMotion, 'metro').then(() => {
@@ -1156,7 +997,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       });
       return;
     }
-    location.href = stop.href;
+    location.href = stop.href?.startsWith('/') ? withLocale(stop.href) : stop.href;
   };
 
   q('[data-restart]')?.addEventListener('click', resetWalk);
@@ -1172,13 +1013,37 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
   const onKey = (code: string, e?: KeyboardEvent) => {
     const repeat = e?.repeat ?? false;
-    if (coriolisFocus) {
-      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) toggleCoriolis(); return; }
+    if (panels.coriolisFocus) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.toggleCoriolis(); return; }
       const cmd: SimCommand | null = code === 'KeyM' ? 'Menu' : code === 'KeyS' ? 'Settings' : code === 'KeyC' ? 'Overlay' : code === 'Space' ? 'Next' : code === 'KeyH' ? 'Home' : null;
       if (cmd) { e?.preventDefault(); if (!repeat) coriolis.command(cmd, time * 1000); return; }
       if (code === 'KeyR') { e?.preventDefault(); if (!repeat) coriolis.rotate(time * 1000); return; }
       const ck = CORIOLIS_KEYS[code];
       if (ck) { e?.preventDefault(); coriolis.setHeld(ck, true); coriolis.key(ck, time * 1000); }
+      return;
+    }
+    if (panels.catFocus) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.setCat(false); return; }
+      if (!repeat && (code === 'KeyP' || code === 'KeyC')) { e?.preventDefault(); catSim.cyclePalette(); audio.click(); panels.syncCatUi(); return; }
+      if (!repeat && (code === 'KeyS' || code === 'Tab')) { e?.preventDefault(); catSim.cycleSize(); audio.click(); panels.syncCatUi(); return; }
+      if (!repeat && code === 'KeyW') { e?.preventDefault(); catSim.toggleWatchOnly(); audio.click(); panels.syncCatUi(); return; }
+      if (!repeat && (code === 'Space' || code === 'Enter')) {
+        e?.preventDefault();
+        const ms = catSim.getMouseState();
+        panels.triggerCatPounce(ms.u, ms.v);
+        return;
+      }
+      return;
+    }
+    if (panels.podOpen) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.setPod(false); return; }
+      if (!repeat && (code === 'Space' || code === 'KeyK')) { e?.preventDefault(); podSim.togglePlay(); audio.click(); panels.syncPodUi(); return; }
+      if (!repeat && (code === 'ArrowRight' || code === 'KeyL')) { e?.preventDefault(); podSim.nextEpisode(); audio.click(); panels.syncPodUi(); return; }
+      if (!repeat && (code === 'ArrowLeft' || code === 'KeyJ')) { e?.preventDefault(); podSim.prevEpisode(); audio.click(); panels.syncPodUi(); return; }
+      if (!repeat && code.startsWith('Digit')) {
+        const n = Number(code.slice(5)) - 1;
+        if (n >= 0 && n < 4) { e?.preventDefault(); podSim.selectShow(n); audio.click(); panels.syncPodUi(); return; }
+      }
       return;
     }
     if (MOVE[code] || ['Space', 'Tab', 'Enter', 'ShiftLeft', 'ShiftRight'].includes(code)) e?.preventDefault();
@@ -1192,21 +1057,25 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       case 'KeyC': cycleCam(); break;
       case 'Tab': hud.toggleGoals(); break;
       case 'KeyM': minimap.toggle(); break;
-      case 'KeyN': void nextSong(); break;
+      case 'KeyN': void panels.nextSong(); break;
       case 'Minus': case 'NumpadSubtract': zoomBy(1.15); break;
       case 'Equal': case 'NumpadAdd': zoomBy(1 / 1.15); break;
       case 'BracketLeft': case 'BracketRight': orbitBy(0); break;
-      case 'Digit1': applySky('day'); break;
-      case 'Digit2': applySky('rain'); break;
-      case 'Digit3': applySky('night'); break;
+      case 'Digit1': skySys.applySky('day'); break;
+      case 'Digit2': skySys.applySky('rain'); break;
+      case 'Digit3': skySys.applySky('night'); break;
       case 'KeyR': resetWalk(); break;
       case 'KeyX':
-        if (nearCoriolis()) toggleCoriolis();
-        else if (nearStemma() || stemmaOpen) setStemma(!stemmaOpen);
+        if (nearCoriolis()) panels.toggleCoriolis();
+        else if (nearCatBooth()) panels.setCat(!panels.catFocus);
+        else if (nearPodBooth()) panels.setPod(!panels.podOpen);
+        else if (nearStemma() || panels.stemmaOpen) panels.setStemma(!panels.stemmaOpen);
         break;
       case 'Escape':
         if (minimap.enlarged) minimap.toggle(false);
-        else if (stemmaOpen) setStemma(false);
+        else if (panels.stemmaOpen) panels.setStemma(false);
+        else if (panels.catFocus) panels.setCat(false);
+        else if (panels.podOpen) panels.setPod(false);
         else if (full) setFull(false);
         else host.blur();
         break;
@@ -1297,6 +1166,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // ---- Proximity helpers --------------------------------------------------------------
   const nearCoriolis = () => Math.hypot(dog.x - level.coriolis.x, dog.z - (level.coriolis.z + 2.5)) < 4.2;
   const nearStemma = () => Math.hypot(dog.x - level.stemma.x, dog.z - level.stemma.z) < 3.6;
+  const nearCatBooth = () => Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 4.0;
+  const nearPodBooth = () => Math.hypot(dog.x - level.dopepod.x, dog.z - level.dopepod.z) < 4.0;
 
   // ---- Human AI -----------------------------------------------------------------------
   const humanSay = (t: string, ttl = 2, tone: 'paper' | 'win' | 'loud' = 'paper') => hud.say('human', t, ttl, tone);
@@ -1332,9 +1203,15 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (human.haulT <= 0) human.state = 'walk';
       return;
     } else {
-      // Events, always telegraphed first (human.gd).
+      // Events, always telegraphed first (human.gd). Skip distractions in the water.
+      const inWater = humanSwimming || level.surface(human.x, human.z, human.y) === 'water';
+      if (humanSwimming && (human.state === 'phone' || human.state === 'selfie' || human.state === 'sit')) {
+        human.state = 'walk';
+        human.seated = false;
+        human.seat = null;
+      }
       human.eventT -= dt;
-      if (human.eventT <= 0 && human.state === 'walk') {
+      if (!inWater && human.eventT <= 0 && human.state === 'walk') {
         human.eventT = rand(3.5, 6.5);
         const roll = Math.random();
         if (roll < 0.3) { humanSay('Ring ring…'); human.state = 'phone'; human.stateT = -0.8; }
@@ -1386,6 +1263,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       }
       if (human.seated && tension < 15) { human.vx = 0; human.vz = 0; return; }
       if (holdStill) speed = 0;
+      if (humanSwimming) speed = Math.min(speed, HUMAN_SWIM_SPEED);
       if (chase?.kind === 'neteja') { wantX = 0; wantZ = 0; speed = 0; human.state = 'phone'; human.stateT = 0.5; }
       if (chase?.kind === 'dimoni' && d > 1.6) {
         // Scared too: they keep right up with Millie.
@@ -1456,14 +1334,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const startWhirl = (pole: Obstacle, coil: number) => {
     const r = Math.max(0.56, Math.hypot(human.x - pole.x, human.z - pole.z));
     const sp = Math.hypot(human.vx, human.vz);
-    // Spin the way the rope pulls the hand around the pole (its torque about the
-    // pole), not the way the whole leash happens to be coiled. If the rope runs
-    // straight at the pole, fall back to the human's own motion, then the coil.
-    const hd = leash.ends().human;
+    // Spin the way that unwinds the rope's local coil around the pole
+    // (positive turning from dog->hand means hand must decrease theta to unwind).
+    // If the coil cancels out, keep the human's current orbit sense around the pole.
     const rx = human.x - pole.x, rz = human.z - pole.z;
-    const pull = rx * hd.z - rz * hd.x;
     const carry = rx * human.vz - rz * human.vx;
-    const dir = Math.abs(pull) > 0.05 ? Math.sign(pull) : Math.abs(carry) > 0.05 ? Math.sign(carry) : coil >= 0 ? 1 : -1;
+    const dir = Math.abs(coil) > 0.1 ? -Math.sign(coil) : carry >= 0 ? 1 : -1;
     whirl = {
       pole, r, t: 0, swept: 0, extra: 0,
       theta: Math.atan2(human.z - pole.z, human.x - pole.x),
@@ -1503,6 +1379,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       human.vx = lx * sp; human.vz = lz * sp;
       human.state = 'stumble'; human.stumbleT = 1;
       whirl = null; leash.whirl = false; leash.freeSlip = 1.2;
+      whirlDet.reset(0.9);
       humanSay('Aaaah!', 1.4, 'loud');
       audio.fling();
       shake = 0.35; slowmo = 0.35;
@@ -1530,7 +1407,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       const sp = clamp(w.omega * w.r, 0.9, 3.8);
       human.vx = tx * sp; human.vz = tz * sp;
       human.state = 'stumble'; human.stumbleT = 0.7;
-      whirl = null; leash.whirl = false;
+      whirl = null; leash.whirl = false; leash.freeSlip = 0.8;
+      whirlDet.reset(0.9);
       humanSay("Ugh, I'm dizzy");
     }
   };
@@ -1540,7 +1418,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let wasInPipica = false;
   let pipIdx = 0; // which pipicà she's off the leash in
   const physicsStep = (dt: number) => {
-    const inp = coriolisFocus || stemmaOpen ? { x: 0, z: 0, mag: 0 } : inputDir();
+    const inp = panels.anyOpen() ? { x: 0, z: 0, mag: 0 } : inputDir();
     const wantsRun = (held.has('ShiftLeft') || held.has('ShiftRight')) && inp.mag > 0;
     const freeZoom = offLeash;
     const running = wantsRun && (dog.zoom > 0.02 || freeZoom);
@@ -1552,7 +1430,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const surf = level.surface(dog.x, dog.z, dog.y);
     const depth = Math.max(0, WATER_Y - level.floor(dog.x, dog.z, dog.y));
     dogSwimming = surf === 'water' && depth > SWIM_DEPTH;
-    const surfMul = surf === 'sand' ? 0.82 : dogSwimming ? 0.42 : surf === 'water' ? clamp(0.75 - depth, 0.35, 0.75) : 1;
+    const surfMul = surf === 'sand' ? 0.82 : dogSwimming ? 0.52 : surf === 'water' ? clamp(0.75 - depth, 0.35, 0.75) : 1;
     const target = (dog.digging ? 1.0 : running ? RUN : WALK) * surfMul * inp.mag;
     const tvx = inp.x * target, tvz = inp.z * target;
     const acc = inp.mag > 0 ? 12 : 9;
@@ -1592,7 +1470,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       dog.y += dog.vy * dt;
       if (dog.y <= g) {
         dog.y = g; dog.vy = 0;
-        if (!dog.onGround) audio.land();
+        if (!dog.onGround) { if (dogSwimming) audio.splash(); else audio.land(); }
         dog.onGround = true;
       } else dog.onGround = false;
     } else dog.y = g;
@@ -1607,16 +1485,26 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       collide(human, HUMAN_R, human.y);
       level.clampBounds(human);
       blockLedge(human, hx0, hz0, human.y);
-      // Wading: they go in up to the waist, no further.
-      let waterBlocked = false;
-      if (WATER_Y - level.floor(human.x, human.z, human.y + 0.3) > HUMAN_WADE && level.surface(human.x, human.z, human.y) === 'water') {
-        human.x = hx0; human.z = hz0; waterBlocked = true;
-        if (!human.toldCold) { humanSay(pickOne(['Too cold for me!', "I'm not swimming!", 'This is as far as I go.']), 1.8); human.toldCold = true; }
-      } else if (WATER_Y - level.floor(human.x, human.z, human.y + 0.3) < 0.2) human.toldCold = false;
-      human.y = level.floor(human.x, human.z, human.y + 0.3);
+      // Swimming: follow Millie out into deep water once past wading depth.
+      const hFloor = level.floor(human.x, human.z, human.y + 0.3);
+      const hDepth = Math.max(0, WATER_Y - hFloor);
+      const hSurf = level.surface(human.x, human.z, human.y);
+      const wasHumanSwimming = humanSwimming;
+      humanSwimming = hSurf === 'water' && hDepth > HUMAN_SWIM_DEPTH;
+      if (humanSwimming && !wasHumanSwimming) {
+        audio.splash();
+        burst(human.x, WATER_Y + 0.08, human.z, 0xcfeeff, 10, 1.6, 1.8, 0.45, 5);
+        if (!human.toldCold) {
+          humanSay(pickOne(['Wait up, I’m swimming!', 'Hold on, coming in!', 'Brrr—okay, I’m swimming!']), 2.0);
+          human.toldCold = true;
+        }
+      } else if (hDepth < 0.2) {
+        human.toldCold = false;
+      }
+      human.y = humanFloor(human.x, human.z, human.y + 0.3);
       const moved = Math.hypot(human.x - hx0, human.z - hz0);
       const wanted = Math.hypot(human.vx, human.vz) * dt;
-      human.stuck = wanted > 0.01 && moved < wanted * 0.2 && !waterBlocked ? human.stuck + dt : Math.max(0, human.stuck - dt);
+      human.stuck = wanted > 0.01 && moved < wanted * 0.2 ? human.stuck + dt : Math.max(0, human.stuck - dt);
       if (human.stuck > 2.5 && !offLeash) {
         // Safety valve: hop to just behind the dog.
         human.x = dog.x - Math.cos(dog.heading) * 1.6;
@@ -1642,8 +1530,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (over > 0 && dog.planted && Math.hypot(human.vx, human.vz) > 1.6 && human.state === 'walk') {
         human.state = 'stumble'; human.stumbleT = 0.8; humanSay('Whoa there!'); audio.stumble();
       }
-      const hit = whirlDet.update(leash, human, dt);
-      if (hit && !whirl && human.state !== 'stumble') startWhirl(hit.pole, hit.coil);
+      if (!whirl && human.state !== 'stumble') {
+        const hit = whirlDet.update(leash, human, dt);
+        if (hit) startWhirl(hit.pole, hit.coil);
+      }
     }
 
     // Pipicà gate: off the leash inside, clipped back on the moment she leaves.
@@ -1678,15 +1568,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let camSnap = true; // jump straight to the framing (first frame, restart, teleport)
   const tmpV = new THREE.Vector3();
   let lightPoolT = 0;
-  let pierReached = false;
+  let pierReached = goal('pier').done;
 
   let runT = 0, dogNoiseT = 0, ambT = 5;
   const listenDir = new THREE.Vector3();
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
     // Goals card follows the area Millie is in.
-    const nowArea = areaOfDistrict(level.districtAt(dog.x, dog.z).id);
-    if (nowArea !== area) { area = nowArea; showGoals(); }
+    goalSys.setArea(areaOfDistrict(level.districtAt(dog.x, dog.z).id));
     level.churchLandmark.visible = !hillDistrict.root.visible;
     const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
     if (slowmo > 0) slowmo -= rawDt;
@@ -1721,10 +1610,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
 
     // Coriolis texture, only when nearby or focused.
-    if (coriolis.tick(time * 1000) && (coriolisFocus || Math.abs(camPos.z - level.coriolis.z) < 45)) {
+    if (coriolis.tick(time * 1000) && (panels.coriolisFocus || Math.abs(camPos.z - level.coriolis.z) < 45)) {
       coriolis.renderToCanvas(cCtx, 4, 1);
       coriolisTex.needsUpdate = true;
     }
+    // Live idling UIs across all boardwalk pavilions.
+    const activeBoothId = panels.catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 16
+      ? 'eat-prey-nap'
+      : panels.podOpen
+        ? 'dopepod'
+        : null;
+    boothScreens.update(dt, audio.playhead(), audio.muted, audio.on && audio.musicOn, activeBoothId);
 
     // Pee, streaks, drinking.
     if (dog.peeing > 0) dog.peeing -= dt;
@@ -1745,15 +1641,25 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         hud.say('dog', 'Shake shake', 1);
       }
     }
+    if (dogSwimming && Math.random() < dt * (sp > 0.3 ? 18 : 5)) {
+      const backX = dog.x - Math.cos(dog.heading) * 0.25 + rand(-0.18, 0.18);
+      const backZ = dog.z - Math.sin(dog.heading) * 0.25 + rand(-0.18, 0.18);
+      burst(backX, WATER_Y + 0.04, backZ, 0xe8f7ff, 2, 0.7 + sp * 0.3, 0.45, 0.35, 2.5);
+    }
+    if (humanSwimming && Math.random() < dt * (Math.hypot(human.vx, human.vz) > 0.2 ? 14 : 4)) {
+      burst(human.x + rand(-0.2, 0.2), WATER_Y + 0.04, human.z + rand(-0.2, 0.2), 0xe8f7ff, 2, 0.7, 0.45, 0.35, 2.5);
+    }
 
     // Digging on the beach.
     if (dog.digging && dog.onGround) {
-      for (const m of level.mounds) {
+      for (let i = 0; i < level.mounds.length; i++) {
+        const m = level.mounds[i];
         if (!m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.3) {
           m.dug = true;
           m.loot.visible = true;
           (m.mesh as THREE.Mesh).scale.y = 0.12;
           findsGot++;
+          markDone(`find:${i}`);
           audio.dig(); audio.pickup();
           burst(m.x, level.floor(m.x, m.z, 0) + 0.1, m.z, 0xcdb586, 18, 2.2, 3);
           hud.toast('Dug up', m.name, '#ffb020');
@@ -1791,10 +1697,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
     // Hurdles: cleared by jumping over them.
     if (!dog.onGround) {
-      for (const h of level.hurdles) {
+      for (let i = 0; i < level.hurdles.length; i++) {
+        const h = level.hurdles[i];
         if (!h.cleared && Math.abs(dog.x - h.x) < 0.3 && Math.abs(dog.z - h.z) < 0.7 && dog.y > -0.4 + 0.5) {
           h.cleared = true;
           hurdlesGot++;
+          markDone(`hurdle:${i}`);
           hud.shout('HUP!', 'good');
           audio.pickup();
           bumpGoal('hurdles', hurdlesGot);
@@ -1850,6 +1758,48 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       tofuM.group.rotation.y = -tofu.heading;
       tofuM.animate(time, tsp, d < 6);
     }
+    // Booth Tofu outside Eat Prey Nap: tracks the mouse across the display and leaps to pounce.
+    {
+      const ms = catSim.getMouseState();
+      const dBooth = Math.hypot(dog.x - boothTofu.x, dog.z - boothTofu.z);
+      const padBaseY = GROUND_Y + 0.06;
+      const targetX = panels.catFocus
+        ? level.catScreen.x - 1.55
+        : level.catScreen.x + ((ms.visible ? ms.u : 0.5 + Math.sin(time * 0.7) * 0.22) - 0.5) * level.catScreen.w * 0.65;
+      const dxB = targetX - boothTofu.x;
+      boothTofu.x += dxB * Math.min(1, dt * (ms.state === 'dart' ? 7 : 3.4));
+      boothTofu.speed = Math.abs(dxB) * 2.5;
+      if (panels.catFocus) {
+        boothTofu.z = lerp(boothTofu.z, level.boothTofuAnchor.z + 0.35, Math.min(1, dt * 4));
+      } else {
+        boothTofu.z = lerp(boothTofu.z, level.boothTofuAnchor.z - (boothTofu.jumpY > 0 ? 0.22 : 0), Math.min(1, dt * 4));
+      }
+      const lookX = panels.catFocus ? level.catScreen.x : targetX;
+      boothTofu.heading = angLerp(boothTofu.heading, Math.atan2(level.catScreen.z - boothTofu.z, lookX - boothTofu.x), dt * 6);
+      boothTofu.pounceCooldown -= dt;
+      if (!panels.catFocus && boothTofu.jumpY <= 0 && boothTofu.pounceCooldown <= 0 && (ms.state === 'creep' || ms.state === 'freeze' || ms.state === 'dart')) {
+        boothTofu.vy = clamp(2.3 + (1 - ms.v) * 2.4, 2.3, 4.4);
+        boothTofu.pounceCooldown = 1.7 + Math.random() * 1.4;
+        boothTofu.swatted = false;
+      }
+      if (boothTofu.jumpY > 0 || boothTofu.vy > 0) {
+        boothTofu.jumpY += boothTofu.vy * dt;
+        boothTofu.vy -= 14 * dt;
+        if (!boothTofu.swatted && boothTofu.vy < 0.7 && boothTofu.jumpY > 0.22) {
+          boothTofu.swatted = true;
+          const res = catSim.pawAt(ms.u + (Math.random() - 0.5) * 0.14, ms.v + (Math.random() - 0.5) * 0.14, true);
+          if (res === 'catch' && dBooth < 8 && !hud.hasBubble('booth-tofu')) hud.say('booth-tofu', 'Gotcha!', 1.1, 'win');
+          if (dBooth < 9 && Math.random() < 0.35) audio.meow({ x: boothTofu.x, z: boothTofu.z });
+        }
+        if (boothTofu.jumpY <= 0) { boothTofu.jumpY = 0; boothTofu.vy = 0; }
+      }
+      if (!panels.catFocus && dBooth < 4.5 && !hud.hasBubble('booth-tofu') && Math.random() < dt * 0.35) {
+        hud.say('booth-tofu', pickOne(['Mrrp!', 'Pounce!', '…']), 1.1);
+      }
+      boothTofuM.group.position.set(boothTofu.x, padBaseY + boothTofu.jumpY, boothTofu.z);
+      boothTofuM.group.rotation.y = -boothTofu.heading;
+      boothTofuM.animate(time, boothTofu.jumpY > 0.05 ? 4 : boothTofu.speed, ms.state === 'creep' || ms.state === 'dart' || dBooth < 6);
+    }
     // The selfie mural: your human can't resist.
     if (!quest.selfie && Math.hypot(human.x - Q.mural.x, human.z - Q.mural.z) < 4 && human.state === 'walk' && !offLeash) {
       humanSay('Selfie with the monkey!', 2.2);
@@ -1893,7 +1843,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     } else begT = 0;
 
     // ---- NPCs ----
-    life.update(dt, time, skyMode);
+    life.update(dt, time, skySys.getMode());
     plaza.update(dt, time);
     hill.update(dt, time);
     strays.update(dt, time);
@@ -2099,7 +2049,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       dv.person.group.position.set(dv.x, GROUND_Y, dv.z);
       dv.person.group.rotation.y = running || cf.x < level.correfoc.x0 - 1 ? Math.PI : Math.sin(time + dv.ox) * 0.6 + Math.PI;
       dv.person.animate(time + dv.ox, { speed: running ? 4 : 0.6, pose: 'walk' });
-      if ((running || skyMode === 'night') && Math.random() < dt * (running ? 30 : 8)) {
+      if ((running || skySys.getMode() === 'night') && Math.random() < dt * (running ? 30 : 8)) {
         const sp = dv.spark.getWorldPosition(tmpV);
         burst(sp.x, sp.y, sp.z, pickOne([0xffe08a, 0xffb020, 0xff7a2a, 0xffffff]), 2, 2.2, 2, 0.5, 6);
       }
@@ -2141,13 +2091,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       fd.m.animate(time + fd.x, { speed: s, dig: false, peeing: false, wag: 0.7, air: false });
     }
     // Particles.
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.t -= dt;
-      p.vy -= p.g * dt;
-      p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
-      if (p.t <= 0) { scene.remove(p.m); particles.splice(i, 1); }
-    }
+    particleSys.update(dt);
     // Fireworks over the Dimoni.
     if (fireworksT > 0) {
       fireworksT -= dt;
@@ -2167,7 +2111,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         audio.firework();
       }
     } else {
-      level.dimoni.glow.intensity = skyMode === 'night' ? 2 : 0;
+      level.dimoni.glow.intensity = skySys.getMode() === 'night' ? 2 : 0;
       // Rebuilt for next year (instantly; it's a game).
       level.dimoni.figure.position.y = 1.3; level.dimoni.figure.rotation.z = 0;
     }
@@ -2197,14 +2141,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     nearStop = found;
     const prompts: { key: string; label: string }[] = [];
     let banner: string | null = null;
-    if (coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
+    if (panels.coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
+    else if (panels.catFocus) { banner = 'Eat Prey Nap — click/tap screen to pounce, [P] palette, [S] size, [X] step back'; }
+    else if (panels.podOpen) { banner = 'dopepod — Space play/pause, arrows skip, [X] close'; }
     else if (nearCoriolis()) { prompts.push({ key: 'X', label: 'Play the LED wall' }); }
-    else if (nearStemma()) { prompts.push({ key: 'X', label: stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
-    if (found && !coriolisFocus) {
+    else if (nearCatBooth()) { prompts.push({ key: 'X', label: 'Play Eat Prey Nap' }); }
+    else if (nearPodBooth()) { prompts.push({ key: 'X', label: 'Open dopepod' }); }
+    else if (nearStemma()) { prompts.push({ key: 'X', label: panels.stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
+    if (found && !panels.coriolisFocus && !panels.catFocus && !panels.podOpen) {
       prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro to 2D street' : `Visit ${found.label}` });
       banner = banner ?? `${found.label} · ${found.kind}`;
     }
-    if (!coriolisFocus && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
+    if (!panels.coriolisFocus && !panels.catFocus && !panels.podOpen && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
     if (!dog.carrying && ((!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) || (!questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9))) prompts.push({ key: 'G', label: 'Pick up' });
     { const pl = plaza.prompt(); if (pl) prompts.push({ key: 'G', label: pl }); }
     { const hl = hill.prompt(); if (hl) prompts.push(hl); }
@@ -2263,12 +2211,15 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     dogM.group.rotation.y = -dog.heading;
     dogM.animate(time, { speed: sp, dig: dog.digging && !dogSwimming, peeing: dog.peeing > 0, wag: offLeash ? 1 : clamp(1 - leash.taut, 0.2, 0.8), air: !dog.onGround, swim: dogSwimming });
     const dg = dogFloor(dog.x, dog.z, dog.y);
+    dogShadow.visible = !dogSwimming;
     dogShadow.position.set(dog.x, dg + 0.03, dog.z);
     dogShadow.scale.setScalar(0.9 * clamp(1 - (dog.y - dg) * 0.3, 0.5, 1));
     humanM.group.position.set(human.x, human.y, human.z);
     humanM.group.rotation.y = -human.heading;
     const hsp = Math.hypot(human.vx, human.vz);
-    const pose: Pose = human.state === 'whirl' ? 'whirl' : human.state === 'stumble' || human.state === 'haul' ? 'stumble'
+    const pose: Pose = human.state === 'whirl' ? 'whirl'
+      : humanSwimming ? 'swim'
+      : human.state === 'stumble' || human.state === 'haul' ? 'stumble'
       : human.state === 'bench' || (human.state === 'sit' && human.seated) ? 'sit'
       : human.state === 'selfie' && human.stateT > 0 ? 'selfie'
       : human.state === 'phone' && human.stateT > 0 ? 'phone' : 'walk';
@@ -2276,6 +2227,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const towing = human.state === 'haul' ? 0 : clamp((lastTension - 2) / 14, 0, 1) * clamp(Math.cos(Math.atan2(dog.z - human.z, dog.x - human.x) - human.heading) + 0.3, 0, 1);
     humanPull += (towing - humanPull) * Math.min(1, dt * 6);
     humanM.animate(time, { speed: hsp, pose, pull: humanPull });
+    humanShadow.visible = !humanSwimming;
     humanShadow.position.set(human.x, human.y + 0.03, human.z);
 
     // Rope mesh: hand to collar with a sag that disappears as it goes taut.
@@ -2309,35 +2261,29 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       b.scale.y = lerp(b.scale.y, 0.15 + lv * 2.4, Math.min(1, dt * 14));
       b.position.y = RAMBLA_Y + 0.25 + b.scale.y * 0.5;
     });
-    drawLanes();
+    panels.drawLanes();
 
     // Night lights near the camera.
     lightPoolT -= dt;
     if (lightPoolT <= 0) {
       lightPoolT = 0.4;
-      const lit = SKY[skyMode].lampsOn;
+      const mode = skySys.getMode();
+      const lit = SKY[mode].lampsOn;
       for (let i = 0; i < lampSorted.length; i++) lampSorted[i].d = lampSorted[i].p.distanceToSquared(camLook);
       lampSorted.sort((a, b) => a.d - b.d);
       lampPool.forEach((l, i) => {
         const s = lampSorted[i];
-        l.intensity = lit && s ? (skyMode === 'night' ? 46 : 22) : 0;
+        l.intensity = lit && s ? (mode === 'night' ? 46 : 22) : 0;
         if (s) l.position.set(s.p.x, s.p.y - 0.4, s.p.z);
       });
     }
 
     // Rain follows the camera.
-    if (rain.visible) {
-      rain.position.set(camLook.x, Math.max(0, camLook.y - 2), camLook.z);
-      for (let i = 0; i < RAIN; i++) {
-        rainArr[i * 6 + 1] -= 16 * dt; rainArr[i * 6 + 4] -= 16 * dt;
-        if (rainArr[i * 6 + 1] < -1) { rainArr[i * 6 + 1] += 18; rainArr[i * 6 + 4] += 18; }
-      }
-      rainGeo.attributes.position.needsUpdate = true;
-    }
+    skySys.updateRain(dt, camLook);
     // Water ripples.
     level.waterMat.normalMap!.offset.set(time * 0.012, time * 0.02);
     level.foamMat.opacity = 0.35 + Math.sin(time * 1.3) * 0.2;
-    (level.foamMat as THREE.MeshBasicMaterial).color.setHex(skyMode === 'night' ? 0x9fb3d6 : 0xffffff);
+    (level.foamMat as THREE.MeshBasicMaterial).color.setHex(skySys.getMode() === 'night' ? 0x9fb3d6 : 0xffffff);
 
     // ---- Camera ----
     updateCamera(rawDt, inTunnel);
@@ -2355,10 +2301,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       const p = proj(x, y, z);
       hud.placeBubble(id, p.x, p.y, p.vis);
     };
-    place('human', human.x, human.y + 2.1, human.z);
+    place('human', human.x, human.y + (humanSwimming ? 1.15 : 2.1), human.z);
     place('dog', dog.x, dog.y + 1.1, dog.z);
     place('kid', Q.kid.x, Q.kid.y + 1.4, Q.kid.z);
     place('tofu', tofu.x, GROUND_Y + 0.7, tofu.z);
+    place('booth-tofu', boothTofu.x, GROUND_Y + 0.72 + boothTofu.jumpY, boothTofu.z);
     for (const dv of devils) place(dv.id, dv.x, GROUND_Y + 2.3, dv.z);
     for (const bd of beachDevils) place(bd.id, bd.x, level.floor(bd.x, bd.z, 0) + 2.3, bd.z);
     place('grocer', Q.grocer.x, RAMBLA_Y + 2.1, Q.grocer.z);
@@ -2370,24 +2317,41 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
 
-    // Sun and shadows follow the action.
-    sun.position.set(camLook.x + 30, camLook.y + 48, camLook.z + 22);
-    sun.target.position.copy(camLook);
-    sun.target.updateMatrixWorld();
+    skySys.followTarget(camLook);
   };
 
   const UPV = new THREE.Vector3(0, 1, 0);
   const segDir = new THREE.Vector3();
   let followYaw = -Math.PI / 2;
 
+  const frameBooth = (sx: number, sy: number, sz: number, spanW: number, minBack = 5.8) => {
+    const vw = host.clientWidth || 1;
+    const vh = host.clientHeight || 1;
+    const aspect = vw / vh;
+    const portrait = vh > vw * 1.05;
+    const compact = vw < 760 || vh < 520;
+    const halfTanY = Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5);
+    const needZ = (spanW * 0.5) / (halfTanY * Math.max(0.32, aspect));
+    const back = Math.max(minBack, needZ * (compact ? 1.12 : 1.0));
+    const visH = 2 * back * halfTanY;
+    const lookDrop = portrait ? visH * 0.16 : compact ? visH * 0.13 : 0;
+    camWantPos.set(sx, Math.max(GROUND_Y + 1.25, sy + (compact ? 0.3 : 0)), sz + back);
+    camWantLook.copy(wallTarget.set(sx, sy - lookDrop, sz));
+    camYaw = 0;
+    return 5;
+  };
+
   const updateCamera = (dt: number, inTunnel: boolean) => {
     camTargetV.set(dog.x, dog.y, dog.z);
     let rate = 4;
-    if (coriolisFocus) {
-      camWantPos.set(level.coriolis.x, level.coriolis.y, level.coriolis.z + 6.4);
-      camWantLook.copy(wallTarget.set(level.coriolis.x, level.coriolis.y, level.coriolis.z));
-      camYaw = 0;
-      rate = 5;
+    if (panels.coriolisFocus) {
+      rate = frameBooth(level.coriolis.x, level.coriolis.y, level.coriolis.z, 4.7, 6.4);
+    } else if (panels.catFocus) {
+      rate = frameBooth(level.catScreen.x, level.catScreen.y, level.catScreen.z, 4.4, 5.4);
+    } else if (panels.podOpen) {
+      rate = frameBooth(level.dopepod.x - 1.0, GROUND_Y + 1.5, level.dopepod.z - 1.5, 4.4, 5.8);
+    } else if (panels.stemmaOpen) {
+      rate = frameBooth(level.stemma.x - 1.2, GROUND_Y + 1.5, level.stemma.z - 1.5, 4.6, 5.8);
     } else if (camMode === 'follow') {
       if (held.has('BracketLeft')) orbitBy(-dt * 1.8);
       if (held.has('BracketRight')) orbitBy(dt * 1.8);
@@ -2459,7 +2423,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     fadeUniforms.uFadeB.value.set(dog.x, dog.y + 0.5, dog.z);
     fadeUniforms.uFadeC.value.set(human.x, human.y, human.z);
     // Fade the embankment a little when the camera dips into the underpass.
-    sky.position.copy(camera.position);
+    skySys.sky.position.copy(camera.position);
   };
   const sp2 = () => Math.hypot(dog.vx, dog.vz);
 
@@ -2507,11 +2471,40 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     perfTick(frameMs, now);
     rafId = requestAnimationFrame(loop);
   };
+  let contextLost = false;
+  let lostOverlay: HTMLElement | null = null;
   const setRunning = () => {
-    const run = engaged && onScreen && !document.hidden;
+    const run = engaged && onScreen && !document.hidden && !contextLost;
     if (run && !rafId) { prev = performance.now(); rafId = requestAnimationFrame(loop); }
     else if (!run && rafId) { cancelAnimationFrame(rafId); rafId = 0; releaseAll(); }
   };
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    contextLost = true;
+    setRunning();
+    if (!lostOverlay) {
+      lostOverlay = document.createElement('div');
+      lostOverlay.className = 'webgl-lost';
+      const box = document.createElement('div');
+      box.className = 'webgl-lost-box';
+      const p = document.createElement('p');
+      p.textContent = '3D view paused while the graphics context resets.';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Reload page';
+      btn.addEventListener('click', () => location.reload());
+      box.append(p, btn);
+      lostOverlay.appendChild(box);
+      host.appendChild(lostOverlay);
+    }
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    contextLost = false;
+    lostOverlay?.remove();
+    lostOverlay = null;
+    renderer.render(scene, camera);
+    setRunning();
+  });
   new IntersectionObserver(([e]) => { onScreen = e.isIntersecting || full; setRunning(); }).observe(host);
   document.addEventListener('visibilitychange', setRunning);
   const engage = () => {
@@ -2558,14 +2551,37 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     (window as unknown as Record<string, unknown>).__walk = {
       dog, human, leash, level, goals, quest,
       get offLeash() { return offLeash; },
+      get dogSwimming() { return dogSwimming; },
+      get humanSwimming() { return humanSwimming; },
       plaza, hill, strays,
-      get area() { return area; },
+      get area() { return goalSys.getArea(); },
       get whirl() { return whirl; },
       get camMode() { return camMode; },
-      get sky() { return skyMode; },
+      get sky() { return skySys.getMode(); },
       get bones() { return bones; },
       get chase() { return chase; },
       debug,
+      booths: {
+        get coriolisFocus() { return panels.coriolisFocus; },
+        get stemmaOpen() { return panels.stemmaOpen; },
+        get catFocus() { return panels.catFocus; },
+        get podOpen() { return panels.podOpen; },
+        get boothTofu() { return { ...boothTofu }; },
+        cat: catSim,
+        pod: podSim,
+        open: (id: 'coriolis' | 'stemma' | 'eat-prey-nap' | 'dopepod' | null) => {
+          panels.closeOtherBooths();
+          if (id === 'coriolis') panels.toggleCoriolis();
+          else if (id === 'stemma') panels.setStemma(true);
+          else if (id === 'eat-prey-nap') panels.setCat(true);
+          else if (id === 'dopepod') panels.setPod(true);
+          else panels.syncPanels();
+        },
+        pounce: (u?: number, v?: number) => {
+          const ms = catSim.getMouseState();
+          return panels.triggerCatPounce(u ?? ms.u, v ?? ms.v);
+        },
+      },
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),
       get sweeper() { return sw; },
       get correfocX() { return cf.x; },
@@ -2601,8 +2617,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       key: (code: string, down: boolean) => (down ? onKey(code) : onKeyUp(code)),
       tick: (frames = 1) => { for (let i = 0; i < frames; i++) update(1 / 60); renderer.render(scene, camera); },
       teleport: (x: number, z: number) => {
-        dog.x = x; dog.z = z; dog.y = level.floor(x, z, 5); dog.vx = dog.vz = 0;
-        human.x = x - 1.2; human.z = z + 0.5; human.y = level.floor(human.x, human.z, 5); human.vx = human.vz = 0;
+        dog.x = x; dog.z = z; dog.y = dogFloor(x, z, 5); dog.vx = dog.vz = dog.vy = 0; dog.onGround = true;
+        human.x = x - 1.2; human.z = z + 0.5; human.y = humanFloor(human.x, human.z, 5); human.vx = human.vz = 0;
         leash.reset(dog, handXZ());
         camSnap = true;
       },

@@ -5,7 +5,7 @@ summary: A Windows music player that splits any song into stems, so you can drop
 kind: Desktop app
 stack: [Python, PySide6, ONNX Runtime, HTDemucs, DirectML, librosa]
 years: "2026"
-cover: /img/projects/stemma-practice.png
+cover: /img/projects/stemma-practice.webp
 coverAlt: The stemma practice view, with a stacked waveform per stem and a mixer below
 coverDark: true
 coverPosition: "88% 50%"
@@ -25,18 +25,18 @@ Import a song, separate it into stems (vocals, drums, bass, guitar, piano, other
 
 ## The practice cockpit
 
-- A tall stacked waveform with one colored lane per stem, sharing the playhead and the A-B loop region.
+- A tall stacked waveform with one colored lane per stem, sharing the playhead and the A-B loop region. The waveform itself acts as a keyboard-accessible position slider, and session state (song, position, mixer, loop, speed, metronome and takes) is restored on launch.
+- **Chord Lane & Song Sections**: the whole song's chords along the timeline with a live look-ahead readout, plus an experimental sections ruler on bar lines where you can click to jump or double-click (`Shift+L`) to loop bar-accurately.
 - **Loop Trainer**: with a loop set, the speed steps up one preset on each repeat until you're playing at full tempo.
-- Pitch-preserving speed, transposition of ±7 semitones, and automatic tempo, key, beat and live chord detection.
-- A metronome with tap tempo and beat sync, plus a count-in before playback and before each loop.
+- Live pitch-preserving speed, transposition of ±7 semitones, automatic tempo, key and beat detection, a synced metronome with count-in, and light and dark themes.
 
-![Recording takes over the stems](/img/projects/stemma-takes.png)
+![Recording takes over the stems](/img/projects/stemma-takes.webp)
 
 ## Separation
 
-- **HTDemucs v4** four- and six-stem separation, and **MDX-Net** two-stem separation on the GPU via DirectML with automatic CPU fallback.
+- **HTDemucs v4** four- and six-stem separation (CPU) and **MDX-Net** two-stem separation on the GPU via DirectML with automatic CPU fallback, plus Wiener filtering and soft gating to reduce bleed.
 - ONNX Runtime inference, with no PyTorch. Models download on first use and are checksum-verified.
-- Imports run in the background, from a file, by drag and drop, or from a YouTube URL.
+- Imports run in the background, from a file, by drag and drop, or from a YouTube URL (with a bundled QuickJS-ng runtime for `yt-dlp`).
 
 ## Playing along
 

@@ -32,7 +32,7 @@ import {
 } from './models';
 import {
   makeLanternPost, makeSpotMast, makeTerrace, makeTamarisk, makeDatePalm, makeChimney, makeXemeneies,
-  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost,
+  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost, makePlanterPot, makeParkedBike,
 } from './props';
 import {
   panotTextures, sandTexture, deckTexture, plasterTexture, waterNormalTexture, signTexture, rng,
@@ -61,7 +61,9 @@ const PIER = SEAFRONT_LAYOUT.pier;
 export const SWIM = SEAFRONT_LAYOUT.swim;
 export const PIPICA = SEAFRONT_LAYOUT.pipica;
 
-const sandFloor = (z: number) => (z > -24 ? SAND_Y : SAND_Y - (-24 - z) * 0.035);
+const SHORE_Z = -24 - (SAND_Y - WATER_Y) / 0.035; // -58.2857, where sandFloor crosses WATER_Y
+const sandFloor = (z: number) =>
+  z > -24 ? SAND_Y : z >= SHORE_Z ? SAND_Y - (-24 - z) * 0.035 : WATER_Y - (SHORE_Z - z) * 0.095;
 const pierDeckY = (z: number) => (z > PIER.root ? GROUND_Y : z > PIER.rise ? GROUND_Y + ((PIER.root - z) / (PIER.root - PIER.rise)) * (PIER.high - GROUND_Y) : PIER.high);
 
 // ---- Instancing collector -------------------------------------------------------------
@@ -138,7 +140,10 @@ function ground(x0: number, x1: number, z0: number, z1: number, y: number, mat: 
 
 const TOWN_Z0 = 33.5;
 
-export interface LevelOpts { coriolisTex: THREE.Texture }
+export interface LevelOpts {
+  coriolisTex: THREE.Texture;
+  boothScreens?: Record<string, THREE.Texture>;
+}
 
 /**
  * Build the level in steps (a generator): it yields between sections so the
@@ -216,9 +221,13 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   root.add(ground(-140, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, 140, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
-  root.add(ground(-140, 140, -10, CUT.sea1, GROUND_Y, concMat, conc.tileMeters));
-  root.add(ground(-140, -CUT.x, CUT.sea1, 4, GROUND_Y, concMat, conc.tileMeters));
-  root.add(ground(CUT.x, 140, CUT.sea1, 4, GROUND_Y, concMat, conc.tileMeters));
+  root.add(ground(-140, 140, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(-140, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(CUT.x, 140, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  const promCurb = box(280, 0.05, 0.26, M(0xd8c3a5, 0.85));
+  promCurb.position.set(0, GROUND_Y + 0.025, -10.02);
+  promCurb.receiveShadow = true;
+  root.add(promCurb);
   const deck = ground(-140, 140, -20, -10, GROUND_Y + 0.01, deckMat, 3);
   root.add(deck);
   // Beach, under the sea too.
@@ -268,7 +277,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (!m) { m = new THREE.MeshStandardMaterial({ color: c, map: plaster, roughness: 0.92 }); plasterMats.set(c, m); }
     return m;
   };
-  const shopGlassMat = M(0x3a4d63, 0.12, 0.4);
+  const shopGlassMat = new THREE.MeshStandardMaterial({ color: 0x4b647d, roughness: 0.12, metalness: 0.35, transparent: true, opacity: 0.34 });
   const wallPlasterMat = new THREE.MeshStandardMaterial({ map: plaster, vertexColors: true, roughness: 0.92 });
   const townBuilder = new DirectBuilder(TOWN_Z0);
   const townLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'town')!;
@@ -624,7 +633,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // Fingerposts at both ends of the underpass: the way to the projects, the beach and town.
   const W_ = Math.PI, E_ = 0, SEA = -Math.PI / 2, LAND = Math.PI / 2;
   place(makeFingerpost([
-    { title: 'Projects', sub: 'Leash game · stemma', color: '#ffb020', angle: W_ },
+    { title: 'Projects', sub: 'dopepod · Cat · Leash · stemma', color: '#ffb020', angle: W_ },
     { title: 'Projects', sub: 'Coriolis · About · Blog', color: '#1fc9b7', angle: E_ },
     { title: 'Platja', sub: 'Beach · old pier', color: '#3d73c7', angle: SEA - 0.75 },
   ]), -4.3, GROUND_Y, -3.4);
@@ -724,6 +733,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (Math.abs(x) < 8) continue;
     addLamp(makeSpotMast(), x, GROUND_Y, -1.5);
   }
+  // Extra promenade mast right beside spawn so pole whirling is an immediate first-screen hook.
+  addLamp(makeSpotMast(), -24, GROUND_Y, -1.5);
   for (let x = -80; x <= 80; x += 12) {
     if (Math.abs(x) < 6 || (x > -54 && x < -42)) continue;
     // Concrete block bench with a wooden seat.
@@ -758,6 +769,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const seafrontLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'seafront')!;
   const pavilions = seafrontLayout.pavilions;
   const PZ0 = pavilions[0].z0, PZ1 = pavilions[0].z1;
+  let catScreenMesh: THREE.Mesh | null = null;
+  let catScreenPos = { x: -58.2, y: GROUND_Y + 1.38, z: PZ1 + 0.13, w: 3.84, h: 2.4 };
   for (const p of pavilions) {
     const g = new THREE.Group();
     const accent = parseInt(p.color.slice(1), 16);
@@ -772,16 +785,70 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     const fascia = box(p.w + 0.62, 0.5, 0.08, M(accent, 0.6));
     fascia.position.set(0, h - 0.05, (PZ1 - PZ0) / 2 + 2.2);
     g.add(fascia);
-    // Posts holding the canopy over the front deck.
+    const awningRoll = cyl(0.14, 0.14, p.w + 0.56, M(accent, 0.55), 10);
+    awningRoll.rotation.z = Math.PI / 2;
+    awningRoll.position.set(0, h - 0.3, (PZ1 - PZ0) / 2 + 2.18);
+    g.add(awningRoll);
+    // Rounded front pilasters + canopy posts.
+    for (const sx of [-(p.w / 2 - 0.08), p.w / 2 - 0.08]) {
+      const pil = cyl(0.12, 0.12, h, M(0xe8e1d5, 0.78), 10);
+      pil.position.set(sx, h / 2, (PZ1 - PZ0) / 2);
+      g.add(pil);
+    }
     for (const sx of [-p.w / 2, p.w / 2]) {
       const post = cyl(0.06, 0.06, h, M(0xe9e6df, 0.6, 0.3), 8);
       post.position.set(sx, h / 2, (PZ1 - PZ0) / 2 + 2.1);
       g.add(post);
     }
     if (p.id !== 'coriolis') {
-      const glass = box(p.w * 0.66, 2.6, 0.06, shopGlassMat);
-      glass.position.set(-p.w * 0.12, 1.45, (PZ1 - PZ0) / 2 + 0.04);
+      const winW = p.w * 0.66;
+      const winX = -p.w * 0.12;
+      const winZ = (PZ1 - PZ0) / 2;
+      // Sunlit shop interior display backing, shelves, and small props behind glazing.
+      const bay = box(winW - 0.12, 2.46, 0.04, new THREE.MeshStandardMaterial({
+        color: 0xfff0d4, emissive: 0x4a3519, emissiveIntensity: 0.42, roughness: 0.88,
+      }));
+      bay.position.set(winX, 1.45, winZ - 0.04);
+      g.add(bay);
+      const woodM = M(0x8c6442, 0.78);
+      for (const sy of [0.95, 1.75]) {
+        const shelf = box(winW - 0.24, 0.07, 0.12, woodM);
+        shelf.position.set(winX, sy, winZ + 0.02);
+        g.add(shelf);
+        for (let k = -2; k <= 2; k++) {
+          const itemC = k % 2 === 0 ? accent : (k + 2) % 3 === 0 ? 0xf4f1ea : 0x1fc9b7;
+          const item = box(0.24, 0.22 + ((Math.abs(k) + (sy > 1.3 ? 1 : 0)) % 2) * 0.1, 0.1, M(itemC, 0.55));
+          item.position.set(winX + k * (winW * 0.16), sy + 0.15, winZ + 0.03);
+          g.add(item);
+        }
+      }
+      for (const mx of [winX - winW * 0.48, winX, winX + winW * 0.48]) {
+        const mul = box(0.06, 2.55, 0.08, woodM);
+        mul.position.set(mx, 1.45, winZ + 0.04);
+        g.add(mul);
+      }
+      const glass = box(winW, 2.6, 0.06, shopGlassMat);
+      glass.position.set(winX, 1.45, winZ + 0.04);
       g.add(glass);
+      const bTex = opts.boothScreens?.[p.id];
+      if (bTex) {
+        const sw = p.id === 'stemma' ? 3.04 : p.id === 'eat-prey-nap' ? 3.84 : p.id === 'blog' ? 3.2 : 3.52;
+        const sh = sw / 1.6;
+        const sx = p.id === 'stemma' ? -0.3 : -p.w * 0.12;
+        const sy = p.id === 'eat-prey-nap' ? 1.38 : 1.5;
+        const sz = (PZ1 - PZ0) / 2 + 0.11;
+        const scrFrame = box(sw + 0.16, sh + 0.16, 0.05, M(0x0b1224, 0.45, 0.35));
+        scrFrame.position.set(sx, sy, sz - 0.025);
+        g.add(scrFrame);
+        const scr = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), new THREE.MeshBasicMaterial({ map: bTex }));
+        scr.position.set(sx, sy, sz + 0.01);
+        scr.name = `booth-${p.id}`;
+        g.add(scr);
+        if (p.id === 'eat-prey-nap') {
+          catScreenMesh = scr;
+          catScreenPos = { x: p.x + sx, y: GROUND_Y + sy, z: (PZ0 + PZ1) / 2 + sz + 0.01, w: sw, h: sh };
+        }
+      }
       const door = box(1.2, 2.5, 0.06, M(accent, 0.55));
       door.position.set(p.w * 0.34, 1.3, (PZ1 - PZ0) / 2 + 0.04);
       g.add(door);
@@ -794,6 +861,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     boxes.push({ x0: p.x - p.w / 2, x1: p.x + p.w / 2, z0: PZ0, z1: PZ1, top: GROUND_Y + h, kind: 'building' });
     for (const sx of [-p.w / 2, p.w / 2]) addCircle(p.x + sx, PZ1 + 2.1, 0.06, GROUND_Y + h, 'post', true, true);
   }
+  // Start-view boardwalk life: festive bunting, planter pots, cafe sets, and parked bicycles.
+  root.add(makeBunting(new THREE.Vector3(-25, GROUND_Y + 3.85, PZ1 + 2.1), new THREE.Vector3(-19, GROUND_Y + 3.85, PZ1 + 2.1)));
+  for (const [fx, fz, fc] of [
+    [-25.4, -10.2, 0xe5487a],
+    [-18.6, -10.2, 0xffb020],
+    [-36.5, -10.2, 0xffb020],
+    [-9.5, -10.2, 0x1fc9b7],
+  ] as [number, number, number][]) {
+    place(makePlanterPot(fc), fx, GROUND_Y, fz, fx);
+    addCircle(fx, fz, 0.34, GROUND_Y + 0.9, 'pot', true, false);
+  }
+  for (const [tx, tz, col] of [[-28.6, -8.8, 0xffb020], [-13.8, -8.8, 0x1fc9b7]] as [number, number, number][]) {
+    place(makeCafeSet(col), tx, GROUND_Y, tz, tx);
+    addCircle(tx, tz, 0.5, GROUND_Y + 0.8, 'table', false, false);
+  }
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 14, Math.PI), M(0x2a2f3d, 0.4, 0.6));
+  hoop.position.set(-17.35, GROUND_Y, -8.5);
+  root.add(hoop);
+  place(makeParkedBike(0xe5302a), -17.8, GROUND_Y, -8.5, 0.35);
+  place(makeParkedBike(0x1fc9b7), -16.9, GROUND_Y, -8.5, 0.15);
+  boxes.push({ x0: -18.4, x1: -16.3, z0: -9.0, z1: -8.0, top: GROUND_Y + 1.0, kind: 'bike' });
   // About: a little terrace in front of the café.
   for (const tx of [24, 31]) {
     place(makeCafeSet(0x8bcb3c), tx, GROUND_Y, -9.8, r() * 3);
@@ -802,6 +890,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // Blog: racks of magazines out front.
   place(makeKiosk(0xe5487a), 40, GROUND_Y, -10.6, 0);
   boxes.push({ x0: 38.7, x1: 41.3, z0: -11.5, z1: -9.7, top: GROUND_Y + 2.8, kind: 'kiosk' });
+  // Eat Prey Nap: low straw-yellow play cushion outside for booth Tofu.
+  const eatPav = pavilions.find((p) => p.id === 'eat-prey-nap')!;
+  const tofuPad = cyl(0.62, 0.68, 0.07, M(0xe3d39d, 0.9), 18);
+  tofuPad.position.set(eatPav.x - 1.2, GROUND_Y + 0.035, PZ1 + 1.1);
+  root.add(tofuPad);
+  // dopepod: warm studio monitor speaker & broadcast mic stand out front.
+  const podPav = pavilions.find((p) => p.id === 'dopepod')!;
+  const podSpk = box(0.58, 0.98, 0.48, M(0x161b29, 0.55));
+  podSpk.position.set(podPav.x - 4.2, GROUND_Y + 0.49, PZ1 + 0.72);
+  root.add(podSpk);
+  const podWoofer = cyl(0.18, 0.18, 0.04, M(0xd94ca6, 0.4), 14);
+  podWoofer.rotation.x = Math.PI / 2;
+  podWoofer.position.set(podPav.x - 4.2, GROUND_Y + 0.58, PZ1 + 0.98);
+  root.add(podWoofer);
+  boxes.push({ x0: podPav.x - 4.5, x1: podPav.x - 3.9, z0: PZ1 + 0.45, z1: PZ1 + 1.0, top: GROUND_Y + 0.98, kind: 'speaker' });
+  const micStand = cyl(0.03, 0.04, 1.35, ironM, 8);
+  micStand.position.set(podPav.x + 2.0, GROUND_Y + 0.68, PZ1 + 0.75);
+  root.add(micStand);
+  const micHead = cyl(0.07, 0.06, 0.16, M(0xd94ca6, 0.35, 0.6), 10);
+  micHead.position.set(podPav.x + 2.0, GROUND_Y + 1.4, PZ1 + 0.75);
+  root.add(micHead);
   // Coriolis: the LED wall on the pavilion's front, facing the promenade.
   const cor = pavilions.find((p) => p.id === 'coriolis')!;
   const wallX = cor.x, wallY = GROUND_Y + 2.3, wallZ = PZ1 + 0.05;
@@ -819,8 +928,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const stemmaBars: THREE.Mesh[] = [];
   const barCols = [0xe5487a, 0xffb020, 0x1fc9b7, 0x8bcb3c];
   for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.08), new THREE.MeshStandardMaterial({ color: barCols[i], emissive: barCols[i], emissiveIntensity: 1 }));
-    m.position.set(stem.x - 3.6 + i * 0.75, GROUND_Y + 0.6, PZ1 + 0.1);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1, 0.08), new THREE.MeshStandardMaterial({ color: barCols[i], emissive: barCols[i], emissiveIntensity: 1 }));
+    m.position.set(stem.x - 3.65 + i * 0.42, GROUND_Y + 0.6, PZ1 + 0.12);
     m.scale.y = 0.2;
     m.userData.dynamic = true;
     root.add(m);
@@ -1244,6 +1353,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     // Along the pavilion fronts (not through them), clear of the blog kiosk and the pier.
     [[-8, -10.9], [14, -11], [36, -10.9]],
     [[-44, -10.9], [-32, -11], [-20.5, -10.9]],
+    [[-80, -10.7], [-66, -10.7], [-53, -10.7]],
     [[-80, -54], [0, -55], [80, -54]],
     [[-48, -12], [-48, -60], [-48, -126]],
     ...PLAZA.pedPaths,
@@ -1262,6 +1372,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     beacon: beacon.lamp,
     coriolis: { x: wallX, y: wallY, z: wallZ, screen },
     stemma: { x: stem.x, z: PZ1 + 1.6 },
+    catScreen: { ...catScreenPos, mesh: catScreenMesh, viewX: eatPav.x - 1.2, viewZ: PZ1 + 1.6 },
+    boothTofuAnchor: { x: eatPav.x - 1.2, z: PZ1 + 1.1 },
+    dopepod: { x: podPav.x, z: PZ1 + 1.6 },
     stemmaBars,
     underpassLight,
     tunnel: { x0: -CUT.tunnelX, x1: CUT.tunnelX, z0: CUT.sea0, z1: CUT.rambla1, cutZ0: CUT.sea1, cutZ1: CUT.rambla0, floor: CUT.floor },

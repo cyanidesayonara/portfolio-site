@@ -422,3 +422,101 @@ export function makeFingerpost(arms: { title: string; sub?: string; color: strin
   shadowed(g);
   return g;
 }
+
+/** Tapered terracotta planter pot with green foliage and seasonal blossoms. */
+export function makePlanterPot(flowerColor = 0xe5487a) {
+  const g = new THREE.Group();
+  const terra = M(0xc86b42, 0.85);
+  const rimM = M(0xd6784c, 0.85);
+  const soilM = M(0x3a2a1d, 0.95);
+  const pot = cyl(0.28, 0.2, 0.44, terra, 12);
+  pot.position.y = 0.22;
+  g.add(pot);
+  const rim = cyl(0.31, 0.29, 0.07, rimM, 12);
+  rim.position.y = 0.43;
+  g.add(rim);
+  const soil = cyl(0.26, 0.26, 0.04, soilM, 12);
+  soil.position.y = 0.44;
+  g.add(soil);
+
+  const bushGeo = new THREE.IcosahedronGeometry(0.18, 1);
+  const leafA = M(0x4d7d3c, 0.92);
+  const leafB = M(0x5e9148, 0.92);
+  const bushOffsets: [number, number, number, number][] = [
+    [0, 0.58, 0, 1.1],
+    [-0.12, 0.53, 0.09, 0.8],
+    [0.13, 0.54, 0.06, 0.82],
+    [0.02, 0.55, -0.12, 0.8],
+  ];
+  bushOffsets.forEach(([x, y, z, s], i) => {
+    const b = new THREE.Mesh(bushGeo, i % 2 ? leafA : leafB);
+    b.scale.setScalar(s);
+    b.position.set(x, y, z);
+    g.add(b);
+  });
+
+  const bloomM = M(flowerColor, 0.65);
+  const blooms: [number, number, number][] = [
+    [0, 0.75, 0.04],
+    [-0.14, 0.66, 0.14],
+    [0.14, 0.67, 0.12],
+    [-0.08, 0.67, -0.13],
+    [0.11, 0.65, -0.1],
+  ];
+  for (const [bx, by, bz] of blooms) {
+    const f = sphere(0.055, bloomM);
+    f.position.set(bx, by, bz);
+    g.add(f);
+  }
+  shadowed(g);
+  return g;
+}
+
+/** Lightweight riderless bicycle for boardwalk/promenade racks. */
+export function makeParkedBike(frameColor = 0xe5302a) {
+  const g = new THREE.Group();
+  const tireM = M(0x1f2228, 0.85);
+  const metalM = M(0xb8bec8, 0.35, 0.7);
+  const frameM = M(frameColor, 0.45, 0.25);
+  const trimM = M(0x2a2320, 0.8);
+  const tireGeo = new THREE.TorusGeometry(0.32, 0.035, 6, 16);
+
+  for (const wx of [-0.54, 0.54]) {
+    const tire = new THREE.Mesh(tireGeo, tireM);
+    tire.position.set(wx, 0.35, 0);
+    g.add(tire);
+    const hub = cyl(0.04, 0.04, 0.06, metalM, 8);
+    hub.rotation.x = Math.PI / 2;
+    hub.position.set(wx, 0.35, 0);
+    g.add(hub);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.012, 4, 14), metalM);
+    rim.position.set(wx, 0.35, 0);
+    g.add(rim);
+  }
+
+  const bb = V(-0.08, 0.36, 0);
+  const seatTop = V(-0.22, 0.78, 0);
+  const headTop = V(0.32, 0.78, 0);
+  const rearAxle = V(-0.54, 0.35, 0);
+  const frontAxle = V(0.54, 0.35, 0);
+
+  g.add(rod(bb, seatTop, 0.025, frameM, 6));
+  g.add(rod(bb, headTop, 0.025, frameM, 6));
+  g.add(rod(seatTop, headTop, 0.022, frameM, 6));
+  g.add(rod(bb, rearAxle, 0.018, frameM, 6));
+  g.add(rod(seatTop, rearAxle, 0.016, frameM, 6));
+  g.add(rod(headTop, frontAxle, 0.02, frameM, 6));
+
+  const saddle = box(0.2, 0.05, 0.1, trimM);
+  saddle.position.set(-0.24, 0.82, 0);
+  g.add(saddle);
+
+  const barStem = rod(headTop, V(0.3, 0.92, 0), 0.018, metalM, 6);
+  g.add(barStem);
+  const bar = rod(V(0.3, 0.92, -0.22), V(0.3, 0.92, 0.22), 0.016, metalM, 6);
+  g.add(bar);
+  g.add(rod(bb, V(-0.12, 0.03, 0.16), 0.012, metalM, 5));
+
+  shadowed(g);
+  return g;
+}

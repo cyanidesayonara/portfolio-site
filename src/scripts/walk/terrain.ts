@@ -170,6 +170,6 @@ export function addStairsToBuilder(
     builder.addBox(s.x1, yBot, z0, s.x1 + 0.35, yTop, z1, wallColor, { skipBottom: true });
   }
 
-  addBox({ x0: s.x0 - 0.35, x1: s.x0, z0: s.z0, z1: s.z1, top: s.y1 + wallH, kind: 'wall' });
-  addBox({ x0: s.x1, x1: s.x1 + 0.35, z0: s.z0, z1: s.z1, top: s.y1 + wallH, kind: 'wall' });
+  addBox({ x0: s.x0 - 0.35, x1: s.x0, z0: s.z0, z1: s.z1, top: s.y1 + wallH + 0.8, kind: 'wall' });
+  addBox({ x0: s.x1, x1: s.x1 + 0.35, z0: s.z0, z1: s.z1, top: s.y1 + wallH + 0.8, kind: 'wall' });
 }

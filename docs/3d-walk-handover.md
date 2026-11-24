@@ -14,10 +14,10 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Running and testing
 
-- **Node:** 22.23.4 or newer. On this Windows machine, use `npx.cmd -y node@22.23.5 node_modules/astro/bin/astro.mjs check` and `... build`.
+- **Node:** 22.23.4 or newer. On this Windows machine, use `npx.cmd -y node@22.23.5 node_modules/astro/bin/astro.mjs check` and `... build`, `npx.cmd -y node@22.23.5 --test tests\leash.test.ts` (`npm test`), and `npx.cmd -y node@22.23.5 tools/smoke-check.mjs` (`npm run test:smoke`). Both `npm test` and `npm run test:smoke` run in `.github/workflows/pages-deploy.yml`.
 - **Preview:** `.claude/launch.json` runs `astro preview` on port 4321. Rebuild `dist/` to see changes, then reload `http://127.0.0.1:4321/walk?walktest`.
 - **`?walktest`** adds a perf readout (fps, worst frame, draw calls, triangles, geometries, build time, district, streaming slice time) and `window.__walk`:
-  - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`.
+  - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`, `dogSwimming`, `humanSwimming`, `booths`.
   - **Driving the game:** `key(code, down)`, `tick(frames)` (runs fixed 60 Hz updates and renders), `teleport(x, z)` (also snaps the camera), `collide(p, r, y)`.
   - **`camera` + `render()`:** aim the camera by hand and render one frame (then `canvas.gl.toDataURL()` in the same task) to inspect distant scenery.
   - **`plaza`:** the Plaça del Mercat runtime (`plazaLife.ts`): `quests()`, `chasing()`, and `debug` (`butcher`, `boti`, `fris`, `paper`, `pigeons`).
@@ -34,7 +34,8 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 | File | What it does |
 | --- | --- |
-| `game3d.ts` | Everything at runtime: renderer, loading bar, input (focus-gated), physics at 120 Hz, the human's AI, leash, goals, quests, chases (La Neteja, correfoc, Dimoni), NPC walkers and cyclists, train, cameras (street, follow and overhead; wheel and `-`/`=` zoom; drag and `[`/`]` orbit), HUD wiring, minimap, theme and sky, fullscreen, the `?walktest` hooks. |
+| `game3d.ts` | Core runtime orchestrator: renderer & context-loss recovery, loading bar, focus-gated input (including `Escape` blur), physics at 120 Hz, human AI, NPCs/cyclists/train, cameras, minimap, fullscreen, and `?walktest` hooks. |
+| `particles.ts`, `sky.ts`, `goals.ts`, `boothPanels.ts` | Modules extracted from `game3d.ts`: particle/stain pools, sky dome + sun/rim/rain rig, 17-goal checklist + localStorage persistence, and the four boardwalk booth panels (`Coriolis`, `Eat Prey Nap`, `dopepod`, `stemma`). |
 | `level.ts` | `buildLevelSteps()`: the level as a generator that yields between sections, so it builds behind a loading bar. It produces geometry, colliders, floor and surface functions, quest and NPC data, and the districts (three resident, plus the streamed plaza and hill). Exports layout constants (`GROUND_Y`, `WATER_Y`, `PIPICA`, `SWIM`, …), `pipicaAt()`, `pipicaBenches`, and `churchLandmark`. |
 | `plaza.ts` | Phase 3: Plaça del Mercat as a streamable district (`makePlazaDistrict()`): the square, fountain, trees, newsstand, café terrace, market hall, butcher's stall, second pipicà, Carrer Major's signs and north exit fingerpost, built in small steps with colliders added straight to the grid (tagged `plaza`). `PLAZA` holds the shared positions. |
 | `plazaLife.ts` | The plaza at runtime: vendor, grandpa, waiter, dog-park regular and butcher; the newspaper, terrace and fetch quests; the botifarra chase (with simple alley routing). Hooks into `game3d.ts` for pickup/drop, bark, prompts, bubbles and the shared one-chase-at-a-time rule. |
@@ -89,15 +90,23 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 ## Next up
 
 1. **Move the metro entrance (later):** it sits at the west end of the Rambla (`metro` in `data/seafront.json`; the 2D street has its own across the road from `Estació`). Santtu wants it deeper in town, where the real station is, once the level spreads that far. All its signs stay generic ("Metro", "L2", "SORTIDA").
-2. **Swimming animation (Santtu, for later):** when the water gets deep enough, both characters should swim. Today Millie just floats at `WATER_Y - SWIM_SINK` once the water is deeper than `SWIM_DEPTH` (`dogSwimming` in `game3d.ts`) with no paddling, and the human stops at waist depth (`HUMAN_WADE`) and says they are not swimming. Wanted: a dog paddle for Millie (legs, head up, wake), and a swim stroke for the human so they can follow her out instead of stopping. The sea is the only deep water now; any other body of water added later should reuse the same `surface === 'water'` and depth checks.
-3. **Test on real phones and tablets:** fullscreen modes, touch buttons, audio by ear. Nothing has been verified on hardware yet. Also check that real fullscreen comes back on the first key press or tap after the train (automation can't produce a real user gesture).
-4. **Saved-progress trade-offs (Phase 5):** saved counts add this visit's progress on top of the saved count, so a favor repeated after a reload counts again (quest flags in `plazaLife`/`hillLife` are per page load), and the Home door finish and its bones can be replayed. Persist quest flags if this matters.
-5. **Plaça del Mercat and Dalt de la Vila polish:** reference photos for the real squares and streets; more ambient walkers and shoppers; maybe a market interior. The grass bank behind the Museu is climbable up to the top-square wall (harmless dead end). Scattering plaza or hilltop pigeons doesn't count toward the `birds` goal.
-6. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
-7. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
-8. **Next phases:** more of the town (toward the harbor, the shopping center and the inland highway, per the expansion plan), each district with its own pipicà, quests and goals area in `progress.ts`.
+2. **Test on real phones and tablets:** fullscreen modes, touch buttons, audio by ear. Nothing has been verified on hardware yet. Also check that real fullscreen comes back on the first key press or tap after the train (automation can't produce a real user gesture).
+3. **Plaça del Mercat and Dalt de la Vila reference pass:** reference photos for the real squares and streets, and maybe a market interior.
+4. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
+5. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
+6. **Next phases:** more of the town (toward the harbor, the shopping center and the inland highway, per the expansion plan), each district with its own pipicà, quests and goals area in `progress.ts`.
 
 ## Polish backlog (from Santtu's playtesting)
+
+- **Done (swimming, whirl, progress & plaza/hill polish):**
+  - **Swimming:** past the shoreline (`SHORE_Z` in `level.ts`), the seabed slopes down faster (`0.095`) so Millie (`SWIM_DEPTH`) and her human (`HUMAN_SWIM_DEPTH`) reach swimming depth a short walk from shore, with dog-paddle and breaststroke animations (`models.ts`), wakes, and full animated `makePerson` NPC swimmers (`life.ts`).
+  - **Leash whirl direction:** `Leash.poleWinding()` and contact-aware `ends()` (`leash.ts`) pair with `-Math.sign(coil)` unwinding in `startWhirl()` and active-whirl gating on `WhirlDetector` (`game3d.ts`) so the human always unwinds around the pole instead of spinning into tighter wraps.
+  - **Saved progress:** `walk3d-progress-v1` (`progress.ts`) persists completed quest, find, hurdle, stray cat, and Home finish keys (`done[]`, compatible with older v1 saves) so repeated favors and the Home door bones cannot be double-counted after reload.
+  - **Plaça & hill polish:** added a market clock gable, east flower/produce stall and florist, terracotta planters, fountain/mirador/church-square seated locals, extra pedestrian loops, church threshold and gable cross; wired plaza and hilltop pigeons to the `birds` goal (`plazaLife.ts`, `hillLife.ts`); and raised hillside retaining/cheek wall colliders (`terrain.ts`, `hill.ts`) to prevent jumping onto the grass bank behind the Museu.
+- **Done (booths, idling boardwalk screens, non-blocking mobile HUD & 8/16-bit 2D street):**
+  - **Boardwalk pavilions:** added `Eat Prey Nap` (`x: -57`) and `dopepod` (`x: -72`) pavilions to `data/seafront.json` and `level.ts`; mounted live idling screens across all boardwalk pavilions (`booths.ts`: `EatPreyNapSim`, `DopepodSim`, `createBoardwalkBoothScreens()`), alongside a booth Tofu (`makeTofu()`) at `level.boothTofuAnchor` who stalks and leaps at the mouse on screen and raycast screen clicks.
+  - **Non-blocking mobile booth controllers:** opening any booth (`Coriolis`, `stemma`, `Eat Prey Nap`, `dopepod`) toggles `.panel-open` on the stage (hiding overlapping `.touch`, `.toolbar`, `.prompts`, and `.minimap` layers), docks panels as compact bottom drawers on small viewports, and frames the 3D screen above the drawer via `frameBooth()` camera pull + look offset (`Walk3D.astro`, `game3d.ts`).
+  - **2D street retro polish:** added `dopepod` and `eat-prey-nap` stops (`ui.ts`), dark CRT bezels (`world.ts`), live 8/16-bit shop-window animations plus a pouncing pixel Tofu outside `Eat Prey Nap`, and a compact pixelated mini-booth drawer (`X` / `TRY`) in `StreetMap.astro` and `street/game.ts`.
 
 - **Metro entrance (PR #6):** Santtu would like it deeper in town, where the real station is, once the level spreads out that far; fine where it is for now.
 

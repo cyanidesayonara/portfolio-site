@@ -1,14 +1,12 @@
 ---
 title: "Shipping a Python desktop app to the Microsoft Store"
 description: "How stemma goes from a Python and PySide6 repo to a signed Microsoft Store release, with listing copy, screenshots and Partner Center submissions treated as code."
-date: 2026-11-21
+date: 2026-11-06
 tags: [python, pyside6, windows, msix, ci]
-cover: /img/projects/stemma-practice.png
+project: stemma
+cover: /img/projects/stemma-practice.webp
 coverAlt: The stemma practice view with stacked stem waveforms and practice controls
-draft: true
 ---
-
-<!-- DRAFT: written from the stemma repo and docs/store-release-pipeline.md. Review, edit in your own voice, then set draft to false. -->
 
 A PyInstaller zip on GitHub Releases is a common place for a Python desktop app to stop. That works for developers, until a normal Windows user downloads the zip, unpacks it, and hits a SmartScreen warning telling them the app comes from an unknown publisher.
 

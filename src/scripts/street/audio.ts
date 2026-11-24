@@ -191,6 +191,20 @@ export class StreetSound {
     if (t < 0) return;
     [523, 659, 784, 1047].forEach((f, i) => this.tone(f, t + i * 0.08, 0.25, 'triangle', 0.16, this.sfx!));
   }
+  fanfare() {
+    const t = this.now();
+    if (t < 0) return;
+    // Celebratory 8-bit victory arpeggio with bass support and high sparkle.
+    [523, 659, 784, 1047, 784, 1047].forEach((f, i) => {
+      const dur = i === 5 ? 0.55 : 0.14;
+      this.tone(f, t + i * 0.085, dur, 'square', 0.11, this.sfx!, 3200);
+      this.tone(f, t + i * 0.085, dur + 0.05, 'triangle', 0.15, this.sfx!);
+    });
+    this.tone(262, t, 0.28, 'triangle', 0.16, this.sfx!);
+    this.tone(392, t + 0.26, 0.28, 'triangle', 0.16, this.sfx!);
+    this.tone(523, t + 0.425, 0.55, 'triangle', 0.18, this.sfx!);
+    this.hiss(t + 0.425, 0.16, 0.05, 6200, 'highpass', this.sfx!);
+  }
   hey() {
     const t = this.now();
     if (t < 0) return;

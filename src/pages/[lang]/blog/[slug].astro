@@ -1,0 +1,27 @@
+---
+import BlogPostView from '../../../components/views/BlogPostView.astro';
+import { getLocalizedPosts } from '../../../i18n/content';
+import { NON_DEFAULT_LOCALES } from '../../../i18n/utils';
+
+export async function getStaticPaths() {
+  const paths = [];
+  for (const lang of NON_DEFAULT_LOCALES) {
+    const posts = await getLocalizedPosts(lang);
+    for (const item of posts) {
+      paths.push({
+        params: { lang, slug: item.slug },
+        props: {
+          locale: lang,
+          post: item.entry,
+          isFallback: item.isFallback,
+        },
+      });
+    }
+  }
+  return paths;
+}
+
+const { locale, post, isFallback } = Astro.props;
+---
+
+<BlogPostView locale={locale} post={post} isFallback={isFallback} />

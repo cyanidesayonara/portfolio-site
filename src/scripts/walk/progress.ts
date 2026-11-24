@@ -34,10 +34,12 @@ export const AREA_BONUS = 5;
 
 const KEY = 'walk3d-progress-v1';
 
-interface Saved {
+export interface Saved {
   v: 1;
   goals: Record<string, { done: boolean; count?: number }>;
   bones: number;
+  /** Completed one-off quest/collectible keys so favors and finishes are not double-counted on reload. */
+  done?: string[];
 }
 
 export function loadProgress(): Saved | null {
@@ -52,11 +54,12 @@ export function loadProgress(): Saved | null {
   }
 }
 
-export function saveProgress(goals: GoalRow[], bones: number) {
+export function saveProgress(goals: GoalRow[], bones: number, done?: Iterable<string>) {
   const s: Saved = { v: 1, goals: {}, bones };
   for (const g of goals) {
     if (g.done || g.count) s.goals[g.id] = g.target ? { done: g.done, count: g.count ?? 0 } : { done: g.done };
   }
+  if (done) s.done = [...done];
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage blocked */ }
 }
 

@@ -1,13 +1,16 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getUi } from '../i18n/ui';
+
+const ui = getUi('en').notFound;
 ---
 
-<Base title="Page not found">
+<Base title={ui.title} noHreflang={true}>
   <section class="wrap lost">
-    <span class="eyebrow">404</span>
-    <h1>Millie sniffed everywhere. Nothing here.</h1>
-    <p>The page you were after has moved or never existed.</p>
-    <a class="btn btn-primary" href="/">Back to the map</a>
+    <span class="eyebrow">{ui.eyebrow}</span>
+    <h1>{ui.heading}</h1>
+    <p>{ui.body}</p>
+    <a class="btn btn-primary" href="/">{ui.cta}</a>
   </section>
 </Base>
 

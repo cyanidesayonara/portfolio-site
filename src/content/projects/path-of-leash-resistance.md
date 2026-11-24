@@ -6,7 +6,7 @@ kind: Game
 stack: [Godot 4, GDScript, Verlet rope physics, Synthesized audio, GitHub Actions]
 years: "2026"
 cover: /img/projects/leash-street.jpg
-coverAlt: A dog pulls its phone-distracted owner across a Barcelona bike lane on a long red leash
+coverAlt: A dog pulling its phone-distracted human along La Rambla's wavy paving next to a bike lane on a red leash
 links:
   - label: Play in the browser
     href: https://cyanidesayonara.github.io/path-of-leash-resistance/
@@ -25,6 +25,8 @@ Your human is glued to their phone and walking on autopilot. You are on the othe
 
 ## How it plays
 
+![Path of Leash Resistance gameplay clip showing pole whirling and leash pulls](/img/projects/leash-hero.webp)
+
 Your human is four times your weight and wins every straight tug. So you win the way a dog does: dig in at the right moment, wind the leash round a lamppost to hold them fast, and bark to stop them dead at the curb. Wind them round a pole and keep pulling, and they whirl off the coil like a tetherball.
 
 The leash is real rope. The one you see is the one doing the physics: it wraps poles, cinches when taut, slips off under a hard wrench, and tangles with other people's leashes.
@@ -33,12 +35,15 @@ The leash is real rope. The one you see is the one doing the physics: it wraps p
 
 ## What's in it
 
-- **Forty-two walks in and around Barcelona**, from La Rambla and El Gòtic to Montjuïc, Sitges and Montserrat, each playable in any weather, by day or at night.
-- **Eight chases**: a street sweeper at dawn, wild boars, the correfoc's fire devils through Gràcia, and wild goats down Montserrat among them.
-- **Four statue bosses**, including El Drac, the mosaic salamander.
-- **Five dogs**, each with a knack of their own, plus collars, bandanas and coats.
-- **Dares and combo tricks**: swing round a pole, grind a ledge, fling your human.
+- **Fifty-one walks in and around Barcelona**, from La Rambla and El Gòtic to Montjuïc, Sitges, Girona, Tarragona, Vic and Montserrat, plus a tutorial walk that teaches one trick at a time. Each walk can be played in any weather, by day or at night.
+- **Ten chases**: a street sweeper at dawn, wild boars, the correfoc's fire devils through Gràcia, the Dimoni's firework float, airport security, Les Atraccions' mascot chase, a runaway snow groomer down La Molina, and wild goats down Montserrat among them.
+- **Five statue bosses**: El Mamut, El Drac the mosaic salamander, Els Lleons, La Lleona in Girona, and El Gat.
+- **Seven dogs**, each with a knack and skill goal of her own, plus buried finds, training, collars, bandanas and coats.
+- **Dares and combo tricks**: swing round a pole, grind a ledge, fling your human, or take a dare for its own tune.
+- **Nine skies and six times of day**, in English, Catalan and Spanish, with adjustable screen shake, flashes, text size and controls.
 - No ads, no purchases, no account. Plays offline.
+
+![Outrunning the street sweeper chase](/img/projects/leash-sweeper.webp)
 
 ![Montserrat](/img/projects/leash-montserrat.jpg)
 
@@ -48,4 +53,4 @@ The leash is real rope. The one you see is the one doing the physics: it wraps p
 - **Everything is drawn in code.** There are no sprite files: every dog, lamppost and tile of trencadís is a vector drawn in `_draw()`, batched to keep the web build fast.
 - **All music and sound is synthesized in code**, then pre-rendered for release builds.
 - **Releases are automated**: a version tag builds and pushes the web and Windows builds to itch.io and packages the Microsoft Store version.
-- **Built with a team of AI coding agents.** Each walk is written up as a brief, built by an agent in its own worktree and branch, and played and reviewed before it merges. More on that in [How I build](/how-i-build).
+- **Built with a team of AI coding agents.** Each walk is written up as a brief, built by an agent in its own worktree and branch, gated by automated tests and CI, with every player-facing change played and accepted before it merges. More on that in [How I build](/how-i-build).

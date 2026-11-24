@@ -7,67 +7,139 @@
   The row of links under the street is the real navigation: it works
   without JavaScript, and it lights up when Millie reaches a shop.
 */
-const STOPS = [
-  { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Game', href: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
-  { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'Music app', href: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
-  { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'LED wall', href: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
-  { id: 'blog', label: 'Blog', short: 'Blog', kind: '', href: '/blog', color: '#e5487a', ink: '#0b1430' },
-  { id: 'how', label: 'How I build', short: 'How I build', kind: '', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
-  { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
-  { id: 'station', label: 'Estació', short: 'Estació (3D)', kind: 'Train to 3D', href: '/walk?via=train', color: '#e5302a', ink: '#f4f1ea' },
-  { id: 'metro', label: 'Metro', short: 'Metro (3D)', kind: 'Metro to 3D', href: '/walk?via=metro', color: '#9b2d8f', ink: '#f4f1ea' },
-  { id: 'park', label: 'The park', short: 'Park', kind: 'Off-leash', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
-];
-// The same keys as Path of Leash Resistance's default layout.
-const KEYS = [
-  { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
-  { keys: ['Shift'], label: 'Run' },
-  { keys: ['Space'], label: 'Dig in' },
-  { keys: ['Q'], label: 'Mark' },
-  { keys: ['F'], label: 'Squat' },
-  { keys: ['G'], label: 'Pick up' },
-  { keys: ['E'], label: 'Bark' },
-  { keys: ['Enter'], label: 'Go in' },
-  { keys: ['Tab'], label: 'Goals' },
-  { keys: ['R'], label: 'Restart' },
-  { keys: ['Esc'], label: 'Leave' },
-];
+import { localePath, type Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = 'en' } = Astro.props;
+const ui = getUi(locale).streetMap;
+
+const STOPS = ui.stops.map((s) => ({
+  id: s.id,
+  label: s.label,
+  short: s.short,
+  kind: s.kind,
+  href: localePath(locale, s.path),
+  color: s.color,
+  ink: s.ink,
+}));
+const CORE_KEYS = ui.keys.filter((k) => ['W', 'Space', 'E'].includes(k.keys[0]));
+const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]));
 ---
 
-<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street, with the same controls as Path of Leash Resistance: WASD or arrows move, Shift runs, Space digs in, Q marks a spot, F squats, G picks up, E barks, Tab shows the goals and Enter goes into a shop." aria-describedby="street-caption">
+<figure
+  class="street"
+  data-street
+  data-stops={JSON.stringify(STOPS)}
+  data-try-booth={ui.tryBooth}
+  data-close-booth={ui.closeBooth}
+  data-open-page={ui.openPage}
+  tabindex="0"
+  aria-label={ui.ariaLabel}
+  aria-describedby="street-caption"
+>
+  <div class="static-street">
+    <svg class="static-skyline" viewBox="0 0 640 108" width="640" height="108" aria-hidden="true">
+      <rect width="640" height="68" fill="#14203d" />
+      <rect y="68" width="640" height="24" fill="#e4dbca" />
+      <rect y="92" width="640" height="16" fill="#4a4f5c" />
+      <rect x="20" y="16" width="84" height="52" rx="4" fill="#212d54" />
+      <rect x="20" y="16" width="84" height="8" fill="#d94ca6" />
+      <rect x="114" y="12" width="92" height="56" rx="4" fill="#f4f1ea" />
+      <rect x="114" y="12" width="92" height="8" fill="#f0c44d" />
+      <rect x="216" y="14" width="102" height="54" rx="4" fill="#f4f1ea" />
+      <rect x="216" y="14" width="102" height="8" fill="#ffb020" />
+      <rect x="328" y="16" width="88" height="52" rx="4" fill="#f4f1ea" />
+      <rect x="328" y="16" width="88" height="8" fill="#1fc9b7" />
+      <rect x="426" y="14" width="92" height="54" rx="4" fill="#0b0b0b" />
+      <rect x="426" y="14" width="92" height="8" fill="#5eea8c" />
+      <rect x="528" y="18" width="92" height="50" rx="4" fill="#f4f1ea" />
+      <rect x="528" y="18" width="92" height="8" fill="#e5487a" />
+      <ellipse cx="268" cy="80" rx="10" ry="6" fill="#1b1b1f" />
+      <circle cx="280" cy="79" r="5" fill="#1b1b1f" />
+      <line x1="258" y1="80" x2="236" y2="76" stroke="#d9403a" stroke-width="2.5" stroke-linecap="round" />
+      <circle cx="233" cy="76" r="6" fill="#1fc9b7" />
+    </svg>
+    <div class="static-copy">
+      <h3>{ui.noscriptTitle}</h3>
+      <p>{ui.noscriptNote}</p>
+    </div>
+  </div>
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
+    <aside class="retro-booth" data-retro-booth hidden aria-live="polite">
+      <header class="rb-head">
+        <b data-retro-title>Eat Prey Nap</b>
+        <div class="rb-actions">
+          <a class="rb-link" data-retro-link href="#">{ui.openPage}</a>
+          <button type="button" class="rb-close" data-retro-close aria-label={ui.closeBooth}>×</button>
+        </div>
+      </header>
+      <div class="rb-body">
+        <canvas class="rb-screen" data-retro-canvas width="160" height="100"></canvas>
+        <div class="rb-ctrl" data-retro-controls></div>
+      </div>
+    </aside>
   </div>
   <figcaption>
     <div class="bar">
-      <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
+      <p id="street-caption" class="caption" data-caption aria-live="polite">{ui.defaultCaption}</p>
       <div class="tools">
-        <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
-        <button class="sound" type="button" data-restart>Restart</button>
-        <button class="sound" type="button" data-fs="window" aria-pressed="false" title="Fill the browser window">Fill window</button>
-        <button class="sound" type="button" data-fs="screen" aria-pressed="false" title="Real fullscreen">Fullscreen</button>
+        <button
+          class="sound"
+          type="button"
+          data-sound
+          aria-pressed="false"
+          data-label-on={ui.soundOn}
+          data-label-off={ui.soundOff}
+        >{ui.soundOff}</button>
+        <button class="sound" type="button" data-restart>{ui.restart}</button>
+        <button class="sound" type="button" data-fs="window" aria-pressed="false" title={ui.fillWindowTitle}>{ui.fillWindow}</button>
+        <button class="sound" type="button" data-fs="screen" aria-pressed="false" title={ui.fullscreenTitle}>{ui.fullscreen}</button>
       </div>
     </div>
-    <ul class="keys" aria-label="Controls">
-      {
-        KEYS.map((k) => (
-          <li>
-            <span class="caps">
-              {k.keys.map((key) => (
-                <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
-              ))}
-            </span>
-            <span class="what">{k.label}</span>
-          </li>
-        ))
-      }
-    </ul>
-    <ul class="stops" aria-label="Stops on the street">
+    <div class="keys-row">
+      <ul class="keys" aria-label={ui.controlsAria}>
+        {
+          CORE_KEYS.map((k) => (
+            <li>
+              <span class="caps">
+                {k.keys.map((key) => (
+                  <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+                ))}
+              </span>
+              <span class="what">{k.label}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <details class="more-keys">
+        <summary>{ui.moreControls}</summary>
+        <ul class="keys extra-keys">
+          {
+            EXTRA_KEYS.map((k) => (
+              <li>
+                <span class="caps">
+                  {k.keys.map((key) => (
+                    <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+                  ))}
+                </span>
+                <span class="what">{k.label}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </details>
+    </div>
+    <ul class="stops" aria-label={ui.stopsAria}>
       {
         STOPS.map((s) => (
-          <li>
+          <li data-stop-item={s.id}>
             <a href={s.href} data-stop={s.id} style={`--c:${s.color};--i:${s.ink}`}>
-              {s.short}
+              <span class="stop-name">{s.short}</span>
+              {s.kind && <span class="stop-kind">{s.kind}</span>}
             </a>
           </li>
         ))
@@ -167,22 +239,57 @@ const KEYS = [
     .sound { padding: 0 11px; font-size: 13px; }
   }
   /* Keycaps for the controls: shown once the game runs, on keyboards only. */
-  .keys {
+  .keys-row {
     display: none;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px 18px;
-    margin: 0;
     padding: 12px 0 0;
     border-top: 1px solid var(--line);
-    list-style: none;
   }
-  .street:global(.live) .keys {
+  .street:global(.live) .keys-row {
     display: flex;
   }
   @media (pointer: coarse) {
-    .street:global(.live) .keys {
+    .street:global(.live) .keys-row {
       display: none;
     }
+  }
+  .keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .more-keys {
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .more-keys[open] {
+    width: 100%;
+  }
+  .more-keys summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--ink);
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .more-keys summary::-webkit-details-marker { display: none; }
+  .more-keys summary::after { content: '+'; font-weight: 800; }
+  .more-keys[open] summary::after { content: '-'; }
+  .extra-keys {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
   }
   .keys li {
     display: inline-flex;
@@ -277,6 +384,7 @@ const KEYS = [
   .stops a {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     min-height: 44px;
     padding: 0 16px;
     border-radius: 999px;
@@ -286,6 +394,9 @@ const KEYS = [
     text-decoration: none;
     transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   }
+  .stop-kind {
+    display: none;
+  }
   .stops a:hover,
   .stops a:global(.near) {
     background: var(--c);
@@ -294,5 +405,180 @@ const KEYS = [
   }
   .stops a:global(.near) {
     transform: translateY(-2px);
+  }
+  .static-street {
+    display: none;
+  }
+  :global(html:not(.js)) .static-street {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) 1fr;
+    gap: 18px;
+    align-items: center;
+    padding: clamp(16px, 3vw, 24px);
+    background: var(--feature-bg);
+    color: var(--feature-ink);
+  }
+  .static-skyline {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-s);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .static-copy h3 {
+    margin: 0 0 6px;
+    font: 800 clamp(20px, 2.8vw, 26px)/1.15 var(--font-display);
+    color: var(--feature-ink);
+  }
+  .static-copy p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--feature-ink-2);
+  }
+  :global(html:not(.js)) .bar {
+    display: none;
+  }
+  :global(html:not(.js)) .stops {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 10px;
+  }
+  :global(html:not(.js)) [data-stop-item='station'],
+  :global(html:not(.js)) [data-stop-item='metro'],
+  :global(html:not(.js)) [data-stop-item='park'] {
+    display: none;
+  }
+  :global(html:not(.js)) .stops a {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    min-height: 54px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--c);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  :global(html:not(.js)) .stops a:hover {
+    background: var(--c);
+    border-color: var(--c);
+    color: var(--i);
+  }
+  :global(html:not(.js)) .stops a:hover .stop-kind {
+    color: var(--i);
+    opacity: 0.85;
+  }
+  :global(html:not(.js)) .stop-kind {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  @media (max-width: 720px) {
+    :global(html:not(.js)) .static-street {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .retro-booth {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 8px 10px;
+    background: #0f162b;
+    color: #f4f1ea;
+    border: 3px solid #f4f1ea;
+    box-shadow: 4px 4px 0 #070b18;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    z-index: 6;
+  }
+  .retro-booth[hidden] { display: none; }
+  .rb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .rb-head b {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .rb-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rb-link {
+    padding: 3px 8px;
+    border: 2px solid #5eea8c;
+    color: #5eea8c;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .rb-close {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 2px solid #f4f1ea;
+    background: #1a284d;
+    color: #f4f1ea;
+    font: 800 14px/1 ui-monospace, monospace;
+    cursor: pointer;
+  }
+  .rb-body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+  .rb-screen {
+    display: block;
+    width: 160px;
+    height: 100px;
+    image-rendering: pixelated;
+    border: 2px solid #3c4f82;
+    background: #070b18;
+    cursor: pointer;
+  }
+  .rb-ctrl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+  }
+  .rb-ctrl :global(button) {
+    padding: 4px 8px;
+    border: 2px solid #3c4f82;
+    background: #1a284d;
+    color: #f4f1ea;
+    font: 700 11px ui-monospace, monospace;
+    cursor: pointer;
+  }
+  .rb-ctrl :global(button[aria-pressed='true']) {
+    border-color: #f0c44d;
+    background: #f0c44d;
+    color: #0b1430;
+  }
+  .rb-ctrl :global(span.rb-stat) {
+    font-size: 11px;
+    color: #b7c2df;
+    width: 100%;
+  }
+  @media (max-width: 600px) {
+    .retro-booth { left: 6px; right: 6px; bottom: 6px; max-height: 44%; padding: 6px 8px; }
+    .rb-body { gap: 8px; }
+    .rb-screen { width: 128px; height: 80px; }
+    .rb-ctrl :global(button) { padding: 3px 6px; font-size: 10px; }
   }
 </style>

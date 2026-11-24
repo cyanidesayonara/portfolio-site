@@ -336,9 +336,38 @@ p {
   display: contents;
 }
 .prose .gallery img {
+  display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: var(--radius-s);
   background: #000;
+}
+.prose .gallery .anim-toggle {
+  position: relative;
+  display: block;
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  text-decoration: none;
+}
+.prose .gallery .anim-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(11, 20, 48, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f4f1ea;
+  font: 700 11.5px var(--font-display);
+  letter-spacing: 0.02em;
+}
+.prose .gallery .anim-toggle.playing .anim-badge {
+  background: rgba(255, 176, 32, 0.94);
+  color: #0b1430;
+  border-color: transparent;
+}
+.prose .gallery .anim-toggle:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }

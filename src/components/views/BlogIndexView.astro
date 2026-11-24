@@ -1,0 +1,47 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostList from '../PostList.astro';
+import { getLocalizedPosts } from '../../i18n/content';
+import { localePath, type Locale } from '../../i18n/utils';
+import { getUi } from '../../i18n/ui';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const ui = getUi(locale).blogIndex;
+
+const posts = await getLocalizedPosts(locale);
+---
+
+<Base title={ui.title} description={ui.description} locale={locale}>
+  <section class="wrap head">
+    <h1>{ui.heading}</h1>
+    <p>{ui.intro}</p>
+    <a href={localePath(locale, '/rss.xml')}>{ui.subscribeRss}</a>
+  </section>
+  <section class="wrap list" aria-label={ui.postsAria}>
+    <PostList posts={posts} locale={locale} />
+  </section>
+</Base>
+
+<style>
+  .head {
+    padding-block: clamp(32px, 6vw, 64px) 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  h1 {
+    font-size: clamp(48px, 7vw, 88px);
+  }
+  .head p {
+    max-width: 620px;
+    font-size: 19px;
+    color: var(--ink-2);
+  }
+  .list {
+    padding-bottom: 96px;
+  }
+</style>

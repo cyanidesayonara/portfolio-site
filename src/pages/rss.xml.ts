@@ -1,20 +1,20 @@
 import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
-import { getCollection } from 'astro:content';
+import { getLocalizedPosts } from '../i18n/content';
+import { getUi } from '../i18n/ui';
 
 export async function GET(context: APIContext) {
-  const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
-    (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
-  );
+  const ui = getUi('en');
+  const posts = await getLocalizedPosts('en', false);
   return rss({
-    title: 'Santtu Nykänen: blog',
-    description: 'Notes on building games, tools and hardware, and on working with AI coding agents.',
+    title: ui.site.rssTitle,
+    description: ui.site.rssDescription,
     site: context.site!,
-    items: posts.map((post) => ({
-      title: post.data.title,
-      description: post.data.description,
-      pubDate: post.data.date,
-      link: `/blog/${post.id}/`,
+    items: posts.map((item) => ({
+      title: item.entry.data.title,
+      description: item.entry.data.description,
+      pubDate: item.entry.data.date,
+      link: `/blog/${item.slug}/`,
     })),
   });
 }

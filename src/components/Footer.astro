@@ -1,12 +1,23 @@
+---
+import { localePath, type Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = 'en' } = Astro.props;
+const ui = getUi(locale);
+---
+
 <footer class="site-footer wrap">
   <div class="top">
     <p class="sign">Santtu Nykänen</p>
-    <nav aria-label="Contact">
+    <nav aria-label={ui.footer.contactAria}>
       <ul>
-        <li><a href="mailto:santtu.nykanen@gmail.com">Email</a></li>
+        <li><a href="mailto:santtu.nykanen@gmail.com">{ui.footer.email}</a></li>
         <li><a href="https://github.com/cyanidesayonara">GitHub</a></li>
         <li><a href="https://www.linkedin.com/in/santtu-nykanen">LinkedIn</a></li>
-        <li><a href="/rss.xml">RSS</a></li>
+        <li><a href={localePath(locale, '/rss.xml')}>{ui.footer.rss}</a></li>
       </ul>
     </nav>
   </div>
