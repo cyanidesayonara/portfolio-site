@@ -3,6 +3,7 @@ title: "Shipping a Python desktop app to the Microsoft Store"
 description: "How stemma goes from a Python and PySide6 repo to a signed Microsoft Store release, with listing copy, screenshots and Partner Center submissions treated as code."
 date: 2026-11-06
 tags: [python, pyside6, windows, msix, ci]
+project: stemma
 cover: /img/projects/stemma-practice.png
 coverAlt: The stemma practice view with stacked stem waveforms and practice controls
 ---

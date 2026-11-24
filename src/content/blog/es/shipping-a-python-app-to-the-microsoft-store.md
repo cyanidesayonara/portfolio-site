@@ -3,6 +3,7 @@ title: "Publicar una aplicación de escritorio Python en Microsoft Store"
 description: "Cómo pasa stemma de un repositorio en Python y PySide6 a un paquete MSIX firmado en Microsoft Store, tratando ficha, capturas y envíos a Partner Center como código."
 date: 2026-11-06
 tags: [python, pyside6, windows, msix, ci]
+project: stemma
 cover: /img/projects/stemma-practice.png
 coverAlt: Vista de práctica de stemma con formas de onda apiladas por pista y controles
 ---

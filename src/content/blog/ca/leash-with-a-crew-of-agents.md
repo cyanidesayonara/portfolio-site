@@ -3,6 +3,7 @@ title: "Quatre mesos, 42 passeigs: fent Path of Leash Resistance amb un equip d'
 description: Com un sol desenvolupador va publicar un joc de Godot a web, itch.io i Microsoft Store escrivint encàrrecs en lloc de codi i revisant tot el que tornava.
 date: 2026-11-15
 tags: [godot, ai, agents, workflow]
+project: path-of-leash-resistance
 cover: /img/projects/leash-street.jpg
 coverAlt: Un gos estira el seu humà distret amb el mòbil travessant un carril bici a Barcelona
 ---

@@ -3,6 +3,7 @@ title: "Programari abans que maquinari: construint primer un mural LED en simula
 description: Coriolis té 25 escenes, llançador, ajustos i una suite d'exercici físic abans fins i tot de muntar el maquinari. Així és per què vaig començar per un simulador d'escriptori.
 date: 2026-11-23
 tags: [hardware, c++, teensy, led, simulation]
+project: coriolis
 cover: /img/projects/coriolis-aurora.png
 coverAlt: Una escena d'aurora al simulador de matriu LED Coriolis
 ---
@@ -37,4 +38,4 @@ Un simulador d'escriptori valida composició, ritmes i navegació compartida, pe
 
 ## El següent: el muntatge
 
-El firmware ja compila net per a Teensy 4.1 (Teensyduino 1.62 amb SmartMatrix 4 apedaçat) deixant uns 196 KB de RAM ràpida lliures, i el simulador permet continuar afinant escenes sense esperar peces. La llista sencera de materials, el mapa de pins del Teensy, el cablejat i la seqüència d'arrencada pas a pas són a la [guia de muntatge de maquinari](https://github.com/cyanidesayonara/coriolis/blob/master/docs/BUILD.md) del repositori (al costat de `Coriolis_Build_Guide.pdf`). El muntatge físic i les proves al banc van a continuació, i tan bon punt s'encengui el mural veurem com s'acosta la realitat al simulador.
+El firmware ja compila net per a Teensy 4.1 (Teensyduino 1.62 amb SmartMatrix 4 apedaçat) deixant uns 196 KB de RAM ràpida lliures, i el simulador permet continuar afinant escenes sense esperar peces. La llista sencera de materials, el mapa de pins del Teensy, el cablejat i la seqüència d'arrencada pas a pas són a la [guia de muntatge de maquinari](https://github.com/cyanidesayonara/coriolis/blob/main/docs/BUILD.md) del repositori (al costat de `Coriolis_Build_Guide.pdf`). El muntatge físic i les proves al banc van a continuació, i tan bon punt s'encengui el mural veurem com s'acosta la realitat al simulador.

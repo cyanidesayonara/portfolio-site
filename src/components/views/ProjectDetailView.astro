@@ -2,8 +2,10 @@
 import { render, type CollectionEntry } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import ProjectPager from '../ProjectPager.astro';
+import PostList from '../PostList.astro';
 import CoriolisSim from '../CoriolisSim.astro';
-import type { LocalizedEntry } from '../../i18n/content';
+import { getPostsForProject, type LocalizedEntry } from '../../i18n/content';
+import projectMeta from '../../data/project-meta.json';
 import { localePath, type Locale } from '../../i18n/utils';
 import { getUi, tKind } from '../../i18n/ui';
 
@@ -20,6 +22,8 @@ const { locale, slug, project, prev, next, isFallback = false } = Astro.props;
 const ui = getUi(locale);
 const p = project.data;
 const { Content } = await render(project);
+const relatedPosts = await getPostsForProject(locale, slug);
+const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?: string | null }>)[slug];
 ---
 
 <Base title={p.title} description={p.summary} image={p.cover} type="article" locale={locale}>
@@ -62,6 +66,16 @@ const { Content } = await render(project);
       <aside class="facts" aria-label={ui.common.projectFactsAria}>
         <h2>{ui.common.builtWith}</h2>
         <ul class="chips">{p.stack.map((s) => <li>{s}</li>)}</ul>
+        {
+          meta?.latestTag && meta.repo && (
+            <div class="release-fact">
+              <h2>{ui.common.latestRelease}</h2>
+              <a class="release-pill" href={`https://github.com/${meta.repo}/releases/tag/${meta.latestTag}`}>
+                {meta.latestTag}
+              </a>
+            </div>
+          )
+        }
       </aside>
       <div class="prose">
         {isFallback && <p class="fallback-note">{ui.common.englishFallbackNotice}</p>}
@@ -69,6 +83,15 @@ const { Content } = await render(project);
       </div>
     </div>
   </article>
+
+  {
+    relatedPosts.length > 0 && (
+      <section class="wrap related" aria-labelledby="related-posts">
+        <h2 id="related-posts" class="section-title">{ui.common.relatedPostsHeading}</h2>
+        <PostList posts={relatedPosts} locale={locale} />
+      </section>
+    )
+  }
 
   <div class="section wrap">
     <ProjectPager prev={prev} next={next} locale={locale} />
@@ -146,9 +169,33 @@ const { Content } = await render(project);
     font-size: 18px;
     margin-bottom: 12px;
   }
+  .release-fact {
+    margin-top: 24px;
+  }
+  .release-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .release-pill:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
   .body .prose {
     flex: 999 1 560px;
     min-width: 0;
+  }
+  .related {
+    padding-top: 24px;
+  }
+  .related .section-title {
+    margin-bottom: 24px;
   }
   .fallback-note {
     padding: 12px 16px;

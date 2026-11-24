@@ -1,6 +1,7 @@
 ---
 import { render, type CollectionEntry } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import { getLocalizedProject } from '../../i18n/content';
 import { BCP47, localePath, type Locale } from '../../i18n/utils';
 import { getUi } from '../../i18n/ui';
 
@@ -13,13 +14,23 @@ const { locale, post, isFallback = false } = Astro.props;
 const ui = getUi(locale);
 const { Content } = await render(post);
 const fmt = new Intl.DateTimeFormat(BCP47[locale], { day: 'numeric', month: 'long', year: 'numeric' });
+const linkedProject = post.data.project ? await getLocalizedProject(locale, post.data.project) : undefined;
 ---
 
 <Base title={post.data.title} description={post.data.description} image={post.data.cover} type="article" locale={locale}>
   <article class="wrap post">
     <header>
       <a class="back" href={localePath(locale, '/blog')}>{ui.common.allPosts}</a>
-      <time datetime={post.data.date.toISOString()}>{fmt.format(post.data.date)}</time>
+      <div class="meta">
+        <time datetime={post.data.date.toISOString()}>{fmt.format(post.data.date)}</time>
+        {
+          linkedProject && (
+            <a class="project-link" href={localePath(locale, `/projects/${linkedProject.slug}`)}>
+              {ui.common.projectLabel}: {linkedProject.entry.data.title}
+            </a>
+          )
+        }
+      </div>
       <h1>{post.data.title}</h1>
       <p class="desc">{post.data.description}</p>
       {post.data.tags.length > 0 && <ul class="chips">{post.data.tags.map((t) => <li>{t}</li>)}</ul>}
@@ -58,9 +69,30 @@ const fmt = new Intl.DateTimeFormat(BCP47[locale], { day: 'numeric', month: 'lon
     content: '←';
     margin-right: 8px;
   }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+  }
   time {
     font-size: 15px;
     color: var(--ink-2);
+  }
+  .project-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .project-link:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
   }
   h1 {
     font-size: clamp(36px, 5.4vw, 60px);

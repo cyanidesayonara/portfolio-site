@@ -38,6 +38,14 @@ export async function getLocalizedProjects(locale: Locale): Promise<LocalizedEnt
   });
 }
 
+export async function getLocalizedProject(
+  locale: Locale,
+  slug: string,
+): Promise<LocalizedEntry<'projects'> | undefined> {
+  const projects = await getLocalizedProjects(locale);
+  return projects.find((item) => item.slug === slug);
+}
+
 export async function getLocalizedPosts(
   locale: Locale,
   includeDrafts = import.meta.env.DEV,
@@ -67,4 +75,13 @@ export async function getLocalizedPosts(
   }
 
   return results.sort((a, b) => b.entry.data.date.valueOf() - a.entry.data.date.valueOf());
+}
+
+export async function getPostsForProject(
+  locale: Locale,
+  projectSlug: string,
+  includeDrafts = import.meta.env.DEV,
+): Promise<LocalizedEntry<'blog'>[]> {
+  const posts = await getLocalizedPosts(locale, includeDrafts);
+  return posts.filter((item) => item.entry.data.project === projectSlug);
 }

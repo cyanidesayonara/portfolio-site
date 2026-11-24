@@ -3,6 +3,7 @@ title: "Four months, 42 walks: building Path of Leash Resistance with a crew of 
 description: How one developer shipped a Godot project to the web, itch.io and the Microsoft Store by writing briefs instead of code and reviewing everything that came back.
 date: 2026-11-15
 tags: [godot, ai, agents, workflow]
+project: path-of-leash-resistance
 cover: /img/projects/leash-street.jpg
 coverAlt: A dog pulls its phone-distracted owner across a Barcelona bike lane
 ---

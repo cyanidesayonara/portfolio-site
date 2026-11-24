@@ -55,6 +55,9 @@ export interface UiDictionary {
     draftBadge: string;
     englishOnlyBadge: string;
     englishFallbackNotice: string;
+    relatedPostsHeading: string;
+    projectLabel: string;
+    latestRelease: string;
   };
   home: {
     eyebrow: string;
@@ -306,6 +309,9 @@ export const UI: Record<Locale, UiDictionary> = {
       draftBadge: 'Draft',
       englishOnlyBadge: 'EN',
       englishFallbackNotice: 'This entry is currently available in English only.',
+      relatedPostsHeading: 'Related posts',
+      projectLabel: 'Project',
+      latestRelease: 'Latest release',
     },
     home: {
       eyebrow: 'Generalist full-stack developer',
@@ -436,7 +442,7 @@ export const UI: Record<Locale, UiDictionary> = {
         'A version tag builds the web and Windows versions in CI, pushes them to itch.io, and packages the Microsoft Store build. stemma ships the same way, with a pinned release lock so CI tests exactly what users get.',
       s5Heading: 'Why work this way',
       s5Body:
-        "The hard part of software was never typing. It's deciding what to build, noticing what's wrong, and keeping a large codebase coherent as it grows. Agents make the typing cheap, which makes those skills matter more, not less. This is how one person ships a game with 50 levels, nine chases and four bosses in a few months, alongside a day job.",
+        "The hard part of software was never typing. It's deciding what to build, noticing what's wrong, and keeping a large codebase coherent as it grows. Agents make the typing cheap, which makes those skills matter more, not less. This is how one person ships a game with 51 walks, ten chases and five bosses in a few months, alongside a day job.",
     },
     walkPage: {
       title: 'Walk in 3D · Path of Leash Resistance',
@@ -648,6 +654,9 @@ export const UI: Record<Locale, UiDictionary> = {
       draftBadge: 'Borrador',
       englishOnlyBadge: 'EN',
       englishFallbackNotice: 'Esta entrada está disponible por ahora solo en inglés.',
+      relatedPostsHeading: 'Artículos relacionados',
+      projectLabel: 'Proyecto',
+      latestRelease: 'Última versión',
     },
     home: {
       eyebrow: 'Desarrollador full-stack generalista',
@@ -778,7 +787,7 @@ export const UI: Record<Locale, UiDictionary> = {
         'Una etiqueta de versión compila en CI las versiones web y de Windows, las sube a itch.io y empaqueta la entrega para Microsoft Store. stemma funciona igual, con un bloqueo fijo de dependencias para que CI pruebe exactamente lo mismo que reciben los usuarios.',
       s5Heading: 'Por qué trabajar así',
       s5Body:
-        'La parte difícil del software nunca fue teclear. Es decidir qué construir, detectar qué falla y mantener coherente una base de código conforme crece. Los agentes abaratan la escritura de código, y eso hace que ese criterio importe más, no menos. Así es como una sola persona publica un juego con 50 niveles, nueve persecuciones y cuatro jefes en pocos meses mientras mantiene su trabajo de día.',
+        'La parte difícil del software nunca fue teclear. Es decidir qué construir, detectar qué falla y mantener coherente una base de código conforme crece. Los agentes abaratan la escritura de código, y eso hace que ese criterio importe más, no menos. Así es como una sola persona publica un juego con 51 paseos, diez persecuciones y cinco jefes en pocos meses mientras mantiene su trabajo de día.',
     },
     walkPage: {
       title: 'Paseo en 3D · Path of Leash Resistance',
@@ -990,6 +999,9 @@ export const UI: Record<Locale, UiDictionary> = {
       draftBadge: 'Esborrany',
       englishOnlyBadge: 'EN',
       englishFallbackNotice: 'Aquesta entrada està disponible ara mateix només en anglès.',
+      relatedPostsHeading: 'Articles relacionats',
+      projectLabel: 'Projecte',
+      latestRelease: 'Última versió',
     },
     home: {
       eyebrow: 'Desenvolupador full-stack generalista',
@@ -1120,7 +1132,7 @@ export const UI: Record<Locale, UiDictionary> = {
         "Una etiqueta de versió compila a CI les versions web i Windows, les puja a itch.io i empaqueta la versió de Microsoft Store. stemma funciona igual, amb un bloqueig fix de dependències perquè CI provi exactament allò que reben els usuaris.",
       s5Heading: 'Per què treballar així',
       s5Body:
-        "La part difícil del programari no va ser mai teclejar. És decidir què construir, adonar-se del que falla i mantenir coherent una base de codi a mesura que creix. Els agents fan barat escriure codi, i això fa que aquest criteri importi més, no menys. Així és com una sola persona publica un joc amb 50 nivells, nou persecucions i quatre caps finals en pocs mesos tot compaginant-ho amb la feina diària.",
+        "La part difícil del programari no va ser mai teclejar. És decidir què construir, adonar-se del que falla i mantenir coherent una base de codi a mesura que creix. Els agents fan barat escriure codi, i això fa que aquest criteri importi més, no menys. Així és com una sola persona publica un joc amb 51 passeigs, deu persecucions i cinc caps finals en pocs mesos tot compaginant-ho amb la feina diària.",
     },
     walkPage: {
       title: 'Passeig en 3D · Path of Leash Resistance',

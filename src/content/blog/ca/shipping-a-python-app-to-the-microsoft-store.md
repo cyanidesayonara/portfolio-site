@@ -3,6 +3,7 @@ title: "Publicar una aplicació d'escriptori Python a Microsoft Store"
 description: "Com passa stemma d'un repositori en Python i PySide6 a un paquet MSIX signat a Microsoft Store, tractant fitxa, captures i enviaments a Partner Center com a codi."
 date: 2026-11-06
 tags: [python, pyside6, windows, msix, ci]
+project: stemma
 cover: /img/projects/stemma-practice.png
 coverAlt: Vista de pràctica de stemma amb formes d'ona apilades per pista i controls
 ---

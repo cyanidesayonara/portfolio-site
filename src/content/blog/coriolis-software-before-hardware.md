@@ -3,6 +3,7 @@ title: "Software before hardware: building an LED wall in a simulator first"
 description: Coriolis has 25 scenes, a launcher, settings and a fitness suite, and the hardware isn't built yet. Here's why I started with a desktop simulator.
 date: 2026-11-23
 tags: [hardware, c++, teensy, led, simulation]
+project: coriolis
 cover: /img/projects/coriolis-aurora.png
 coverAlt: An aurora scene on the Coriolis LED matrix simulator
 ---
@@ -37,4 +38,4 @@ A desktop simulator can prove out layout, timing, and shared navigation logic, b
 
 ## Next: the build
 
-The firmware already compiles cleanly for Teensy 4.1 (Teensyduino 1.62 with a patched SmartMatrix 4) with roughly 196 KB of fast RAM to spare, and the simulator lets me keep refining scenes without waiting on parts. The full shopping list, Teensy pin map, wiring notes, and staged bring-up sequence live in the repository's [hardware build guide](https://github.com/cyanidesayonara/coriolis/blob/master/docs/BUILD.md) (alongside a printable `Coriolis_Build_Guide.pdf`). Physical assembly and panel bring-up are queued up next—and once the wall is lit, we'll find out how closely reality matches the sim.
+The firmware already compiles cleanly for Teensy 4.1 (Teensyduino 1.62 with a patched SmartMatrix 4) with roughly 196 KB of fast RAM to spare, and the simulator lets me keep refining scenes without waiting on parts. The full shopping list, Teensy pin map, wiring notes, and staged bring-up sequence live in the repository's [hardware build guide](https://github.com/cyanidesayonara/coriolis/blob/main/docs/BUILD.md) (alongside a printable `Coriolis_Build_Guide.pdf`). Physical assembly and panel bring-up are queued up next—and once the wall is lit, we'll find out how closely reality matches the sim.

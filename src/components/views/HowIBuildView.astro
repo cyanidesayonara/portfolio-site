@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
-import type { Locale } from '../../i18n/utils';
+import projectMeta from '../../data/project-meta.json';
+import { BCP47, type Locale } from '../../i18n/utils';
 import { getUi } from '../../i18n/ui';
 
 interface Props {
@@ -8,6 +9,13 @@ interface Props {
 }
 const { locale } = Astro.props;
 const ui = getUi(locale).howIBuild;
+const fmtNum = new Intl.NumberFormat(BCP47[locale]);
+const leash = projectMeta.projects['path-of-leash-resistance'];
+const liveValues = [leash.commits, leash.mergedPrs, leash.testFiles, leash.mainWalks];
+const stats = ui.stats.map((s, idx) => ({
+  value: typeof liveValues[idx] === 'number' ? fmtNum.format(liveValues[idx]) : s.value,
+  label: s.label,
+}));
 ---
 
 <Base title={ui.title} description={ui.description} locale={locale}>
@@ -20,7 +28,7 @@ const ui = getUi(locale).howIBuild;
   <section class="wrap" aria-label={ui.statsAria}>
     <ul class="stats">
       {
-        ui.stats.map((s) => (
+        stats.map((s) => (
           <li>
             <strong>{s.value}</strong>
             <span>{s.label}</span>

@@ -3,6 +3,7 @@ title: "Cuatro meses, 42 paseos: construyendo Path of Leash Resistance con un eq
 description: Cómo un solo desarrollador lanzó un juego de Godot a web, itch.io y Microsoft Store redactando encargos en lugar de código y revisando todo lo que volvía.
 date: 2026-11-15
 tags: [godot, ai, agents, workflow]
+project: path-of-leash-resistance
 cover: /img/projects/leash-street.jpg
 coverAlt: Un perro tira de su humano distraído con el móvil cruzando un carril bici en Barcelona
 ---

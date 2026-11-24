@@ -3,6 +3,7 @@ title: "Stem separation in Python without PyTorch: ONNX Runtime and DirectML"
 description: "How stemma runs HTDemucs, MDX-Net and beat tracking locally on Windows GPUs and CPUs without shipping the PyTorch runtime."
 date: 2026-10-14
 tags: [python, onnx, directml, audio, dsp]
+project: stemma
 cover: /img/projects/stemma-takes.png
 coverAlt: stemma mixer showing separated instrument stems and recorded takes
 ---

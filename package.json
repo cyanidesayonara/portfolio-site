@@ -10,7 +10,9 @@
     "dev": "astro dev",
     "build": "astro check && astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "sync:check": "node tools/sync-projects.mjs",
+    "sync:apply": "node tools/sync-projects.mjs --apply"
   },
   "dependencies": {
     "@astrojs/rss": "4.0.19",

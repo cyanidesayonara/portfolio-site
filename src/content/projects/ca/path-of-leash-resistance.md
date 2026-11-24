@@ -33,9 +33,9 @@ La corretja és una corda real. La que veus en pantalla és la mateixa que calcu
 
 ## Què inclou
 
-- **Cinquanta passeigs per Barcelona i rodalies**, des de La Rambla i El Gòtic fins a Montjuïc, Sitges, Girona, Tarragona, Vic i Montserrat, a més d'un primer passeig que ensenya cada truc d'un en un. Cada ruta es pot jugar amb qualsevol temps, de dia o de nit.
-- **Nou persecucions**: una escombradora a trenc d'alba, senglars, els diables de foc del correfoc per Gràcia, la carrossa pirotècnica del Dimoni, seguretat de l'aeroport, una màquina trepitjaneus desbocada baixant La Molina i cabres salvatges per Montserrat, entre altres.
-- **Quatre estàtues cap**: El Mamut, Els Lleons, El Drac la salamandra de mosaic i El Gat.
+- **Cinquanta-un passeigs per Barcelona i rodalies**, des de La Rambla i El Gòtic fins a Montjuïc, Sitges, Girona, Tarragona, Vic i Montserrat, a més d'un passeig tutorial que ensenya cada truc d'un en un. Cada ruta es pot jugar amb qualsevol temps, de dia o de nit.
+- **Deu persecucions**: una escombradora a trenc d'alba, senglars, els diables de foc del correfoc per Gràcia, la carrossa pirotècnica del Dimoni, seguretat de l'aeroport, la mascota de Les Atraccions, una màquina trepitjaneus desbocada baixant La Molina i cabres salvatges per Montserrat, entre altres.
+- **Cinc estàtues cap**: El Mamut, El Drac la salamandra de mosaic, Els Lleons, La Lleona a Girona i El Gat.
 - **Set gossos**, cadascun amb una traça i un objectiu d'habilitat propis, a més de troballes enterrades, ensinistrament, collars, mocadors i abrics.
 - **Reptes i combos**: fes girar l'humà al voltant d'un pal, llisca per un ressalt, llança'l pels aires o accepta un repte amb música pròpia.
 - **Nou cels i sis hores del dia**, en anglès, català i espanyol, amb intensitat de tremolor de pantalla, centelleigs, mida de text i controls ajustables.

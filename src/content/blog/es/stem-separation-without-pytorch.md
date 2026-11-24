@@ -3,6 +3,7 @@ title: "Separación de pistas en Python sin PyTorch: ONNX Runtime y DirectML"
 description: "Cómo stemma ejecuta HTDemucs, MDX-Net y detección de pulsos localmente en GPUs y CPUs de Windows sin empaquetar PyTorch."
 date: 2026-10-14
 tags: [python, onnx, directml, audio, dsp]
+project: stemma
 cover: /img/projects/stemma-takes.png
 coverAlt: Mezclador de stemma mostrando pistas de instrumentos separadas y tomas grabadas
 ---

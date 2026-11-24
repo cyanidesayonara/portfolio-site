@@ -3,6 +3,7 @@ title: "Sense sprites: dibuixant tot un joc de Godot en codi"
 description: "Cada gos, fanal, panot de vorera i cinemàtica de Path of Leash Resistance es dibuixa dins _draw(). Així és com es manté ràpid i verificable l'art vectorial procedural al navegador."
 date: 2026-10-27
 tags: [godot, rendering, performance, testing]
+project: path-of-leash-resistance
 cover: /img/projects/leash-eixample.jpg
 coverAlt: Un gos i el seu humà en una cantonada de l'Eixample de Barcelona dibuixats íntegrament amb vectors procedurals
 ---

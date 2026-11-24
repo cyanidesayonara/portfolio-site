@@ -3,6 +3,7 @@ title: "Sin sprites: dibujando todo un juego de Godot en código"
 description: "Cada perro, farola, baldosa de acera y cinemática de Path of Leash Resistance se dibuja en _draw(). Así es como se mantiene rápido y verificable el arte vectorial procedural en navegador."
 date: 2026-10-27
 tags: [godot, rendering, performance, testing]
+project: path-of-leash-resistance
 cover: /img/projects/leash-eixample.jpg
 coverAlt: Un perro y su humano en una esquina del Eixample de Barcelona dibujados íntegramente con vectores procedurales
 ---

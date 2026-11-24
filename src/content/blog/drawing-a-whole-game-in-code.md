@@ -3,6 +3,7 @@ title: "No sprites: drawing a whole Godot game in code"
 description: "Every dog, lamppost, sidewalk tile and cutscene in Path of Leash Resistance is drawn in _draw(). Here's how to keep procedural vector art fast and testable in a web build."
 date: 2026-10-27
 tags: [godot, rendering, performance, testing]
+project: path-of-leash-resistance
 cover: /img/projects/leash-eixample.jpg
 coverAlt: A dog and its human on a Barcelona Eixample street corner drawn entirely with procedural vectors
 ---

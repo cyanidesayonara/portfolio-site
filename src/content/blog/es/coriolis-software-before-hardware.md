@@ -3,6 +3,7 @@ title: "Software antes que hardware: construyendo primero un mural LED en simula
 description: Coriolis tiene 25 escenas, lanzador, ajustes y una suite de ejercicio físico antes incluso de montar el hardware. Así es por qué empecé por un simulador de escritorio.
 date: 2026-11-23
 tags: [hardware, c++, teensy, led, simulation]
+project: coriolis
 cover: /img/projects/coriolis-aurora.png
 coverAlt: Una escena de aurora en el simulador de matriz LED Coriolis
 ---
@@ -37,4 +38,4 @@ Un simulador de escritorio valida composición, tiempos y navegación compartida
 
 ## Lo siguiente: el montaje
 
-El firmware ya compila limpio para Teensy 4.1 (Teensyduino 1.62 con SmartMatrix 4 parcheado) dejando unos 196 KB de RAM rápida libres, y el simulador permite seguir afinando escenas sin esperar piezas. La lista completa de materiales, el pinout del Teensy, el esquema de cableado y la secuencia escalonada de encendido viven en la [guía de montaje de hardware](https://github.com/cyanidesayonara/coriolis/blob/master/docs/BUILD.md) del repositorio (junto con `Coriolis_Build_Guide.pdf`). El ensamblaje físico y las primeras pruebas en banco vienen a continuación, y en cuanto el mural se ilumine comprobaremos qué tan cerca queda la realidad del simulador.
+El firmware ya compila limpio para Teensy 4.1 (Teensyduino 1.62 con SmartMatrix 4 parcheado) dejando unos 196 KB de RAM rápida libres, y el simulador permite seguir afinando escenas sin esperar piezas. La lista completa de materiales, el pinout del Teensy, el esquema de cableado y la secuencia escalonada de encendido viven en la [guía de montaje de hardware](https://github.com/cyanidesayonara/coriolis/blob/main/docs/BUILD.md) del repositorio (junto con `Coriolis_Build_Guide.pdf`). El ensamblaje físico y las primeras pruebas en banco vienen a continuación, y en cuanto el mural se ilumine comprobaremos qué tan cerca queda la realidad del simulador.

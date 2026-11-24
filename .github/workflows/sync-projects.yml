@@ -1,0 +1,59 @@
+name: Sync active projects
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [project-updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Sync project metadata and binary assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node tools/sync-projects.mjs --github --apply --markdown > sync-report.md
+          cat sync-report.md
+
+      - name: Verify Astro check and build when files changed
+        id: changes
+        run: |
+          if [ -n "$(git status --porcelain public src/data/project-meta.json)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            npm ci
+            npm run build
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and open pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "Santtu Nykänen"
+          git config user.email "santtu.nykanen@gofore.com"
+          BRANCH="chore/sync-projects"
+          git checkout -B "$BRANCH"
+          git add public src/data/project-meta.json
+          git commit -m "Sync project metadata and assets"
+          git push origin "$BRANCH" --force-with-lease
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            gh pr edit "$BRANCH" --body-file sync-report.md
+          else
+            gh pr create --base main --head "$BRANCH" --title "Sync project metadata and assets" --body-file sync-report.md
+          fi
