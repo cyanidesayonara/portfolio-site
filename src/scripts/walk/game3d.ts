@@ -138,6 +138,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
   scene.add(sun, sun.target);
+  const rim = new THREE.DirectionalLight(0xffe1b8, 0.72);
+  scene.add(rim, rim.target);
 
   // ---- Coriolis & boardwalk booth screens ---------------------------------------------
   const cCanvas = document.createElement('canvas');
@@ -722,6 +724,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     scene.fog = new THREE.Fog(s.fog, s.fogNear, s.fogFar);
     sun.color.setHex(s.sunColor);
     sun.intensity = s.sunIntensity;
+    rim.color.setHex(mode === 'night' ? 0x8bb6ff : mode === 'rain' ? 0xc2d0de : 0xffe1b8);
+    rim.intensity = mode === 'day' ? 0.72 : mode === 'rain' ? 0.35 : 0.45;
     hemi.color.setHex(s.hemiSky);
     hemi.groundColor.setHex(s.hemiGround);
     hemi.intensity = s.hemiIntensity;
@@ -2706,10 +2710,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
 
-    // Sun and shadows follow the action.
+    // Sun, shadows, and rim light follow the action.
     sun.position.set(camLook.x + 30, camLook.y + 48, camLook.z + 22);
     sun.target.position.copy(camLook);
     sun.target.updateMatrixWorld();
+    rim.position.set(camLook.x - 24, camLook.y + 18, camLook.z - 28);
+    rim.target.position.copy(camLook);
+    rim.target.updateMatrixWorld();
   };
 
   const UPV = new THREE.Vector3(0, 1, 0);

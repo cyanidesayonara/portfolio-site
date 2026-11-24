@@ -32,7 +32,7 @@ import {
 } from './models';
 import {
   makeLanternPost, makeSpotMast, makeTerrace, makeTamarisk, makeDatePalm, makeChimney, makeXemeneies,
-  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost,
+  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost, makePlanterPot, makeParkedBike,
 } from './props';
 import {
   panotTextures, sandTexture, deckTexture, plasterTexture, waterNormalTexture, signTexture, rng,
@@ -221,9 +221,13 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   root.add(ground(-140, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, 140, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
-  root.add(ground(-140, 140, -10, CUT.sea1, GROUND_Y, concMat, conc.tileMeters));
-  root.add(ground(-140, -CUT.x, CUT.sea1, 4, GROUND_Y, concMat, conc.tileMeters));
-  root.add(ground(CUT.x, 140, CUT.sea1, 4, GROUND_Y, concMat, conc.tileMeters));
+  root.add(ground(-140, 140, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(-140, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(CUT.x, 140, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  const promCurb = box(280, 0.05, 0.26, M(0xd8c3a5, 0.85));
+  promCurb.position.set(0, GROUND_Y + 0.025, -10.02);
+  promCurb.receiveShadow = true;
+  root.add(promCurb);
   const deck = ground(-140, 140, -20, -10, GROUND_Y + 0.01, deckMat, 3);
   root.add(deck);
   // Beach, under the sea too.
@@ -273,7 +277,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (!m) { m = new THREE.MeshStandardMaterial({ color: c, map: plaster, roughness: 0.92 }); plasterMats.set(c, m); }
     return m;
   };
-  const shopGlassMat = M(0x3a4d63, 0.12, 0.4);
+  const shopGlassMat = new THREE.MeshStandardMaterial({ color: 0x4b647d, roughness: 0.12, metalness: 0.35, transparent: true, opacity: 0.34 });
   const wallPlasterMat = new THREE.MeshStandardMaterial({ map: plaster, vertexColors: true, roughness: 0.92 });
   const townBuilder = new DirectBuilder(TOWN_Z0);
   const townLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'town')!;
@@ -781,15 +785,50 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     const fascia = box(p.w + 0.62, 0.5, 0.08, M(accent, 0.6));
     fascia.position.set(0, h - 0.05, (PZ1 - PZ0) / 2 + 2.2);
     g.add(fascia);
-    // Posts holding the canopy over the front deck.
+    const awningRoll = cyl(0.14, 0.14, p.w + 0.56, M(accent, 0.55), 10);
+    awningRoll.rotation.z = Math.PI / 2;
+    awningRoll.position.set(0, h - 0.3, (PZ1 - PZ0) / 2 + 2.18);
+    g.add(awningRoll);
+    // Rounded front pilasters + canopy posts.
+    for (const sx of [-(p.w / 2 - 0.08), p.w / 2 - 0.08]) {
+      const pil = cyl(0.12, 0.12, h, M(0xe8e1d5, 0.78), 10);
+      pil.position.set(sx, h / 2, (PZ1 - PZ0) / 2);
+      g.add(pil);
+    }
     for (const sx of [-p.w / 2, p.w / 2]) {
       const post = cyl(0.06, 0.06, h, M(0xe9e6df, 0.6, 0.3), 8);
       post.position.set(sx, h / 2, (PZ1 - PZ0) / 2 + 2.1);
       g.add(post);
     }
     if (p.id !== 'coriolis') {
-      const glass = box(p.w * 0.66, 2.6, 0.06, shopGlassMat);
-      glass.position.set(-p.w * 0.12, 1.45, (PZ1 - PZ0) / 2 + 0.04);
+      const winW = p.w * 0.66;
+      const winX = -p.w * 0.12;
+      const winZ = (PZ1 - PZ0) / 2;
+      // Sunlit shop interior display backing, shelves, and small props behind glazing.
+      const bay = box(winW - 0.12, 2.46, 0.04, new THREE.MeshStandardMaterial({
+        color: 0xfff0d4, emissive: 0x4a3519, emissiveIntensity: 0.42, roughness: 0.88,
+      }));
+      bay.position.set(winX, 1.45, winZ - 0.04);
+      g.add(bay);
+      const woodM = M(0x8c6442, 0.78);
+      for (const sy of [0.95, 1.75]) {
+        const shelf = box(winW - 0.24, 0.07, 0.12, woodM);
+        shelf.position.set(winX, sy, winZ + 0.02);
+        g.add(shelf);
+        for (let k = -2; k <= 2; k++) {
+          const itemC = k % 2 === 0 ? accent : (k + 2) % 3 === 0 ? 0xf4f1ea : 0x1fc9b7;
+          const item = box(0.24, 0.22 + ((Math.abs(k) + (sy > 1.3 ? 1 : 0)) % 2) * 0.1, 0.1, M(itemC, 0.55));
+          item.position.set(winX + k * (winW * 0.16), sy + 0.15, winZ + 0.03);
+          g.add(item);
+        }
+      }
+      for (const mx of [winX - winW * 0.48, winX, winX + winW * 0.48]) {
+        const mul = box(0.06, 2.55, 0.08, woodM);
+        mul.position.set(mx, 1.45, winZ + 0.04);
+        g.add(mul);
+      }
+      const glass = box(winW, 2.6, 0.06, shopGlassMat);
+      glass.position.set(winX, 1.45, winZ + 0.04);
       g.add(glass);
       const bTex = opts.boothScreens?.[p.id];
       if (bTex) {
@@ -822,6 +861,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     boxes.push({ x0: p.x - p.w / 2, x1: p.x + p.w / 2, z0: PZ0, z1: PZ1, top: GROUND_Y + h, kind: 'building' });
     for (const sx of [-p.w / 2, p.w / 2]) addCircle(p.x + sx, PZ1 + 2.1, 0.06, GROUND_Y + h, 'post', true, true);
   }
+  // Start-view boardwalk life: festive bunting, planter pots, cafe sets, and parked bicycles.
+  root.add(makeBunting(new THREE.Vector3(-25, GROUND_Y + 3.85, PZ1 + 2.1), new THREE.Vector3(-19, GROUND_Y + 3.85, PZ1 + 2.1)));
+  for (const [fx, fz, fc] of [
+    [-25.4, -10.2, 0xe5487a],
+    [-18.6, -10.2, 0xffb020],
+    [-36.5, -10.2, 0xffb020],
+    [-9.5, -10.2, 0x1fc9b7],
+  ] as [number, number, number][]) {
+    place(makePlanterPot(fc), fx, GROUND_Y, fz, fx);
+    addCircle(fx, fz, 0.34, GROUND_Y + 0.9, 'pot', true, false);
+  }
+  for (const [tx, tz, col] of [[-28.6, -8.8, 0xffb020], [-13.8, -8.8, 0x1fc9b7]] as [number, number, number][]) {
+    place(makeCafeSet(col), tx, GROUND_Y, tz, tx);
+    addCircle(tx, tz, 0.5, GROUND_Y + 0.8, 'table', false, false);
+  }
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 14, Math.PI), M(0x2a2f3d, 0.4, 0.6));
+  hoop.position.set(-17.35, GROUND_Y, -8.5);
+  root.add(hoop);
+  place(makeParkedBike(0xe5302a), -17.8, GROUND_Y, -8.5, 0.35);
+  place(makeParkedBike(0x1fc9b7), -16.9, GROUND_Y, -8.5, 0.15);
+  boxes.push({ x0: -18.4, x1: -16.3, z0: -9.0, z1: -8.0, top: GROUND_Y + 1.0, kind: 'bike' });
   // About: a little terrace in front of the café.
   for (const tx of [24, 31]) {
     place(makeCafeSet(0x8bcb3c), tx, GROUND_Y, -9.8, r() * 3);
