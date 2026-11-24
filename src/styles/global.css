@@ -335,7 +335,8 @@ p {
 .prose .gallery p {
   display: contents;
 }
-.prose .gallery img {
+.prose .gallery img,
+.prose .gallery video {
   display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
