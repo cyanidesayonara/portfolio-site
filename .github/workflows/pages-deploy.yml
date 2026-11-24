@@ -37,6 +37,9 @@ jobs:
       - name: Type-check and build
         run: npm run build
 
+      - name: Run headless smoke tests
+        run: npm run test:smoke
+
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:

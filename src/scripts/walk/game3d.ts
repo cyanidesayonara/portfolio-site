@@ -6,8 +6,12 @@
 */
 import * as THREE from 'three';
 import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim';
-import { WalkAudio, STEM_GROUPS, type StemGroup, type SongMeta } from './audio';
-import { Hud, type GoalRow } from './hud';
+import { WalkAudio, STEM_GROUPS } from './audio';
+import { Hud } from './hud';
+import { createParticles } from './particles';
+import { createSkySystem } from './sky';
+import { createGoalSystem } from './goals';
+import { createBoothPanels } from './boothPanels';
 import { Leash, applyTug, capStretch, WhirlDetector, type Obstacle } from './leash';
 import { buildLevelSteps, runSliced, LEVEL_STEPS, PIPICA, WATER_Y, RAMBLA_Y, GROUND_Y, TRAIN_Y, TRAIN_Z, type Level } from './level';
 import { Streamer, type District } from './world';
@@ -25,13 +29,13 @@ import { HILL } from './hill';
 import { bakeStatic, collapseRig } from './bake';
 import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
-import { isNightTheme, onThemeChange, SKY, type SkyMode } from './theme';
+import { SKY } from './theme';
 import { createTransitOverlay, playDepartureDoors } from './transit';
 import { trackVisibleViewport } from '../viewport';
-import { AREAS, AREA_BONUS, areaOfDistrict, loadProgress, saveProgress, clearProgress } from './progress';
+import { areaOfDistrict } from './progress';
 import { createStrays } from './strays';
 import {
-  EatPreyNapSim, DopepodSim, CAT_PALETTES, CAT_SIZES, createBoardwalkBoothScreens,
+  EatPreyNapSim, DopepodSim, createBoardwalkBoothScreens,
 } from './booths';
 import projectMeta from '../../data/project-meta.json';
 
@@ -99,47 +103,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // Far enough for the hills and the skyline (horizon.ts, up to ~1.5 km out).
   const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.15, 1800);
 
-  // Sky dome with a vertical gradient, plus stars and a moon for the night.
-  const skyUniforms = { top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() } };
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(600, 24, 12),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyUniforms,
-      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: 'uniform vec3 top; uniform vec3 horizon; varying vec3 vP; void main(){ float h = clamp(vP.y*1.6, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.7)), 1.0); }',
-    }),
-  );
-  sky.renderOrder = -1; // always first: it writes no depth, so everything draws over it
-  scene.add(sky);
-  const starGeo = new THREE.BufferGeometry();
-  const starPos: number[] = [];
-  for (let i = 0; i < 500; i++) {
-    const a = Math.random() * Math.PI * 2, e = Math.random() * 0.9 + 0.08;
-    starPos.push(Math.cos(a) * Math.cos(e) * 500, Math.sin(e) * 500, Math.sin(a) * Math.cos(e) * 500);
-  }
-  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85 }));
-  scene.add(stars);
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf4efe0, fog: false }));
-  moon.position.set(-120, 140, -420);
-  scene.add(moon);
-
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x888888, 1);
-  scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 2);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 120;
-  sun.shadow.camera.left = -34;
-  sun.shadow.camera.right = 34;
-  sun.shadow.camera.top = 34;
-  sun.shadow.camera.bottom = -34;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.03;
-  scene.add(sun, sun.target);
-  const rim = new THREE.DirectionalLight(0xffe1b8, 0.72);
-  scene.add(rim, rim.target);
+  const skySys = createSkySystem(scene, renderer, root);
 
   // ---- Coriolis & boardwalk booth screens ---------------------------------------------
   const cCanvas = document.createElement('canvas');
@@ -166,7 +130,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const viaMetro = searchParams.get('via') === 'metro';
   const walktest = searchParams.has('walktest');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const transit = createTransitOverlay(host, { viaTrain, viaMetro, night: isNightTheme(), reduced: reducedMotion, walktest });
+  const transit = createTransitOverlay(host, { viaTrain, viaMetro, night: skySys.getMode() === 'night', reduced: reducedMotion, walktest });
   const buildT0 = performance.now();
   let stepsDone = 0;
   // Longest single step (the page can't respond during one): what to split next.
@@ -259,12 +223,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let hurdlesGot = 0;
   let townDone = 0;
   let combo: null | { links: string[]; pts: number; t: number } = null;
-  let coriolisFocus = false;
-  let stemmaOpen = false;
-  let catFocus = false;
-  let podOpen = false;
   let camMode: CamMode = 'street';
-  let skyMode: SkyMode = isNightTheme() ? 'night' : 'day';
   let nearStop: Level['stops'][number] | null = null;
   let time = 0;
   let slowmo = 0;
@@ -272,106 +231,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let fireworksT = 0;
   const markedSpots = new Set<object>();
 
-  const goals: GoalRow[] = [
-    { id: 'whirl', label: 'Fling your human with a pole whirl', done: false, area: 'any' },
-    { id: 'mark', label: 'Mark 5 spots (Q)', done: false, count: 0, target: 5, area: 'any' },
-    { id: 'birds', label: 'Scatter the gulls or pigeons (E)', done: false, area: 'any' },
-    { id: 'finds', label: 'Dig up 3 finds on the beach (Space)', done: false, count: 0, target: 3, area: 'seafront' },
-    { id: 'hurdles', label: 'Clear the 3 hurdles in the pipicà (V)', done: false, count: 0, target: 3, area: 'seafront' },
-    { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false, area: 'seafront' },
-    { id: 'stemma', label: 'Change the music at stemma (X)', done: false, area: 'seafront' },
-    { id: 'pier', label: 'Walk to the end of the pier', done: false, area: 'seafront' },
-    { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false, area: 'seafront' },
-    { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
-    { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
-    { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
-    { id: 'plaza', label: 'Help out on Plaça del Mercat', done: false, count: 0, target: 3, area: 'plaza' },
-    { id: 'butcher', label: 'Get away with the butcher’s botifarra', done: false, area: 'plaza' },
-    { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2, area: 'hill' },
-    { id: 'cats', label: 'Send 3 old-town cats running', done: false, count: 0, target: 3, area: 'hill' },
-    { id: 'hill_top', label: 'Climb to the hilltop church and head home', done: false, area: 'hill' },
-  ];
-  const goal = (id: string) => goals.find((g) => g.id === id)!;
   // Progress is saved in this browser (progress.ts); ?walktest starts clean
   // and never saves unless ?walksave is added too.
   const saving = !walktest || searchParams.has('walksave');
-  let progressDirty = false;
-  let resetting = false;
-  // Counts reported by the game are per page load; saved counts are added on top.
-  const countBase: Record<string, number> = {};
-  let area = 'seafront';
-  const showGoals = () => hud.setGoals(goals, AREAS, area);
-  const completeGoal = (id: string) => {
-    const g = goal(id);
-    if (g.done) return;
-    g.done = true;
-    if (g.target) g.count = g.target;
-    hud.toast('Goal complete', g.label.replace(/ \([^)]*\)$/, ''), '#8bcb3c');
-    audio.goal();
-    // Every goal in an area done: a bonus, once.
-    const a = AREAS.find((x) => x.id === g.area);
-    if (a && a.id !== 'any' && goals.filter((x) => x.area === a.id).every((x) => x.done)) {
-      setTimeout(() => {
-        bones += AREA_BONUS;
-        hud.shout(`${a.label.toUpperCase()} DONE +${AREA_BONUS}`, 'good');
-        progressDirty = true;
-      }, 1200);
-    }
-    showGoals();
-    progressDirty = true;
-    if (goals.every((x) => x.done)) setTimeout(() => hud.shout('BEST WALK EVER', 'loud'), 900);
-  };
-  const bumpGoal = (id: string, n: number) => {
-    const g = goal(id);
-    if (g.done) return;
-    const c = Math.max(g.count ?? 0, (countBase[id] ?? 0) + n);
-    if (c === g.count) return;
-    g.count = c;
-    progressDirty = true;
-    if (g.target && c >= g.target) completeGoal(id);
-    else showGoals();
-  };
-  const saved = saving ? loadProgress() : null;
-  const doneKeys = new Set<string>(saved?.done ?? []);
-  const markDone = (key: string) => {
-    if (doneKeys.has(key)) return;
-    doneKeys.add(key);
-    progressDirty = true;
-  };
-  if (saved) {
-    for (const g of goals) {
-      const sg = saved.goals[g.id];
-      if (!sg) continue;
-      g.done = !!sg.done;
-      if (g.target) g.count = g.done ? g.target : Math.min(g.target, sg.count ?? 0);
-      if (g.count && (g.id === 'mark' || saved.done === undefined)) countBase[g.id] = g.count;
-    }
-    if (saved.done === undefined) {
-      if (goal('town').done) ['ball', 'tofu', 'crate', 'bakery', 'selfie'].forEach((k) => doneKeys.add(`town:${k}`));
-      if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
-      if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));
-      if (goal('hill_top').done) doneKeys.add('hill:home');
-      if (goal('finds').done) [0, 1, 2].forEach((i) => doneKeys.add(`find:${i}`));
-      if (goal('hurdles').done) [0, 1, 2].forEach((i) => doneKeys.add(`hurdle:${i}`));
-      if (goal('cats').done) [0, 1, 2, 3].forEach((i) => doneKeys.add(`cat:${i}`));
-    }
-    bones = Math.max(0, saved.bones | 0);
-  }
-  showGoals();
-  if (saving) {
-    const flush = () => { if (progressDirty && !resetting) { progressDirty = false; saveProgress(goals, bones, doneKeys); } };
-    let lastBones = bones;
-    setInterval(() => { if (bones !== lastBones) { lastBones = bones; progressDirty = true; } flush(); }, 3000);
-    window.addEventListener('pagehide', () => { progressDirty = true; flush(); });
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { progressDirty = true; flush(); } });
-  }
-  hud.onResetProgress = () => {
-    if (!window.confirm('Reset your saved walk progress? Goals and bones start over.')) return;
-    resetting = true;
-    clearProgress();
-    progressDirty = false;
-    location.reload();
-  };
+  const goalSys = createGoalSystem({
+    hud,
+    audio,
+    saving,
+    getBones: () => bones,
+    addBones: (n) => { bones += n; },
+    setBones: (n) => { bones = n; },
+  });
+  const { goals, goal, doneKeys, saved, completeGoal, bumpGoal, markDone } = goalSys;
 
   const addBones = (n: number, why?: string) => {
     bones += n;
@@ -384,27 +255,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     combo.t = 4;
   };
 
-  // ---- Particles ----------------------------------------------------------------------
-  const partGeo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
-  const partMats = new Map<number, THREE.MeshBasicMaterial>();
-  const particles: { m: THREE.Mesh; vx: number; vy: number; vz: number; t: number; g: number }[] = [];
-  const burst = (x: number, y: number, z: number, color: number, n = 10, spd = 3, up = 3, life = 0.7, g = 9) => {
-    let mat = partMats.get(color);
-    if (!mat) { mat = new THREE.MeshBasicMaterial({ color }); partMats.set(color, mat); }
-    for (let i = 0; i < n; i++) {
-      if (particles.length > 400) break;
-      const m = new THREE.Mesh(partGeo, mat);
-      m.position.set(x, y, z);
-      scene.add(m);
-      const a = Math.random() * Math.PI * 2, s = spd * (0.4 + Math.random() * 0.8);
-      particles.push({ m, vx: Math.cos(a) * s, vy: up * (0.5 + Math.random()), vz: Math.sin(a) * s, t: life * (0.6 + Math.random() * 0.6), g });
-    }
-  };
-
-  // Pee marks (shared geometry/material, recycled).
-  const stainGeo = new THREE.CircleGeometry(0.3, 14);
-  const stainMat = new THREE.MeshBasicMaterial({ color: 0xd6b23c, transparent: true, opacity: 0.4, depthWrite: false });
-  const stains: THREE.Mesh[] = [];
+  const particleSys = createParticles(scene);
+  const { burst, addStain } = particleSys;
 
   // ---- Collectibles ---------------------------------------------------------------------
   const boneSpots: [number, number][] = [[0, 186], [14, 187], [0, 211], [12, 224], [10, 108], [-17, 148], [40, 158.4], [1.5, 48], [-20, 53], [22, 71], [-14, 89], [30, 88.8], [-40, 24], [40, 29], [60, 20], [-60, -5], [70, -3], [-48, -60], [-48, -100], [70, -27], [0, -40], [-1, 9]];
@@ -699,53 +551,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     return { m, x: 66 + i * 6, z: -27, tx: 70, tz: -28, heading: 0, speed: 0, t: rand(0, 3) };
   });
 
-  // ---- Rain ---------------------------------------------------------------------------
-  const RAIN = 900;
-  const rainGeo = new THREE.BufferGeometry();
-  const rainArr = new Float32Array(RAIN * 6);
-  for (let i = 0; i < RAIN; i++) {
-    const x = rand(-25, 25), y = rand(0, 18), z = rand(-25, 25);
-    rainArr.set([x, y, z, x + 0.05, y - 0.7, z], i * 6);
-  }
-  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainArr, 3));
-  const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xb8c6d6, transparent: true, opacity: 0.55 }));
-  rain.visible = false;
-  scene.add(rain);
-
   // Fireworks for the Dimoni.
   const fireworks: { x: number; y: number; z: number; t: number; color: number }[] = [];
 
-  // ---- Sky & theme --------------------------------------------------------------------
-  const applySky = (mode: SkyMode) => {
-    skyMode = mode;
-    const s = SKY[mode];
-    skyUniforms.top.value.setHex(s.skyTop);
-    skyUniforms.horizon.value.setHex(s.skyHorizon);
-    scene.fog = new THREE.Fog(s.fog, s.fogNear, s.fogFar);
-    sun.color.setHex(s.sunColor);
-    sun.intensity = s.sunIntensity;
-    rim.color.setHex(mode === 'night' ? 0x8bb6ff : mode === 'rain' ? 0xc2d0de : 0xffe1b8);
-    rim.intensity = mode === 'day' ? 0.72 : mode === 'rain' ? 0.35 : 0.45;
-    hemi.color.setHex(s.hemiSky);
-    hemi.groundColor.setHex(s.hemiGround);
-    hemi.intensity = s.hemiIntensity;
-    renderer.toneMappingExposure = s.exposure;
-    level.waterMat.color.setHex(s.sea);
-    level.lampGlass.forEach((m) => { m.emissiveIntensity = s.lampsOn ? 2.6 : 0.05; });
-    level.litWindowMat.emissiveIntensity = mode === 'night' ? 1.3 : mode === 'rain' ? 0.5 : 0;
-    level.underpassLight.intensity = mode === 'day' ? 6 : 10;
-    stars.visible = mode === 'night';
-    moon.visible = mode === 'night';
-    rain.visible = mode === 'rain';
-    if (humanM.phoneScreen) humanM.phoneScreen.emissiveIntensity = mode === 'night' ? 1.6 : 0.6;
-    riders.forEach((r) => { r.light.emissiveIntensity = s.lampsOn ? 2 : 0.2; });
-    // Wet paving shines in the rain.
-    level.wetMats.forEach((m) => { m.roughness = mode === 'rain' ? 0.35 : 0.92; });
-    root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sky === mode)));
-  };
-  applySky(skyMode);
-  onThemeChange((night) => {
-    applySky(night ? 'night' : skyMode === 'rain' && !night ? 'rain' : 'day');
+  skySys.bindTargets({
+    waterMat: level.waterMat,
+    lampGlass: level.lampGlass,
+    litWindowMat: level.litWindowMat,
+    underpassLight: level.underpassLight,
+    wetMats: level.wetMats,
+    phoneScreen: humanM.phoneScreen,
+    riderLights: riders.map((r) => r.light),
   });
 
   // ---- Helpers ------------------------------------------------------------------------
@@ -839,7 +655,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   // ---- Actions ------------------------------------------------------------------------
   const doJump = () => {
-    if (!dog.onGround || coriolisFocus || catFocus || podOpen || dogSwimming) return;
+    if (!dog.onGround || panels.coriolisFocus || panels.catFocus || panels.podOpen || dogSwimming) return;
     dog.vy = 6.5;
     dog.onGround = false;
     audio.jump();
@@ -859,11 +675,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
     const sx = best ? lerp(best.x, dog.x, 0.55) : dog.x - Math.cos(dog.heading) * 0.35;
     const sz = best ? lerp(best.z, dog.z, 0.55) : dog.z - Math.sin(dog.heading) * 0.35;
-    const st = stains.length > 40 ? stains.shift()! : new THREE.Mesh(stainGeo, stainMat);
-    st.rotation.x = -Math.PI / 2;
-    st.position.set(sx, level.floor(sx, sz, dog.y) + 0.02, sz);
-    scene.add(st);
-    stains.push(st);
+    addStain(sx, level.floor(sx, sz, dog.y) + 0.02, sz);
     if (best && !markedSpots.has(best)) {
       markedSpots.add(best);
       marked++;
@@ -949,204 +761,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
   };
 
-  const catPanel = q<HTMLElement>('[data-cat-panel]');
-  const podPanel = q<HTMLElement>('[data-pod-panel]');
-  const anyBoothOpen = () => coriolisFocus || stemmaOpen || catFocus || podOpen;
-  const syncPanels = () => {
-    root.classList.toggle('panel-open', anyBoothOpen());
-    q('[data-coriolis-panel]')?.classList.toggle('open', coriolisFocus);
-    stemmaPanel?.classList.toggle('open', stemmaOpen);
-    catPanel?.classList.toggle('open', catFocus);
-    podPanel?.classList.toggle('open', podOpen);
-  };
-  const closeOtherBooths = (keep?: 'coriolis' | 'stemma' | 'cat' | 'pod') => {
-    if (keep !== 'coriolis' && coriolisFocus) { coriolisFocus = false; coriolis.clearHeld(); }
-    if (keep !== 'stemma') stemmaOpen = false;
-    if (keep !== 'cat') catFocus = false;
-    if (keep !== 'pod') podOpen = false;
-  };
-
-  const toggleCoriolis = () => {
-    coriolisFocus = !coriolisFocus;
-    coriolis.clearHeld();
-    if (coriolisFocus) {
-      closeOtherBooths('coriolis');
-      completeGoal('coriolis');
-    }
-    syncPanels();
-  };
-
-  // ---- Eat Prey Nap booth panel ------------------------------------------------------
-  const catScoreEl = q<HTMLElement>('[data-cat-score]');
-  const catPalLabel = q<HTMLElement>('[data-cat-pal-label]');
-  const catSizeLabel = q<HTMLElement>('[data-cat-size-label]');
-  const catWatchBtn = q<HTMLButtonElement>('[data-cat-watch]');
-  let catToastDone = false;
-  const syncCatUi = () => {
-    const st = catSim.getMouseState();
-    if (catPalLabel) catPalLabel.textContent = CAT_PALETTES[st.palette].name;
-    if (catSizeLabel) catSizeLabel.textContent = CAT_SIZES[st.size].label;
-    if (catScoreEl) catScoreEl.textContent = `${st.catches}`;
-    catWatchBtn?.setAttribute('aria-pressed', String(st.watchOnly));
-  };
-  const setCat = (open: boolean) => {
-    catFocus = open;
-    if (open) {
-      closeOtherBooths('cat');
-      syncCatUi();
-      if (!catToastDone) {
-        catToastDone = true;
-        hud.toast('Eat Prey Nap', 'Tap or click the booth screen to pounce at the mouse.', '#f0c44d');
-      }
-    }
-    syncPanels();
-  };
-  q('[data-cat-close]')?.addEventListener('click', () => setCat(false));
-  q('[data-cat-palette]')?.addEventListener('click', () => { catSim.cyclePalette(); audio.click(); syncCatUi(); });
-  q('[data-cat-size]')?.addEventListener('click', () => { catSim.cycleSize(); audio.click(); syncCatUi(); });
-  q('[data-cat-watch]')?.addEventListener('click', () => { catSim.toggleWatchOnly(); audio.click(); syncCatUi(); });
-  const triggerCatPounce = (u: number, v: number) => {
-    const res = catSim.pawAt(u, v, false);
-    if (res === 'catch') {
-      audio.chime();
-      hud.shout('CAUGHT!', 'good');
-      boothTofu.vy = Math.max(boothTofu.vy, 2.8);
-    } else if (res === 'pin') {
-      audio.click();
-      hud.shout('PINNED!', 'plain');
-    } else {
-      audio.click();
-    }
-    syncCatUi();
-    return res;
-  };
-  q('[data-cat-pounce]')?.addEventListener('click', () => {
-    const ms = catSim.getMouseState();
-    triggerCatPounce(ms.u, ms.v);
-  });
-
-  // ---- dopepod booth panel -----------------------------------------------------------
-  const podNowEl = q<HTMLElement>('[data-pod-now]');
-  const podPlayBtn = q<HTMLButtonElement>('[data-pod-play]');
-  let podToastDone = false;
-  const syncPodUi = () => {
-    const st = podSim.getState();
-    if (podNowEl) podNowEl.textContent = `${st.showName} · ${st.episodeTitle}`;
-    if (podPlayBtn) {
-      podPlayBtn.setAttribute('aria-pressed', String(st.playing));
-      podPlayBtn.textContent = st.playing ? 'Pause' : 'Play';
-    }
-    root.querySelectorAll<HTMLButtonElement>('[data-pod-show]').forEach((b) => {
-      b.setAttribute('aria-pressed', String(Number(b.dataset.podShow) === st.showIdx));
-    });
-  };
-  const setPod = (open: boolean) => {
-    podOpen = open;
-    if (open) {
-      closeOtherBooths('pod');
-      syncPodUi();
-      if (!podToastDone) {
-        podToastDone = true;
-        hud.toast('dopepod', 'Switch podcasts or scrub episodes from the booth.', '#d94ca6');
-      }
-    }
-    syncPanels();
-  };
-  q('[data-pod-close]')?.addEventListener('click', () => setPod(false));
-  podPlayBtn?.addEventListener('click', () => { podSim.togglePlay(); audio.click(); syncPodUi(); });
-  q('[data-pod-prev]')?.addEventListener('click', () => { podSim.prevEpisode(); audio.click(); syncPodUi(); });
-  q('[data-pod-next]')?.addEventListener('click', () => { podSim.nextEpisode(); audio.click(); syncPodUi(); });
-  root.querySelectorAll<HTMLButtonElement>('[data-pod-show]').forEach((b) => b.addEventListener('click', () => {
-    podSim.selectShow(Number(b.dataset.podShow ?? 0));
-    audio.click();
-    syncPodUi();
-  }));
-
-  // ---- stemma panel -------------------------------------------------------------------
-  const stemmaPanel = q<HTMLElement>('[data-stemma-panel]');
-  const songList = q<HTMLElement>('[data-song-list]');
-  const lanesCanvas = q<HTMLCanvasElement>('[data-stem-lanes]');
-  const creditEl = q<HTMLElement>('[data-song-credit]');
-  const renderSongs = () => {
-    if (!songList) return;
-    songList.innerHTML = audio.songs
-      .map((s) => `<li><button type="button" data-song="${s.id}" aria-pressed="${s.id === audio.songId}"><b>${s.title}</b><span>${s.credit_as ?? s.artist}</span></button></li>`)
-      .join('');
-    songList.querySelectorAll<HTMLButtonElement>('[data-song]').forEach((b) => {
-      b.addEventListener('click', () => {
-        if (!audio.on) setSound(true);
-        void audio.playSong(b.dataset.song!);
-        completeGoal('stemma');
-      });
-    });
-  };
-  const renderCredit = (s: SongMeta | undefined) => {
-    if (!creditEl || !s) return;
-    const who = s.credit_as ?? s.artist;
-    creditEl.innerHTML = `“${s.title}” by ${who}. <a href="${s.source}" rel="noopener" target="_blank">Source</a> · <a href="${s.licence_url}" rel="noopener" target="_blank">${s.licence}</a>. Stems separated by stemma.`;
-  };
-  audio.onSongChange = (s) => { renderSongs(); renderCredit(s); };
-  // N (or the toolbar button): skip to the next song, turning sound on if it was off.
-  const nextSong = async () => {
-    const list = await audio.loadIndex();
-    if (!list.length) return;
-    const i = list.findIndex((x) => x.id === audio.songId);
-    const nx = list[(i + 1) % list.length];
-    // Exactly one request for the new song: the jukebox lets the latest one win.
-    audio.songId = nx.id;
-    if (!audio.on) { audio.musicOn = true; setSound(true); } // enabling plays songId
-    else if (!audio.musicOn) audio.setMusicOn(true);
-    else void audio.playSong(nx.id);
-    hud.toast('Now playing', `${nx.title} by ${nx.credit_as ?? nx.artist}`);
-  };
-  q('[data-next-song]')?.addEventListener('click', () => { void nextSong(); host.focus({ preventScroll: true }); });
-  const drawLanes = () => {
-    if (!lanesCanvas || !stemmaOpen) return;
-    const s = audio.song();
-    if (!s) return;
-    const g = lanesCanvas.getContext('2d')!;
-    const w = lanesCanvas.width, h = lanesCanvas.height, lh = h / 4;
-    g.clearRect(0, 0, w, h);
-    const cols: Record<StemGroup, string> = { vocals: '#e5487a', drums: '#ffb020', bass: '#1fc9b7', other: '#8bcb3c' };
-    const ph = audio.playhead();
-    STEM_GROUPS.forEach((grp, li) => {
-      // Peaks are 0–100; guitar and piano fold into "other".
-      const src = grp === 'other' ? ['other', 'guitar', 'piano'].map((k) => s.peaks[k]).filter(Boolean) : [s.peaks[grp] ?? []];
-      const peaks = (src[0] ?? []).map((_, i) => Math.min(1, Math.max(...src.map((p) => p[i] ?? 0)) / 100));
-      const muted = audio.muted[grp];
-      g.fillStyle = muted ? 'rgba(255,255,255,0.12)' : cols[grp];
-      const n = peaks.length;
-      for (let i = 0; i < n; i++) {
-        const v = peaks[i] * (lh * 0.42);
-        const x = (i / n) * w;
-        g.globalAlpha = i / n < ph ? 1 : 0.45;
-        g.fillRect(x, li * lh + lh / 2 - v, Math.max(1, w / n - 1), v * 2);
-      }
-      g.globalAlpha = 1;
-    });
-    g.fillStyle = '#f4f1ea';
-    g.fillRect(ph * w - 1, 0, 2, h);
-  };
-  root.querySelectorAll<HTMLButtonElement>('[data-stem]').forEach((b) => {
-    b.addEventListener('click', () => {
-      if (!audio.on) setSound(true);
-      const muted = audio.toggleStem(b.dataset.stem as StemGroup);
-      b.setAttribute('aria-pressed', String(!muted));
-      completeGoal('stemma');
-    });
-  });
-  const setStemma = (open: boolean) => {
-    stemmaOpen = open;
-    if (open) {
-      closeOtherBooths('stemma');
-      if (!audio.on) setSound(true);
-      void audio.loadIndex().then(() => { renderSongs(); renderCredit(audio.song()); });
-    }
-    syncPanels();
-  };
-  q('[data-stemma-close]')?.addEventListener('click', () => setStemma(false));
-
-  // ---- Toolbar ------------------------------------------------------------------------
+  // ---- Toolbar & boardwalk booth panels -----------------------------------------------
   const soundBtn = q<HTMLButtonElement>('[data-sound]');
   const setSound = (on: boolean) => {
     if (on) audio.enable(); else audio.disable();
@@ -1155,6 +770,19 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     }
   };
+  const panels = createBoothPanels({
+    root,
+    host,
+    hud,
+    audio,
+    coriolis,
+    catSim,
+    podSim,
+    completeGoal,
+    setSound,
+    onCatPounce: () => { boothTofu.vy = Math.max(boothTofu.vy, 2.8); },
+    getTimeMs: () => time * 1000,
+  });
   soundBtn?.addEventListener('click', () => setSound(!audio.on));
   const camBtn = q<HTMLButtonElement>('[data-camera]');
   const camLabel = (m: CamMode) => {
@@ -1222,7 +850,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
-    if (catFocus || coriolisFocus) return;
+    if (panels.catFocus || panels.coriolisFocus) return;
     if (!drag.moved) { drag.moved = true; try { renderer.domElement.setPointerCapture(e.pointerId); } catch {} }
     drag.x = e.clientX; drag.y = e.clientY;
     orbitBy(dx * 0.006, dy * 0.006);
@@ -1232,7 +860,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (drag && e.pointerId === drag.id) {
       const wasTap = !drag.moved && e.type === 'pointerup';
       drag = null;
-      if (wasTap && level.catScreen.mesh && (catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 9)) {
+      if (wasTap && level.catScreen.mesh && (panels.catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 9)) {
         const rect = renderer.domElement.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
           tapNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1240,7 +868,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
           raycaster.setFromCamera(tapNdc, camera);
           const hits = raycaster.intersectObject(level.catScreen.mesh, false);
           if (hits.length && hits[0].uv) {
-            triggerCatPounce(hits[0].uv.x, 1 - hits[0].uv.y);
+            panels.triggerCatPounce(hits[0].uv.x, 1 - hits[0].uv.y);
           }
         }
       }
@@ -1248,7 +876,6 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
   host.addEventListener('pointerup', endDrag);
   host.addEventListener('pointercancel', endDrag);
-  root.querySelectorAll<HTMLButtonElement>('[data-sky]').forEach((b) => b.addEventListener('click', () => applySky(b.dataset.sky as SkyMode)));
 
   // Two fullscreen modes: "window" fills the browser window (works everywhere,
   // keeps the tabs and address bar), "screen" also asks for real fullscreen.
@@ -1318,14 +945,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     host.addEventListener('pointerdown', upgrade, true);
   };
 
-  q('[data-c-exit]')?.addEventListener('click', () => { if (coriolisFocus) toggleCoriolis(); });
-  root.querySelectorAll<HTMLButtonElement>('[data-c-key]').forEach((b) => b.addEventListener('click', () => {
-    const k = b.dataset.cKey as SimKey;
-    coriolis.setHeld(k, true);
-    coriolis.key(k, time * 1000);
-    setTimeout(() => coriolis.setHeld(k, false), 120);
-  }));
-  root.querySelectorAll<HTMLButtonElement>('[data-c-cmd]').forEach((b) => b.addEventListener('click', () => coriolis.command(b.dataset.cCmd as SimCommand, time * 1000)));
+
 
   // ---- Keyboard (only while the stage has focus) --------------------------------------
   const resetWalk = () => {
@@ -1393,8 +1013,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
   const onKey = (code: string, e?: KeyboardEvent) => {
     const repeat = e?.repeat ?? false;
-    if (coriolisFocus) {
-      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) toggleCoriolis(); return; }
+    if (panels.coriolisFocus) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.toggleCoriolis(); return; }
       const cmd: SimCommand | null = code === 'KeyM' ? 'Menu' : code === 'KeyS' ? 'Settings' : code === 'KeyC' ? 'Overlay' : code === 'Space' ? 'Next' : code === 'KeyH' ? 'Home' : null;
       if (cmd) { e?.preventDefault(); if (!repeat) coriolis.command(cmd, time * 1000); return; }
       if (code === 'KeyR') { e?.preventDefault(); if (!repeat) coriolis.rotate(time * 1000); return; }
@@ -1402,27 +1022,27 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (ck) { e?.preventDefault(); coriolis.setHeld(ck, true); coriolis.key(ck, time * 1000); }
       return;
     }
-    if (catFocus) {
-      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) setCat(false); return; }
-      if (!repeat && (code === 'KeyP' || code === 'KeyC')) { e?.preventDefault(); catSim.cyclePalette(); audio.click(); syncCatUi(); return; }
-      if (!repeat && (code === 'KeyS' || code === 'Tab')) { e?.preventDefault(); catSim.cycleSize(); audio.click(); syncCatUi(); return; }
-      if (!repeat && code === 'KeyW') { e?.preventDefault(); catSim.toggleWatchOnly(); audio.click(); syncCatUi(); return; }
+    if (panels.catFocus) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.setCat(false); return; }
+      if (!repeat && (code === 'KeyP' || code === 'KeyC')) { e?.preventDefault(); catSim.cyclePalette(); audio.click(); panels.syncCatUi(); return; }
+      if (!repeat && (code === 'KeyS' || code === 'Tab')) { e?.preventDefault(); catSim.cycleSize(); audio.click(); panels.syncCatUi(); return; }
+      if (!repeat && code === 'KeyW') { e?.preventDefault(); catSim.toggleWatchOnly(); audio.click(); panels.syncCatUi(); return; }
       if (!repeat && (code === 'Space' || code === 'Enter')) {
         e?.preventDefault();
         const ms = catSim.getMouseState();
-        triggerCatPounce(ms.u, ms.v);
+        panels.triggerCatPounce(ms.u, ms.v);
         return;
       }
       return;
     }
-    if (podOpen) {
-      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) setPod(false); return; }
-      if (!repeat && (code === 'Space' || code === 'KeyK')) { e?.preventDefault(); podSim.togglePlay(); audio.click(); syncPodUi(); return; }
-      if (!repeat && (code === 'ArrowRight' || code === 'KeyL')) { e?.preventDefault(); podSim.nextEpisode(); audio.click(); syncPodUi(); return; }
-      if (!repeat && (code === 'ArrowLeft' || code === 'KeyJ')) { e?.preventDefault(); podSim.prevEpisode(); audio.click(); syncPodUi(); return; }
+    if (panels.podOpen) {
+      if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.setPod(false); return; }
+      if (!repeat && (code === 'Space' || code === 'KeyK')) { e?.preventDefault(); podSim.togglePlay(); audio.click(); panels.syncPodUi(); return; }
+      if (!repeat && (code === 'ArrowRight' || code === 'KeyL')) { e?.preventDefault(); podSim.nextEpisode(); audio.click(); panels.syncPodUi(); return; }
+      if (!repeat && (code === 'ArrowLeft' || code === 'KeyJ')) { e?.preventDefault(); podSim.prevEpisode(); audio.click(); panels.syncPodUi(); return; }
       if (!repeat && code.startsWith('Digit')) {
         const n = Number(code.slice(5)) - 1;
-        if (n >= 0 && n < 4) { e?.preventDefault(); podSim.selectShow(n); audio.click(); syncPodUi(); return; }
+        if (n >= 0 && n < 4) { e?.preventDefault(); podSim.selectShow(n); audio.click(); panels.syncPodUi(); return; }
       }
       return;
     }
@@ -1437,25 +1057,25 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       case 'KeyC': cycleCam(); break;
       case 'Tab': hud.toggleGoals(); break;
       case 'KeyM': minimap.toggle(); break;
-      case 'KeyN': void nextSong(); break;
+      case 'KeyN': void panels.nextSong(); break;
       case 'Minus': case 'NumpadSubtract': zoomBy(1.15); break;
       case 'Equal': case 'NumpadAdd': zoomBy(1 / 1.15); break;
       case 'BracketLeft': case 'BracketRight': orbitBy(0); break;
-      case 'Digit1': applySky('day'); break;
-      case 'Digit2': applySky('rain'); break;
-      case 'Digit3': applySky('night'); break;
+      case 'Digit1': skySys.applySky('day'); break;
+      case 'Digit2': skySys.applySky('rain'); break;
+      case 'Digit3': skySys.applySky('night'); break;
       case 'KeyR': resetWalk(); break;
       case 'KeyX':
-        if (nearCoriolis()) toggleCoriolis();
-        else if (nearCatBooth()) setCat(!catFocus);
-        else if (nearPodBooth()) setPod(!podOpen);
-        else if (nearStemma() || stemmaOpen) setStemma(!stemmaOpen);
+        if (nearCoriolis()) panels.toggleCoriolis();
+        else if (nearCatBooth()) panels.setCat(!panels.catFocus);
+        else if (nearPodBooth()) panels.setPod(!panels.podOpen);
+        else if (nearStemma() || panels.stemmaOpen) panels.setStemma(!panels.stemmaOpen);
         break;
       case 'Escape':
         if (minimap.enlarged) minimap.toggle(false);
-        else if (stemmaOpen) setStemma(false);
-        else if (catFocus) setCat(false);
-        else if (podOpen) setPod(false);
+        else if (panels.stemmaOpen) panels.setStemma(false);
+        else if (panels.catFocus) panels.setCat(false);
+        else if (panels.podOpen) panels.setPod(false);
         else if (full) setFull(false);
         else host.blur();
         break;
@@ -1798,7 +1418,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let wasInPipica = false;
   let pipIdx = 0; // which pipicà she's off the leash in
   const physicsStep = (dt: number) => {
-    const inp = anyBoothOpen() ? { x: 0, z: 0, mag: 0 } : inputDir();
+    const inp = panels.anyOpen() ? { x: 0, z: 0, mag: 0 } : inputDir();
     const wantsRun = (held.has('ShiftLeft') || held.has('ShiftRight')) && inp.mag > 0;
     const freeZoom = offLeash;
     const running = wantsRun && (dog.zoom > 0.02 || freeZoom);
@@ -1955,8 +1575,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
     // Goals card follows the area Millie is in.
-    const nowArea = areaOfDistrict(level.districtAt(dog.x, dog.z).id);
-    if (nowArea !== area) { area = nowArea; showGoals(); }
+    goalSys.setArea(areaOfDistrict(level.districtAt(dog.x, dog.z).id));
     level.churchLandmark.visible = !hillDistrict.root.visible;
     const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
     if (slowmo > 0) slowmo -= rawDt;
@@ -1991,14 +1610,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
 
     // Coriolis texture, only when nearby or focused.
-    if (coriolis.tick(time * 1000) && (coriolisFocus || Math.abs(camPos.z - level.coriolis.z) < 45)) {
+    if (coriolis.tick(time * 1000) && (panels.coriolisFocus || Math.abs(camPos.z - level.coriolis.z) < 45)) {
       coriolis.renderToCanvas(cCtx, 4, 1);
       coriolisTex.needsUpdate = true;
     }
     // Live idling UIs across all boardwalk pavilions.
-    const activeBoothId = catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 16
+    const activeBoothId = panels.catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 16
       ? 'eat-prey-nap'
-      : podOpen
+      : panels.podOpen
         ? 'dopepod'
         : null;
     boothScreens.update(dt, audio.playhead(), audio.muted, audio.on && audio.musicOn, activeBoothId);
@@ -2144,21 +1763,21 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       const ms = catSim.getMouseState();
       const dBooth = Math.hypot(dog.x - boothTofu.x, dog.z - boothTofu.z);
       const padBaseY = GROUND_Y + 0.06;
-      const targetX = catFocus
+      const targetX = panels.catFocus
         ? level.catScreen.x - 1.55
         : level.catScreen.x + ((ms.visible ? ms.u : 0.5 + Math.sin(time * 0.7) * 0.22) - 0.5) * level.catScreen.w * 0.65;
       const dxB = targetX - boothTofu.x;
       boothTofu.x += dxB * Math.min(1, dt * (ms.state === 'dart' ? 7 : 3.4));
       boothTofu.speed = Math.abs(dxB) * 2.5;
-      if (catFocus) {
+      if (panels.catFocus) {
         boothTofu.z = lerp(boothTofu.z, level.boothTofuAnchor.z + 0.35, Math.min(1, dt * 4));
       } else {
         boothTofu.z = lerp(boothTofu.z, level.boothTofuAnchor.z - (boothTofu.jumpY > 0 ? 0.22 : 0), Math.min(1, dt * 4));
       }
-      const lookX = catFocus ? level.catScreen.x : targetX;
+      const lookX = panels.catFocus ? level.catScreen.x : targetX;
       boothTofu.heading = angLerp(boothTofu.heading, Math.atan2(level.catScreen.z - boothTofu.z, lookX - boothTofu.x), dt * 6);
       boothTofu.pounceCooldown -= dt;
-      if (!catFocus && boothTofu.jumpY <= 0 && boothTofu.pounceCooldown <= 0 && (ms.state === 'creep' || ms.state === 'freeze' || ms.state === 'dart')) {
+      if (!panels.catFocus && boothTofu.jumpY <= 0 && boothTofu.pounceCooldown <= 0 && (ms.state === 'creep' || ms.state === 'freeze' || ms.state === 'dart')) {
         boothTofu.vy = clamp(2.3 + (1 - ms.v) * 2.4, 2.3, 4.4);
         boothTofu.pounceCooldown = 1.7 + Math.random() * 1.4;
         boothTofu.swatted = false;
@@ -2174,7 +1793,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         }
         if (boothTofu.jumpY <= 0) { boothTofu.jumpY = 0; boothTofu.vy = 0; }
       }
-      if (!catFocus && dBooth < 4.5 && !hud.hasBubble('booth-tofu') && Math.random() < dt * 0.35) {
+      if (!panels.catFocus && dBooth < 4.5 && !hud.hasBubble('booth-tofu') && Math.random() < dt * 0.35) {
         hud.say('booth-tofu', pickOne(['Mrrp!', 'Pounce!', '…']), 1.1);
       }
       boothTofuM.group.position.set(boothTofu.x, padBaseY + boothTofu.jumpY, boothTofu.z);
@@ -2224,7 +1843,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     } else begT = 0;
 
     // ---- NPCs ----
-    life.update(dt, time, skyMode);
+    life.update(dt, time, skySys.getMode());
     plaza.update(dt, time);
     hill.update(dt, time);
     strays.update(dt, time);
@@ -2430,7 +2049,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       dv.person.group.position.set(dv.x, GROUND_Y, dv.z);
       dv.person.group.rotation.y = running || cf.x < level.correfoc.x0 - 1 ? Math.PI : Math.sin(time + dv.ox) * 0.6 + Math.PI;
       dv.person.animate(time + dv.ox, { speed: running ? 4 : 0.6, pose: 'walk' });
-      if ((running || skyMode === 'night') && Math.random() < dt * (running ? 30 : 8)) {
+      if ((running || skySys.getMode() === 'night') && Math.random() < dt * (running ? 30 : 8)) {
         const sp = dv.spark.getWorldPosition(tmpV);
         burst(sp.x, sp.y, sp.z, pickOne([0xffe08a, 0xffb020, 0xff7a2a, 0xffffff]), 2, 2.2, 2, 0.5, 6);
       }
@@ -2472,13 +2091,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       fd.m.animate(time + fd.x, { speed: s, dig: false, peeing: false, wag: 0.7, air: false });
     }
     // Particles.
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.t -= dt;
-      p.vy -= p.g * dt;
-      p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
-      if (p.t <= 0) { scene.remove(p.m); particles.splice(i, 1); }
-    }
+    particleSys.update(dt);
     // Fireworks over the Dimoni.
     if (fireworksT > 0) {
       fireworksT -= dt;
@@ -2498,7 +2111,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         audio.firework();
       }
     } else {
-      level.dimoni.glow.intensity = skyMode === 'night' ? 2 : 0;
+      level.dimoni.glow.intensity = skySys.getMode() === 'night' ? 2 : 0;
       // Rebuilt for next year (instantly; it's a game).
       level.dimoni.figure.position.y = 1.3; level.dimoni.figure.rotation.z = 0;
     }
@@ -2528,18 +2141,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     nearStop = found;
     const prompts: { key: string; label: string }[] = [];
     let banner: string | null = null;
-    if (coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
-    else if (catFocus) { banner = 'Eat Prey Nap — click/tap screen to pounce, [P] palette, [S] size, [X] step back'; }
-    else if (podOpen) { banner = 'dopepod — Space play/pause, arrows skip, [X] close'; }
+    if (panels.coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
+    else if (panels.catFocus) { banner = 'Eat Prey Nap — click/tap screen to pounce, [P] palette, [S] size, [X] step back'; }
+    else if (panels.podOpen) { banner = 'dopepod — Space play/pause, arrows skip, [X] close'; }
     else if (nearCoriolis()) { prompts.push({ key: 'X', label: 'Play the LED wall' }); }
     else if (nearCatBooth()) { prompts.push({ key: 'X', label: 'Play Eat Prey Nap' }); }
     else if (nearPodBooth()) { prompts.push({ key: 'X', label: 'Open dopepod' }); }
-    else if (nearStemma()) { prompts.push({ key: 'X', label: stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
-    if (found && !coriolisFocus && !catFocus && !podOpen) {
+    else if (nearStemma()) { prompts.push({ key: 'X', label: panels.stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
+    if (found && !panels.coriolisFocus && !panels.catFocus && !panels.podOpen) {
       prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro to 2D street' : `Visit ${found.label}` });
       banner = banner ?? `${found.label} · ${found.kind}`;
     }
-    if (!coriolisFocus && !catFocus && !podOpen && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
+    if (!panels.coriolisFocus && !panels.catFocus && !panels.podOpen && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
     if (!dog.carrying && ((!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) || (!questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9))) prompts.push({ key: 'G', label: 'Pick up' });
     { const pl = plaza.prompt(); if (pl) prompts.push({ key: 'G', label: pl }); }
     { const hl = hill.prompt(); if (hl) prompts.push(hl); }
@@ -2648,35 +2261,29 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       b.scale.y = lerp(b.scale.y, 0.15 + lv * 2.4, Math.min(1, dt * 14));
       b.position.y = RAMBLA_Y + 0.25 + b.scale.y * 0.5;
     });
-    drawLanes();
+    panels.drawLanes();
 
     // Night lights near the camera.
     lightPoolT -= dt;
     if (lightPoolT <= 0) {
       lightPoolT = 0.4;
-      const lit = SKY[skyMode].lampsOn;
+      const mode = skySys.getMode();
+      const lit = SKY[mode].lampsOn;
       for (let i = 0; i < lampSorted.length; i++) lampSorted[i].d = lampSorted[i].p.distanceToSquared(camLook);
       lampSorted.sort((a, b) => a.d - b.d);
       lampPool.forEach((l, i) => {
         const s = lampSorted[i];
-        l.intensity = lit && s ? (skyMode === 'night' ? 46 : 22) : 0;
+        l.intensity = lit && s ? (mode === 'night' ? 46 : 22) : 0;
         if (s) l.position.set(s.p.x, s.p.y - 0.4, s.p.z);
       });
     }
 
     // Rain follows the camera.
-    if (rain.visible) {
-      rain.position.set(camLook.x, Math.max(0, camLook.y - 2), camLook.z);
-      for (let i = 0; i < RAIN; i++) {
-        rainArr[i * 6 + 1] -= 16 * dt; rainArr[i * 6 + 4] -= 16 * dt;
-        if (rainArr[i * 6 + 1] < -1) { rainArr[i * 6 + 1] += 18; rainArr[i * 6 + 4] += 18; }
-      }
-      rainGeo.attributes.position.needsUpdate = true;
-    }
+    skySys.updateRain(dt, camLook);
     // Water ripples.
     level.waterMat.normalMap!.offset.set(time * 0.012, time * 0.02);
     level.foamMat.opacity = 0.35 + Math.sin(time * 1.3) * 0.2;
-    (level.foamMat as THREE.MeshBasicMaterial).color.setHex(skyMode === 'night' ? 0x9fb3d6 : 0xffffff);
+    (level.foamMat as THREE.MeshBasicMaterial).color.setHex(skySys.getMode() === 'night' ? 0x9fb3d6 : 0xffffff);
 
     // ---- Camera ----
     updateCamera(rawDt, inTunnel);
@@ -2710,13 +2317,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
 
-    // Sun, shadows, and rim light follow the action.
-    sun.position.set(camLook.x + 30, camLook.y + 48, camLook.z + 22);
-    sun.target.position.copy(camLook);
-    sun.target.updateMatrixWorld();
-    rim.position.set(camLook.x - 24, camLook.y + 18, camLook.z - 28);
-    rim.target.position.copy(camLook);
-    rim.target.updateMatrixWorld();
+    skySys.followTarget(camLook);
   };
 
   const UPV = new THREE.Vector3(0, 1, 0);
@@ -2743,13 +2344,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const updateCamera = (dt: number, inTunnel: boolean) => {
     camTargetV.set(dog.x, dog.y, dog.z);
     let rate = 4;
-    if (coriolisFocus) {
+    if (panels.coriolisFocus) {
       rate = frameBooth(level.coriolis.x, level.coriolis.y, level.coriolis.z, 4.7, 6.4);
-    } else if (catFocus) {
+    } else if (panels.catFocus) {
       rate = frameBooth(level.catScreen.x, level.catScreen.y, level.catScreen.z, 4.4, 5.4);
-    } else if (podOpen) {
+    } else if (panels.podOpen) {
       rate = frameBooth(level.dopepod.x - 1.0, GROUND_Y + 1.5, level.dopepod.z - 1.5, 4.4, 5.8);
-    } else if (stemmaOpen) {
+    } else if (panels.stemmaOpen) {
       rate = frameBooth(level.stemma.x - 1.2, GROUND_Y + 1.5, level.stemma.z - 1.5, 4.6, 5.8);
     } else if (camMode === 'follow') {
       if (held.has('BracketLeft')) orbitBy(-dt * 1.8);
@@ -2822,7 +2423,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     fadeUniforms.uFadeB.value.set(dog.x, dog.y + 0.5, dog.z);
     fadeUniforms.uFadeC.value.set(human.x, human.y, human.z);
     // Fade the embankment a little when the camera dips into the underpass.
-    sky.position.copy(camera.position);
+    skySys.sky.position.copy(camera.position);
   };
   const sp2 = () => Math.hypot(dog.vx, dog.vz);
 
@@ -2953,32 +2554,32 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get dogSwimming() { return dogSwimming; },
       get humanSwimming() { return humanSwimming; },
       plaza, hill, strays,
-      get area() { return area; },
+      get area() { return goalSys.getArea(); },
       get whirl() { return whirl; },
       get camMode() { return camMode; },
-      get sky() { return skyMode; },
+      get sky() { return skySys.getMode(); },
       get bones() { return bones; },
       get chase() { return chase; },
       debug,
       booths: {
-        get coriolisFocus() { return coriolisFocus; },
-        get stemmaOpen() { return stemmaOpen; },
-        get catFocus() { return catFocus; },
-        get podOpen() { return podOpen; },
+        get coriolisFocus() { return panels.coriolisFocus; },
+        get stemmaOpen() { return panels.stemmaOpen; },
+        get catFocus() { return panels.catFocus; },
+        get podOpen() { return panels.podOpen; },
         get boothTofu() { return { ...boothTofu }; },
         cat: catSim,
         pod: podSim,
         open: (id: 'coriolis' | 'stemma' | 'eat-prey-nap' | 'dopepod' | null) => {
-          closeOtherBooths();
-          if (id === 'coriolis') toggleCoriolis();
-          else if (id === 'stemma') setStemma(true);
-          else if (id === 'eat-prey-nap') setCat(true);
-          else if (id === 'dopepod') setPod(true);
-          else syncPanels();
+          panels.closeOtherBooths();
+          if (id === 'coriolis') panels.toggleCoriolis();
+          else if (id === 'stemma') panels.setStemma(true);
+          else if (id === 'eat-prey-nap') panels.setCat(true);
+          else if (id === 'dopepod') panels.setPod(true);
+          else panels.syncPanels();
         },
         pounce: (u?: number, v?: number) => {
           const ms = catSim.getMouseState();
-          return triggerCatPounce(u ?? ms.u, v ?? ms.v);
+          return panels.triggerCatPounce(u ?? ms.u, v ?? ms.v);
         },
       },
       collide: (p: { x: number; z: number }, r: number, y: number) => collide(p, r, y),

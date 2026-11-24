@@ -550,6 +550,8 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
 
   // ---- Simulation ----------------------------------------------------------------------
+  // Intentionally kept separate from walk/leash.ts (meter-scale Verlet + pole stick-slip
+  // + whirl) so the 2D home widget stays small and preserves its pixel-space game feel.
   function solveRope() {
     for (let i = 1; i < ROPE_N; i++) {
       const p = rope[i];
