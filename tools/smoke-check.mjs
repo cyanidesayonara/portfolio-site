@@ -122,7 +122,7 @@ const chromeBin = findChrome();
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'santtu-smoke-'));
 const preview = spawn(
   process.execPath,
-  ['node_modules/astro/bin/astro.mjs', 'preview', '--host', '127.0.0.1', '--port', String(PORT)],
+  ['node_modules/astro/bin/astro.mjs', 'preview', '--host', '127.0.0.1', '--port', String(PORT), '--ignore-lock'],
   { stdio: 'ignore' },
 );
 let chrome = null;

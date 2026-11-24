@@ -4,7 +4,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Ground rules
 
-- **Branch:** everything is on `main` and deployed: PR #4 (Phase 4 hill), PR #5 (fullscreen modes and the train handoff), PR #6 (the metro link between both games), PR #7 (Phase 5) and PR #8 (this handover). No PRs are open. Branch from an up-to-date `main` for new work, commit as you go and push.
+- **Branch:** everything is on `main` and deployed: PR #4 (Phase 4 hill), PR #5 (fullscreen modes and the train handoff), PR #6 (the metro link between both games), PR #7 (Phase 5), PR #8 (this handover) and PR #9 (swimming, booths, module split, blog posts and CI tests). Branch from an up-to-date `main` for new work, commit as you go and push.
 - **Never merge to `main` without Santtu's explicit go-ahead.** Merging deploys the site to GitHub Pages (`.github/workflows/pages-deploy.yml`).
 - **Commit messages & PRs:** authored only by Santtu Nykänen. Never add `Co-authored-by` trailers or any AI/agent attribution anywhere (see `AGENTS.md`).
 - **Copy:** American English, professional. Santtu is a generalist developer, not a "game maker". Never invent stats or facts.
