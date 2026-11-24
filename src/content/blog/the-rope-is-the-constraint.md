@@ -1,12 +1,11 @@
 ---
 title: "The rope is the constraint: replacing pivot bookkeeping with a Verlet leash"
 description: "Why separate wrap-pivot state kept breaking on multi-wraps and detaching in Path of Leash Resistance, and how a 24-point Verlet rope solved poles, tangles, and slip-off with one solver."
-date: 2026-11-24
+date: 2026-10-20
 tags: [godot, physics, verlet, testing]
 project: path-of-leash-resistance
 cover: /img/projects/leash-street.jpg
 coverAlt: A dog pulling its human on a long red leash across La Rambla's wavy paving
-draft: true
 ---
 
 In a game called *Path of Leash Resistance*, the leash cannot be decorative. If the drawn strap curves around a lamppost while the physics pulls along the straight line between dog and human, every wrap feels fake.

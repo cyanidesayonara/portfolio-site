@@ -1,12 +1,11 @@
 ---
 title: "Porting a 2D Godot walk into Three.js without blowing up draw calls"
 description: "Notes from building the interactive /walk seafront on this portfolio: translating pixels to meters, merging geometry with DirectBuilder, streaming districts, and porting the leash tests."
-date: 2026-11-24
+date: 2026-11-19
 tags: [threejs, typescript, webgl, physics]
 project: path-of-leash-resistance
 cover: /img/projects/leash-eixample.jpg
 coverAlt: A walk through the Eixample in Path of Leash Resistance
-draft: true
 ---
 
 *Path of Leash Resistance* lives on the portfolio site as a 2D canvas street on the home page and a 3D walkable Catalan seafront town at `/walk`. Bringing the seafront, town blocks, market square, and hillside into a browser WebGL canvas without bundling external 3D art meant solving two problems early: physics scale and draw-call discipline.
