@@ -3,7 +3,8 @@ title: dopepod
 tagline: A podcast player that grew from a Django web app into a Flutter mobile app.
 summary: Discover and listen to thousands of free podcasts. Started as my CS50 final project, rebuilt with Flutter and Django REST Framework.
 kind: Mobile app
-stack: [Flutter, Django REST Framework, PostgreSQL, Celery, Redis, Scrapy]
+stack: [Flutter, Django REST Framework, PostgreSQL, Celery, Redis, Scrapy, Docker]
+years: "2017 to now"
 cover: /img/projects/dop3pod.png
 coverAlt: The dopepod mobile app
 links:
@@ -25,6 +26,10 @@ The original dopepod started life as my CS50 final project. It used Django with 
 
 ![The original web version](/img/projects/dopepod.png)
 
-## Mobile version (v3)
+## Mobile version (`dop3pod`)
 
-Version 3 is a complete rebuild with Flutter and Django. The backend uses Django REST Framework with PostgreSQL, Celery and Redis handle background tasks, and Scrapy spiders keep the podcast directory fresh.
+Version 3 (`dop3pod`) rebuilt the project around a Dockerized Django REST Framework backend and a Flutter client:
+
+- **Backend and indexing:** Django REST Framework backed by PostgreSQL, with Celery workers, Redis for caching and message brokering, and Scrapy spiders keeping the podcast directory and episode feeds updated.
+- **Mobile client:** Flutter app connected to the REST API with podcast search, episode listings, and a persistent audio player overlay with playlist controls.
+- **Ongoing updates:** Following Docker and dependency updates on `dop3pod` (including work on user authentication and player improvements), active development on this third-generation codebase is back underway.

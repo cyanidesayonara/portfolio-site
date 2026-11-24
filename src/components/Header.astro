@@ -1,25 +1,34 @@
 ---
+import { LOCALES, LOCALE_LABELS, LOCALE_NAMES, localePath, stripLocale, switchLocalePath, type Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = 'en' } = Astro.props;
+const ui = getUi(locale);
+
 const nav = [
-  { href: '/projects', label: 'Projects' },
-  { href: '/how-i-build', label: 'How I build' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/about', label: 'About' },
+  { base: '/projects', label: ui.header.nav.projects },
+  { base: '/how-i-build', label: ui.header.nav.howIBuild },
+  { base: '/blog', label: ui.header.nav.blog },
+  { base: '/about', label: ui.header.nav.about },
 ];
-const path = Astro.url.pathname.replace(/\/$/, '') || '/';
-const isCurrent = (href: string) => path === href || path.startsWith(href + '/');
+const path = stripLocale(Astro.url.pathname);
+const isCurrent = (base: string) => path === base || path.startsWith(base + '/');
 ---
 
 <header class="site-header wrap">
-  <a class="brand" href="/">
+  <a class="brand" href={localePath(locale, '/')}>
     <img src="/img/avatar.png" alt="" width="40" height="40" />
     <span>Santtu Nykänen</span>
   </a>
-  <nav aria-label="Main">
+  <nav aria-label={ui.header.navAria}>
     <ul>
       {
         nav.map((item) => (
           <li>
-            <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+            <a href={localePath(locale, item.base)} aria-current={isCurrent(item.base) ? 'page' : undefined}>
               {item.label}
             </a>
           </li>
@@ -28,12 +37,27 @@ const isCurrent = (href: string) => path === href || path.startsWith(href + '/')
     </ul>
   </nav>
   <div class="actions">
-    <button class="theme-toggle" type="button" aria-label="Switch color theme">
+    <div class="lang-switch" role="group" aria-label={ui.header.langSwitcherAria}>
+      {
+        LOCALES.map((loc) => (
+          <a
+            href={switchLocalePath(Astro.url.pathname, loc)}
+            hreflang={loc}
+            lang={loc}
+            title={LOCALE_NAMES[loc]}
+            aria-current={loc === locale ? 'true' : undefined}
+          >
+            {LOCALE_LABELS[loc]}
+          </a>
+        ))
+      }
+    </div>
+    <button class="theme-toggle" type="button" aria-label={ui.header.themeToggleAria}>
       <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"></path>
       </svg>
     </button>
-    <a class="btn btn-primary walk" href="/walk">Walk the site</a>
+    <a class="btn btn-primary walk" href={localePath(locale, '/walk')}>{ui.header.walkCta}</a>
   </div>
 </header>
 
@@ -104,6 +128,33 @@ const isCurrent = (href: string) => path === href || path.startsWith(href + '/')
     align-items: center;
     gap: 8px;
   }
+  .lang-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--bg-sunk);
+  }
+  .lang-switch a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 8px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--ink-2);
+  }
+  .lang-switch a:hover {
+    color: var(--ink);
+  }
+  .lang-switch a[aria-current='true'] {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
   .theme-toggle {
     display: inline-flex;
     align-items: center;
@@ -139,17 +190,32 @@ const isCurrent = (href: string) => path === href || path.startsWith(href + '/')
       height: 28px;
     }
     .actions {
-      gap: 6px;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .lang-switch {
+      padding: 2px;
+    }
+    .lang-switch a {
+      min-height: 30px;
+      padding: 0 6px;
+      font-size: 11px;
     }
     .theme-toggle {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
     }
     .walk {
-      min-height: 38px;
+      min-height: 36px;
       padding: 0 10px;
-      font-size: 13px;
+      font-size: 12.5px;
       white-space: nowrap;
+    }
+    nav a {
+      font-size: 13.5px;
+      padding: 0 6px;
+      min-height: 38px;
     }
   }
   @media (max-width: 720px) {

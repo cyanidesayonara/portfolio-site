@@ -5,64 +5,66 @@
   (/coriolis/coriolis.js + /coriolis/coriolis.wasm) with keyboard controls
   and virtual IR remote buttons.
 */
+import type { Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = 'en' } = Astro.props;
+const ui = getUi(locale).coriolisSim;
 ---
 
-<section class="coriolis-sim" data-coriolis-sim tabindex="0" aria-label="Interactive Coriolis 128 by 128 LED wall emulator">
+<section class="coriolis-sim" data-coriolis-sim tabindex="0" aria-label={ui.sectionAria}>
   <div class="sim-head">
     <div>
-      <span class="sim-badge">Live C++11 emulator · 128×128 LED matrix (WebAssembly)</span>
-      <h2>Try the wall display in your browser</h2>
+      <span class="sim-badge">{ui.badge}</span>
+      <h2>{ui.heading}</h2>
     </div>
-    <div class="quick" role="group" aria-label="Quick scenes">
-      <button type="button" data-scene-idx="0">Clock</button>
-      <button type="button" data-scene-idx="1">Analog</button>
-      <button type="button" data-scene-idx="16">Coriolis</button>
-      <button type="button" data-scene-idx="24">Aurora</button>
-      <button type="button" data-scene-idx="23">Fireplace</button>
-      <button type="button" data-scene-idx="9">Yoga</button>
-      <button type="button" data-scene-idx="10">Exercise</button>
-      <button type="button" data-scene-idx="11">Breathe</button>
-      <button type="button" data-scene-idx="6">Snake</button>
-      <button type="button" data-scene-idx="7">Tetris</button>
-      <button type="button" data-scene-idx="8">Labyrinth</button>
+    <div class="quick" role="group" aria-label={ui.quickAria}>
+      {ui.quickScenes.map((q) => <button type="button" data-scene-idx={q.idx}>{q.label}</button>)}
     </div>
   </div>
 
   <div class="sim-stage">
     <div class="bezel">
-      <canvas width="640" height="640" data-sim-canvas role="img" aria-label="Emulated 128 by 128 LED panel; the current scene and palette are named below it"></canvas>
+      <canvas width="640" height="640" data-sim-canvas role="img" aria-label={ui.canvasAria}></canvas>
       <div class="sim-meta">
-        <span data-sim-scene>Loading emulator…</span>
+        <span data-sim-scene>{ui.loading}</span>
         <span data-sim-palette></span>
       </div>
     </div>
 
-    <div class="remote" aria-label="Virtual IR remote">
-      <p class="remote-label">IR Remote &amp; Controls</p>
+    <div class="remote" aria-label={ui.remoteAria}>
+      <p class="remote-label">{ui.remoteLabel}</p>
       <div class="dpad">
-        <button type="button" class="up" data-key="1" aria-label="Up">▲</button>
-        <button type="button" class="left" data-key="3" aria-label="Left">◀</button>
-        <button type="button" class="ok" data-key="5">OK</button>
-        <button type="button" class="right" data-key="4" aria-label="Right">▶</button>
-        <button type="button" class="down" data-key="2" aria-label="Down">▼</button>
+        <button type="button" class="up" data-key="1" aria-label={ui.upAria}>▲</button>
+        <button type="button" class="left" data-key="3" aria-label={ui.leftAria}>◀</button>
+        <button type="button" class="ok" data-key="5">{ui.okLabel}</button>
+        <button type="button" class="right" data-key="4" aria-label={ui.rightAria}>▶</button>
+        <button type="button" class="down" data-key="2" aria-label={ui.downAria}>▼</button>
       </div>
 
       <div class="cmd-grid">
-        <button type="button" data-cmd="1"><kbd>M</kbd> Launcher</button>
-        <button type="button" data-cmd="2"><kbd>S</kbd> Settings</button>
-        <button type="button" data-cmd="3"><kbd>C</kbd> Clock overlay</button>
-        <button type="button" data-key="6"><kbd>⌫</kbd> Back</button>
-        <button type="button" data-cmd="4"><kbd>Space</kbd> Next scene</button>
-        <button type="button" data-cmd="5"><kbd>H</kbd> Home</button>
-        <button type="button" data-rotate><kbd>R</kbd> Rotate 90°</button>
-        <button type="button" data-night aria-pressed="false"><kbd>N</kbd> Night mode</button>
-        <button type="button" data-audio aria-pressed="false"><kbd>A</kbd> Sound off</button>
-        <a class="full-emu" href="https://cyanidesayonara.github.io/coriolis/#try" rel="noopener">Full showcase →</a>
+        <button type="button" data-cmd="1"><kbd>M</kbd> {ui.launcher}</button>
+        <button type="button" data-cmd="2"><kbd>S</kbd> {ui.settings}</button>
+        <button type="button" data-cmd="3"><kbd>C</kbd> {ui.clockOverlay}</button>
+        <button type="button" data-key="6"><kbd>⌫</kbd> {ui.back}</button>
+        <button type="button" data-cmd="4"><kbd>Space</kbd> {ui.nextScene}</button>
+        <button type="button" data-cmd="5"><kbd>H</kbd> {ui.home}</button>
+        <button type="button" data-rotate><kbd>R</kbd> {ui.rotate}</button>
+        <button type="button" data-night aria-pressed="false"><kbd>N</kbd> {ui.nightMode}</button>
+        <button
+          type="button"
+          data-audio
+          aria-pressed="false"
+          data-label-on={ui.soundOn}
+          data-label-off={ui.soundOff}
+        ><kbd>A</kbd> {ui.soundOff}</button>
+        <a class="full-emu" href="https://cyanidesayonara.github.io/coriolis/#try" rel="noopener">{ui.fullShowcase}</a>
       </div>
 
-      <p class="remote-hint">
-        Click the LED panel or use the remote buttons. Arrows navigate, play Snake/Pong/Tetris/Labyrinth, or switch palettes on ambient scenes.
-      </p>
+      <p class="remote-hint">{ui.hint}</p>
     </div>
   </div>
 </section>
@@ -228,7 +230,8 @@
     const syncAudioBtn = () => {
       if (!audioBtn) return;
       audioBtn.setAttribute('aria-pressed', String(audioEnabled));
-      audioBtn.innerHTML = `<kbd>A</kbd> ${audioEnabled ? 'Sound on' : 'Sound off'}`;
+      const label = audioEnabled ? (audioBtn.dataset.labelOn ?? 'Sound on') : (audioBtn.dataset.labelOff ?? 'Sound off');
+      audioBtn.innerHTML = `<kbd>A</kbd> ${label}`;
     };
     const toggleAudio = () => {
       audioEnabled = !audioEnabled;

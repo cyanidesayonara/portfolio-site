@@ -8,105 +8,106 @@
   `lazy` (the home page) loads the game only when the stage nears the
   viewport, so three.js never weighs down the first paint.
 */
+import type { Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
+
 interface Props {
   lazy?: boolean;
   id?: string;
+  locale?: Locale;
 }
-const { lazy = false, id = 'walk' } = Astro.props;
-
-// The same keys as Path of Leash Resistance's default layout, plus the 3D extras.
-const KEYS = [
-  { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
-  { keys: ['Shift'], label: 'Run' },
-  { keys: ['V'], label: 'Jump' },
-  { keys: ['Space'], label: 'Dig / dig in' },
-  { keys: ['Q'], label: 'Mark' },
-  { keys: ['E'], label: 'Bark' },
-  { keys: ['G'], label: 'Pick up' },
-  { keys: ['X'], label: 'Use' },
-  { keys: ['Enter'], label: 'Go in' },
-  { keys: ['C'], label: 'Camera' },
-  { keys: ['Drag', '[', ']'], label: 'Turn camera' },
-  { keys: ['Wheel', '-', '='], label: 'Zoom' },
-  { keys: ['Tab'], label: 'Goals' },
-  { keys: ['M'], label: 'Map' },
-  { keys: ['N'], label: 'Next song' },
-  { keys: ['R'], label: 'Restart' },
-];
+const { lazy = false, id = 'walk', locale = 'en' } = Astro.props;
+const ui = getUi(locale).walk3d;
+const KEYS = ui.keys;
+const localePrefix = locale === 'en' ? '' : `/${locale}`;
 ---
 
-<figure class="walk3d" data-walk-3d data-lazy={lazy ? '' : undefined} id={id}>
+<figure class="walk3d" data-walk-3d data-locale-prefix={localePrefix} data-lazy={lazy ? '' : undefined} id={id}>
   <div
     class="stage"
     data-stage
     tabindex="0"
     role="application"
     aria-roledescription="game"
-    aria-label="Path of Leash Resistance in 3D, in a Catalan seafront town. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, N skips to the next song, Tab shows the goals. Shift+Tab or Escape leaves the game."
+    aria-label={ui.stageAria}
   >
-    <div class="focus-hint" aria-hidden="true"><span>Click to play</span></div>
+    <div class="focus-hint" aria-hidden="true"><span>{ui.clickToPlay}</span></div>
 
-    <div class="toolbar" role="group" aria-label="Game settings">
-      <button type="button" class="tb" data-sound aria-pressed="false">Sound off</button>
-      <button type="button" class="tb" data-next-song>Next song</button>
-      <span class="seg" role="group" aria-label="Time and weather">
-        <button type="button" class="tb" data-sky="day" aria-pressed="false">Day</button>
-        <button type="button" class="tb" data-sky="rain" aria-pressed="false">Rain</button>
-        <button type="button" class="tb" data-sky="night" aria-pressed="false">Night</button>
+    <div class="toolbar" role="group" aria-label={ui.settingsAria}>
+      <button
+        type="button"
+        class="tb"
+        data-sound
+        aria-pressed="false"
+        data-label-on={ui.soundOn}
+        data-label-off={ui.soundOff}
+      >{ui.soundOff}</button>
+      <button type="button" class="tb" data-next-song>{ui.nextSong}</button>
+      <span class="seg" role="group" aria-label={ui.weatherAria}>
+        <button type="button" class="tb" data-sky="day" aria-pressed="false">{ui.skyDay}</button>
+        <button type="button" class="tb" data-sky="rain" aria-pressed="false">{ui.skyRain}</button>
+        <button type="button" class="tb" data-sky="night" aria-pressed="false">{ui.skyNight}</button>
       </span>
-      <button type="button" class="tb" data-camera>Cam: Street</button>
-      <button type="button" class="tb" data-restart>Restart</button>
-      <span class="seg" role="group" aria-label="Screen">
-        <button type="button" class="tb" data-fs="window" aria-pressed="false" title="Fill the browser window">Fill window</button>
-        <button type="button" class="tb" data-fs="screen" aria-pressed="false" title="Real fullscreen">Fullscreen</button>
+      <button
+        type="button"
+        class="tb"
+        data-camera
+        data-cam-street={ui.camStreet}
+        data-cam-follow={ui.camFollow}
+        data-cam-overhead={ui.camOverhead}
+      >{ui.camStreet}</button>
+      <button type="button" class="tb" data-restart>{ui.restart}</button>
+      <span class="seg" role="group" aria-label={ui.screenAria}>
+        <button type="button" class="tb" data-fs="window" aria-pressed="false" title={ui.fillWindowTitle}>{ui.fillWindow}</button>
+        <button type="button" class="tb" data-fs="screen" aria-pressed="false" title={ui.fullscreenTitle}>{ui.fullscreen}</button>
       </span>
     </div>
 
-    <aside class="panel stemma-panel" data-stemma-panel aria-label="stemma jukebox">
+    <aside class="panel stemma-panel" data-stemma-panel aria-label={ui.stemmaAria}>
       <header>
-        <div><b>stemma</b><span>Real songs, split into stems by stemma. Pick the street's music.</span></div>
-        <button type="button" class="x" data-stemma-close aria-label="Close the jukebox">×</button>
+        <div><b>stemma</b><span>{ui.stemmaSub}</span></div>
+        <button type="button" class="x" data-stemma-close aria-label={ui.stemmaCloseAria}>×</button>
       </header>
       <ul class="songs" data-song-list></ul>
-      <div class="stems" role="group" aria-label="Stems">
-        <button type="button" data-stem="vocals" aria-pressed="true"><i style="--c:#e5487a"></i>Vocals</button>
-        <button type="button" data-stem="drums" aria-pressed="true"><i style="--c:#ffb020"></i>Drums</button>
-        <button type="button" data-stem="bass" aria-pressed="true"><i style="--c:#1fc9b7"></i>Bass</button>
-        <button type="button" data-stem="other" aria-pressed="true"><i style="--c:#8bcb3c"></i>Other</button>
+      <div class="stems" role="group" aria-label={ui.stemsAria}>
+        <button type="button" data-stem="vocals" aria-pressed="true"><i style="--c:#e5487a"></i>{ui.stemVocals}</button>
+        <button type="button" data-stem="drums" aria-pressed="true"><i style="--c:#ffb020"></i>{ui.stemDrums}</button>
+        <button type="button" data-stem="bass" aria-pressed="true"><i style="--c:#1fc9b7"></i>{ui.stemBass}</button>
+        <button type="button" data-stem="other" aria-pressed="true"><i style="--c:#8bcb3c"></i>{ui.stemOther}</button>
       </div>
       <canvas class="lanes" data-stem-lanes width="560" height="132" aria-hidden="true"></canvas>
       <p class="credit" data-song-credit></p>
     </aside>
 
-    <aside class="panel coriolis-panel" data-coriolis-panel aria-label="Coriolis LED wall controls">
-      <header><div><b>Coriolis</b><span>Arrows steer, Enter selects, M opens the launcher.</span></div><button type="button" class="x" data-c-exit aria-label="Step back from the wall">×</button></header>
+    <aside class="panel coriolis-panel" data-coriolis-panel aria-label={ui.coriolisAria}>
+      <header><div><b>Coriolis</b><span>{ui.coriolisSub}</span></div><button type="button" class="x" data-c-exit aria-label={ui.coriolisCloseAria}>×</button></header>
       <div class="remote">
-        <button type="button" data-c-key="Up" aria-label="Up">▲</button>
-        <button type="button" data-c-key="Left" aria-label="Left">◀</button>
-        <button type="button" data-c-key="Select">OK</button>
-        <button type="button" data-c-key="Right" aria-label="Right">▶</button>
-        <button type="button" data-c-key="Down" aria-label="Down">▼</button>
+        <button type="button" data-c-key="Up" aria-label={ui.upAria}>▲</button>
+        <button type="button" data-c-key="Left" aria-label={ui.leftAria}>◀</button>
+        <button type="button" data-c-key="Select">{ui.okLabel}</button>
+        <button type="button" data-c-key="Right" aria-label={ui.rightAria}>▶</button>
+        <button type="button" data-c-key="Down" aria-label={ui.downAria}>▼</button>
       </div>
       <div class="cmds">
-        <button type="button" data-c-cmd="Menu">Launcher</button>
-        <button type="button" data-c-cmd="Settings">Settings</button>
-        <button type="button" data-c-cmd="Next">Next</button>
-        <button type="button" data-c-key="Back">Back</button>
+        <button type="button" data-c-cmd="Menu">{ui.coriolisLauncher}</button>
+        <button type="button" data-c-cmd="Settings">{ui.coriolisSettings}</button>
+        <button type="button" data-c-cmd="Next">{ui.coriolisNext}</button>
+        <button type="button" data-c-key="Back">{ui.coriolisBack}</button>
       </div>
     </aside>
 
-    <div class="touch" role="group" aria-label="Touch controls">
+    <div class="touch" role="group" aria-label={ui.touchAria}>
       <div class="stick" data-stick><i data-knob></i></div>
       <div class="acts">
-        <button type="button" data-touch="KeyV">Jump</button>
-        <button type="button" data-touch="KeyE">Bark</button>
-        <button type="button" data-touch="Space">Dig</button>
-        <button type="button" data-touch="KeyQ">Mark</button>
+        <button type="button" data-touch="KeyV">{ui.touchJump}</button>
+        <button type="button" data-touch="KeyE">{ui.touchBark}</button>
+        <button type="button" data-touch="Space">{ui.touchDig}</button>
+        <button type="button" data-touch="KeyQ">{ui.touchMark}</button>
       </div>
     </div>
   </div>
   <figcaption>
-    <ul class="keys" aria-label="Controls">
+    <ul class="keys" aria-label={ui.controlsAria}>
       {
         KEYS.map((k) => (
           <li>

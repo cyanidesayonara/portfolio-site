@@ -1470,7 +1470,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     else sound.disable();
     if (soundBtn) {
       soundBtn.setAttribute('aria-pressed', String(on));
-      soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+      soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     }
   }
   // Two fullscreen modes: "window" fills the browser window (works everywhere),
@@ -1538,7 +1538,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   if (soundBtn) {
     soundBtn.setAttribute('aria-pressed', String(wantSound));
-    soundBtn.textContent = wantSound ? 'Sound on' : 'Sound off';
+    soundBtn.textContent = wantSound ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     soundBtn.addEventListener('click', () => setSound(!wantSound));
   }
   fig.querySelector<HTMLButtonElement>('[data-restart]')?.addEventListener('click', () => { takeLeash(); restart(); });

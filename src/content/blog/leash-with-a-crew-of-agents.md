@@ -1,14 +1,11 @@
 ---
 title: "Four months, 42 walks: building Path of Leash Resistance with a crew of coding agents"
 description: How one developer shipped a Godot project to the web, itch.io and the Microsoft Store by writing briefs instead of code and reviewing everything that came back.
-date: 2026-11-21
+date: 2026-11-15
 tags: [godot, ai, agents, workflow]
 cover: /img/projects/leash-street.jpg
 coverAlt: A dog pulls its phone-distracted owner across a Barcelona bike lane
-draft: true
 ---
-
-<!-- DRAFT: written from the repository's history and docs. Check the facts, add your own voice and opinions, then set draft to false. -->
 
 On July 10, 2026, I committed a top-down prototype with three things in it: a leash, a human glued to their phone, and some bikes. Four months later, at the v1.75 release, Path of Leash Resistance had 42 walks, eight chases, four statue bosses and five dogs, and it's out on the web, itch.io and the Microsoft Store. The repository has over 2,000 commits and over 600 merged pull requests.
 

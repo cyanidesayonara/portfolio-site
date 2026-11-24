@@ -1,0 +1,32 @@
+---
+import ProjectDetailView from '../../../components/views/ProjectDetailView.astro';
+import { getLocalizedProjects } from '../../../i18n/content';
+import { NON_DEFAULT_LOCALES } from '../../../i18n/utils';
+
+export async function getStaticPaths() {
+  const paths = [];
+  for (const lang of NON_DEFAULT_LOCALES) {
+    const projects = await getLocalizedProjects(lang);
+    const n = projects.length;
+    for (let i = 0; i < n; i++) {
+      const item = projects[i];
+      paths.push({
+        params: { lang, slug: item.slug },
+        props: {
+          locale: lang,
+          slug: item.slug,
+          project: item.entry,
+          isFallback: item.isFallback,
+          prev: projects[(i - 1 + n) % n],
+          next: projects[(i + 1) % n],
+        },
+      });
+    }
+  }
+  return paths;
+}
+
+const { locale, slug, project, isFallback, prev, next } = Astro.props;
+---
+
+<ProjectDetailView locale={locale} slug={slug} project={project} isFallback={isFallback} prev={prev} next={next} />

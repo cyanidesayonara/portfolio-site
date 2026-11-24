@@ -1012,17 +1012,25 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (on) audio.enable(); else audio.disable();
     if (soundBtn) {
       soundBtn.setAttribute('aria-pressed', String(on));
-      soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+      soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
     }
   };
   soundBtn?.addEventListener('click', () => setSound(!audio.on));
   const camBtn = q<HTMLButtonElement>('[data-camera]');
+  const camLabel = (m: CamMode) => {
+    if (!camBtn) return '';
+    return m === 'street'
+      ? (camBtn.dataset.camStreet ?? 'Cam: Street')
+      : m === 'follow'
+        ? (camBtn.dataset.camFollow ?? 'Cam: Follow')
+        : (camBtn.dataset.camOverhead ?? 'Cam: Overhead');
+  };
   const cycleCam = () => {
     camMode = camMode === 'street' ? 'follow' : camMode === 'follow' ? 'overhead' : 'street';
-    if (camBtn) camBtn.textContent = `Cam: ${camMode === 'street' ? 'Street' : camMode === 'follow' ? 'Follow' : 'Overhead'}`;
+    if (camBtn) camBtn.textContent = camLabel(camMode);
   };
   camBtn?.addEventListener('click', cycleCam);
-  const setCamMode = (m: CamMode) => { if (camMode !== m) { camMode = m; if (camBtn) camBtn.textContent = `Cam: ${m === 'street' ? 'Street' : m === 'follow' ? 'Follow' : 'Overhead'}`; } };
+  const setCamMode = (m: CamMode) => { if (camMode !== m) { camMode = m; if (camBtn) camBtn.textContent = camLabel(m); } };
 
   // Camera controls: wheel / − = zoom in any mode; drag / [ ] orbit (switching to follow).
   let camZoom = 1, camPitch = 1, camHandsOff = 0;
@@ -1181,13 +1189,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     departing = false;
     host.querySelectorAll('.loading.depart').forEach((el) => el.remove());
   });
+  const localePrefix = root.dataset.localePrefix ?? '';
+  const withLocale = (href: string) =>
+    localePrefix && href.startsWith('/') && !href.startsWith(`${localePrefix}/`) && href !== localePrefix
+      ? `${localePrefix}${href}`
+      : href;
   const goToStop = (stop: Level['stops'][number]) => {
     if (departing) return;
     if (stop.id === 'station') {
       departing = true;
       releaseAll();
       audio.trainHorn();
-      const dest = new URL(stop.href || '/?via=train', location.origin);
+      const dest = new URL(withLocale(stop.href || '/?via=train'), location.origin);
       if (audio.on) dest.searchParams.set('sound', '1');
       if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
       void playDepartureDoors(host, 'Boarding R1 · Back to 2D street…', reducedMotion).then(() => {
@@ -1200,7 +1213,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       departing = true;
       releaseAll();
       audio.chime();
-      const dest = new URL(stop.href || '/?via=metro', location.origin);
+      const dest = new URL(withLocale(stop.href || '/?via=metro'), location.origin);
       if (audio.on) dest.searchParams.set('sound', '1');
       if (fsMode !== 'off') dest.searchParams.set('fs', fsMode);
       void playDepartureDoors(host, 'Metro L2 · Back to 2D street…', reducedMotion, 'metro').then(() => {
@@ -1208,7 +1221,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       });
       return;
     }
-    location.href = stop.href;
+    location.href = stop.href?.startsWith('/') ? withLocale(stop.href) : stop.href;
   };
 
   q('[data-restart]')?.addEventListener('click', resetWalk);

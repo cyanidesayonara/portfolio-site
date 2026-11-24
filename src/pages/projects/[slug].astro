@@ -1,148 +1,23 @@
 ---
-import { getCollection, render } from 'astro:content';
-import Base from '../../layouts/Base.astro';
-import ProjectPager from '../../components/ProjectPager.astro';
-import CoriolisSim from '../../components/CoriolisSim.astro';
+import ProjectDetailView from '../../components/views/ProjectDetailView.astro';
+import { getLocalizedProjects } from '../../i18n/content';
 
 export async function getStaticPaths() {
-  const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+  const projects = await getLocalizedProjects('en');
   const n = projects.length;
-  return projects.map((project, i) => ({
-    params: { slug: project.id },
-    props: { project, prev: projects[(i - 1 + n) % n], next: projects[(i + 1) % n] },
+  return projects.map((item, i) => ({
+    params: { slug: item.slug },
+    props: {
+      slug: item.slug,
+      project: item.entry,
+      isFallback: item.isFallback,
+      prev: projects[(i - 1 + n) % n],
+      next: projects[(i + 1) % n],
+    },
   }));
 }
 
-const { project, prev, next } = Astro.props;
-const p = project.data;
-const { Content } = await render(project);
+const { slug, project, isFallback, prev, next } = Astro.props;
 ---
 
-<Base title={p.title} description={p.summary} image={p.cover} type="article">
-  <article>
-    <header class="wrap head">
-      <a class="back" href="/projects">All projects</a>
-      <span class="kind" style={`--k: var(--${p.color})`}>{p.kind}{p.years && ` · ${p.years}`}</span>
-      <h1>{p.title}</h1>
-      <p class="tagline">{p.tagline}</p>
-      {
-        p.links.length > 0 && (
-          <ul class="links">
-            {p.links.map((l, i) => (
-              <li>
-                <a class:list={['btn', i === 0 ? 'btn-primary' : 'btn-ghost']} href={l.href}>
-                  {l.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </header>
-
-    <div class="wrap">
-      <div class:list={['cover', { dark: p.coverDark }]}>
-        <img src={p.cover} alt={p.coverAlt} fetchpriority="high" />
-      </div>
-    </div>
-
-    {
-      project.id === 'coriolis' && (
-        <div class="wrap">
-          <CoriolisSim />
-        </div>
-      )
-    }
-
-    <div class="wrap body">
-      <aside class="facts" aria-label="Project facts">
-        <h2>Built with</h2>
-        <ul class="chips">{p.stack.map((s) => <li>{s}</li>)}</ul>
-      </aside>
-      <div class="prose">
-        <Content />
-      </div>
-    </div>
-  </article>
-
-  <div class="section wrap">
-    <ProjectPager prev={prev} next={next} />
-  </div>
-</Base>
-
-<style>
-  .head {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding-block: clamp(24px, 4vw, 48px) 40px;
-  }
-  .back {
-    align-self: flex-start;
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    font-weight: 500;
-  }
-  .back::before {
-    content: '←';
-    margin-right: 8px;
-  }
-  .kind {
-    align-self: flex-start;
-    padding: 6px 14px;
-    border-radius: 999px;
-    background: var(--k);
-    color: var(--navy-deep);
-    font-size: 14px;
-    font-weight: 600;
-  }
-  h1 {
-    font-size: clamp(44px, 7vw, 88px);
-  }
-  .tagline {
-    max-width: 720px;
-    font-size: clamp(19px, 2vw, 22px);
-    color: var(--ink-2);
-  }
-  .links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin: 8px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  .cover {
-    border-radius: var(--radius-l);
-    overflow: hidden;
-    background: var(--bg-sunk);
-  }
-  .cover.dark {
-    background: #000;
-  }
-  .cover img {
-    width: 100%;
-    max-height: 720px;
-    object-fit: contain;
-    margin-inline: auto;
-  }
-  .body {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 40px 64px;
-    padding-block: 56px 24px;
-  }
-  .facts {
-    flex: 1 1 220px;
-    max-width: 300px;
-  }
-  .facts h2 {
-    font-size: 18px;
-    margin-bottom: 12px;
-  }
-  .body .prose {
-    flex: 999 1 560px;
-    min-width: 0;
-  }
-</style>
+<ProjectDetailView locale="en" slug={slug} project={project} isFallback={isFallback} prev={prev} next={next} />

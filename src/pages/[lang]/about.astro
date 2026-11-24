@@ -1,0 +1,12 @@
+---
+import AboutView from '../../components/views/AboutView.astro';
+import { NON_DEFAULT_LOCALES } from '../../i18n/utils';
+
+export function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((lang) => ({ params: { lang } }));
+}
+
+const { lang } = Astro.params;
+---
+
+<AboutView locale={lang} />

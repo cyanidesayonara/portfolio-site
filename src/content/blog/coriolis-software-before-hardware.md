@@ -1,14 +1,11 @@
 ---
 title: "Software before hardware: building an LED wall in a simulator first"
 description: Coriolis has 25 scenes, a launcher, settings and a fitness suite, and the hardware isn't built yet. Here's why I started with a desktop simulator.
-date: 2026-11-21
+date: 2026-11-23
 tags: [hardware, c++, teensy, led, simulation]
 cover: /img/projects/coriolis-aurora.png
 coverAlt: An aurora scene on the Coriolis LED matrix simulator
-draft: true
 ---
-
-<!-- DRAFT: written from the Coriolis PROJECT.md and README. Check the facts, add your own voice, then set draft to false. -->
 
 In 2016 I built Borealis, a 64×64 LED wall, before I knew how to program. I changed some numbers in someone else's code and commented out features until it fit into 64 KB of RAM. It still hangs on my wall.
 

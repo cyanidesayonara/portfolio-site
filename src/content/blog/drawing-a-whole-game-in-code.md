@@ -1,14 +1,11 @@
 ---
 title: "No sprites: drawing a whole Godot game in code"
 description: "Every dog, lamppost, sidewalk tile and cutscene in Path of Leash Resistance is drawn in _draw(). Here's how to keep procedural vector art fast and testable in a web build."
-date: 2026-11-21
+date: 2026-10-27
 tags: [godot, rendering, performance, testing]
 cover: /img/projects/leash-eixample.jpg
 coverAlt: A dog and its human on a Barcelona Eixample street corner drawn entirely with procedural vectors
-draft: true
 ---
-
-<!-- DRAFT: written from the path-of-leash-resistance repo (AGENTS.md and systems/shape_batch.gd). Review, edit in your own voice, then set draft to false. -->
 
 Apart from two font files (`BricolageGrotesque.ttf` and `Inter.ttf`) and a generated `icon.png`, [Path of Leash Resistance](https://github.com/cyanidesayonara/path-of-leash-resistance) the game itself loads no image files. Every dog, passerby, Barcelona storefront, panot sidewalk tile, and side-on chase film is drawn procedurally in GDScript inside `_draw()`, sharing one Trencadís palette defined in `hud/ui_kit.gd`.
 

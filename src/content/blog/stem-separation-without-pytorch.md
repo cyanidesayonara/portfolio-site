@@ -1,14 +1,11 @@
 ---
 title: "Stem separation in Python without PyTorch: ONNX Runtime and DirectML"
 description: "How stemma runs HTDemucs, MDX-Net and beat tracking locally on Windows GPUs and CPUs without shipping the PyTorch runtime."
-date: 2026-11-21
+date: 2026-10-14
 tags: [python, onnx, directml, audio, dsp]
 cover: /img/projects/stemma-takes.png
 coverAlt: stemma mixer showing separated instrument stems and recorded takes
-draft: true
 ---
-
-<!-- DRAFT: written from the stemma repo (PROJECT.md and src/onnx_session.py). Review, edit in your own voice, then set draft to false. -->
 
 Audio ML in Python usually starts with `pip install torch`. For a desktop app, that means shipping a large runtime and still only getting GPU acceleration where that runtime supports the user's hardware.
 

@@ -1,15 +1,21 @@
 ---
 import type { CollectionEntry } from 'astro:content';
+import { parseEntryId } from '../i18n/content';
+import { localePath, type Locale } from '../i18n/utils';
+import { tKind } from '../i18n/ui';
 
 interface Props {
   project: CollectionEntry<'projects'>;
+  locale?: Locale;
+  slug?: string;
   variant?: 'feature' | 'card' | 'compact';
   headingLevel?: 'h2' | 'h3';
 }
 
-const { project, variant = 'card', headingLevel = 'h3' } = Astro.props;
+const { project, locale = 'en', slug, variant = 'card', headingLevel = 'h3' } = Astro.props;
 const p = project.data;
-const href = `/projects/${project.id}`;
+const resolvedSlug = slug ?? parseEntryId(project.id).slug;
+const href = localePath(locale, `/projects/${resolvedSlug}`);
 const H = headingLevel;
 ---
 
@@ -18,7 +24,7 @@ const H = headingLevel;
     <img src={p.cover} alt={p.coverAlt} loading="lazy" decoding="async" style={`object-position: ${p.coverPosition}`} />
   </div>
   <div class="body">
-    <span class="kind" style={`--k: var(--${p.color})`}>{p.kind}</span>
+    <span class="kind" style={`--k: var(--${p.color})`}>{tKind(locale, p.kind)}</span>
     <H class="title">{p.title}</H>
     <p class="tagline">{p.tagline}</p>
     {variant !== 'compact' && <p class="stack">{p.stack.join(' · ')}</p>}

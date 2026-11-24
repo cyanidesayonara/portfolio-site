@@ -6,6 +6,13 @@ export default defineConfig({
   site: 'https://santtu.fyi',
   trailingSlash: 'ignore',
   integrations: [sitemap()],
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'es', 'ca'],
+    routing: {
+      prefixDefaultLocale: false,
+    },
+  },
   // Old Jekyll/Chirpy URLs, so existing links keep working.
   redirects: {
     '/about-me': '/about',
@@ -19,7 +26,10 @@ export default defineConfig({
     '/posts/monitorimittari': '/projects/monitorimittari',
     '/posts/noteowl': '/projects/noteowl',
     '/posts/varastolista': '/projects/varastolista',
-    '/posts/trivialpurrsuit': '/projects/trivial-purrsuit',
+    '/posts/trivialpurrsuit': '/projects/eat-prey-nap',
+    '/projects/trivial-purrsuit': '/projects/eat-prey-nap',
+    '/es/projects/trivial-purrsuit': '/es/projects/eat-prey-nap',
+    '/ca/projects/trivial-purrsuit': '/ca/projects/eat-prey-nap',
     '/posts/comparing-claude-versions-building-expense-app': '/blog/comparing-claude-versions',
   },
   markdown: {

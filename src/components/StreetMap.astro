@@ -7,48 +7,49 @@
   The row of links under the street is the real navigation: it works
   without JavaScript, and it lights up when Millie reaches a shop.
 */
-const STOPS = [
-  { id: 'leash', label: 'Path of Leash Resistance', short: 'Leash', kind: 'Game', href: '/projects/path-of-leash-resistance', color: '#ffb020', ink: '#0b1430' },
-  { id: 'stemma', label: 'stemma', short: 'stemma', kind: 'Music app', href: '/projects/stemma', color: '#1fc9b7', ink: '#0b1430' },
-  { id: 'coriolis', label: 'Coriolis', short: 'Coriolis', kind: 'LED wall', href: '/projects/coriolis', color: '#0b0b0b', ink: '#5eea8c' },
-  { id: 'blog', label: 'Blog', short: 'Blog', kind: '', href: '/blog', color: '#e5487a', ink: '#0b1430' },
-  { id: 'how', label: 'How I build', short: 'How I build', kind: '', href: '/how-i-build', color: '#14203d', ink: '#f4f1ea' },
-  { id: 'about', label: 'About', short: 'About', kind: '', href: '/about', color: '#8bcb3c', ink: '#0b1430' },
-  { id: 'station', label: 'Estació', short: 'Estació (3D)', kind: 'Train to 3D', href: '/walk?via=train', color: '#e5302a', ink: '#f4f1ea' },
-  { id: 'metro', label: 'Metro', short: 'Metro (3D)', kind: 'Metro to 3D', href: '/walk?via=metro', color: '#9b2d8f', ink: '#f4f1ea' },
-  { id: 'park', label: 'The park', short: 'Park', kind: 'Off-leash', href: '/walk', color: '#5f9e4a', ink: '#0b1430' },
-];
-// The same keys as Path of Leash Resistance's default layout.
-const KEYS = [
-  { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
-  { keys: ['Shift'], label: 'Run' },
-  { keys: ['Space'], label: 'Dig in' },
-  { keys: ['Q'], label: 'Mark' },
-  { keys: ['F'], label: 'Squat' },
-  { keys: ['G'], label: 'Pick up' },
-  { keys: ['E'], label: 'Bark' },
-  { keys: ['Enter'], label: 'Go in' },
-  { keys: ['Tab'], label: 'Goals' },
-  { keys: ['R'], label: 'Restart' },
-  { keys: ['Esc'], label: 'Leave' },
-];
+import { localePath, type Locale } from '../i18n/utils';
+import { getUi } from '../i18n/ui';
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = 'en' } = Astro.props;
+const ui = getUi(locale).streetMap;
+
+const STOPS = ui.stops.map((s) => ({
+  id: s.id,
+  label: s.label,
+  short: s.short,
+  kind: s.kind,
+  href: localePath(locale, s.path),
+  color: s.color,
+  ink: s.ink,
+}));
+const KEYS = ui.keys;
 ---
 
-<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label="Playable street, with the same controls as Path of Leash Resistance: WASD or arrows move, Shift runs, Space digs in, Q marks a spot, F squats, G picks up, E barks, Tab shows the goals and Enter goes into a shop." aria-describedby="street-caption">
+<figure class="street" data-street data-stops={JSON.stringify(STOPS)} tabindex="0" aria-label={ui.ariaLabel} aria-describedby="street-caption">
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
   </div>
   <figcaption>
     <div class="bar">
-      <p id="street-caption" class="caption" data-caption aria-live="polite">Pick a stop.</p>
+      <p id="street-caption" class="caption" data-caption aria-live="polite">{ui.defaultCaption}</p>
       <div class="tools">
-        <button class="sound" type="button" data-sound aria-pressed="false">Sound off</button>
-        <button class="sound" type="button" data-restart>Restart</button>
-        <button class="sound" type="button" data-fs="window" aria-pressed="false" title="Fill the browser window">Fill window</button>
-        <button class="sound" type="button" data-fs="screen" aria-pressed="false" title="Real fullscreen">Fullscreen</button>
+        <button
+          class="sound"
+          type="button"
+          data-sound
+          aria-pressed="false"
+          data-label-on={ui.soundOn}
+          data-label-off={ui.soundOff}
+        >{ui.soundOff}</button>
+        <button class="sound" type="button" data-restart>{ui.restart}</button>
+        <button class="sound" type="button" data-fs="window" aria-pressed="false" title={ui.fillWindowTitle}>{ui.fillWindow}</button>
+        <button class="sound" type="button" data-fs="screen" aria-pressed="false" title={ui.fullscreenTitle}>{ui.fullscreen}</button>
       </div>
     </div>
-    <ul class="keys" aria-label="Controls">
+    <ul class="keys" aria-label={ui.controlsAria}>
       {
         KEYS.map((k) => (
           <li>
@@ -62,7 +63,7 @@ const KEYS = [
         ))
       }
     </ul>
-    <ul class="stops" aria-label="Stops on the street">
+    <ul class="stops" aria-label={ui.stopsAria}>
       {
         STOPS.map((s) => (
           <li>
