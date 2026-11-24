@@ -196,6 +196,7 @@ export interface UiDictionary {
     soundOn: string;
     fullShowcase: string;
     hint: string;
+    noscriptNote: string;
   };
   streetMap: {
     ariaLabel: string;
@@ -212,6 +213,8 @@ export interface UiDictionary {
     tryBooth: string;
     closeBooth: string;
     openPage: string;
+    noscriptTitle: string;
+    noscriptNote: string;
     stops: StopSpec[];
     keys: KeySpec[];
   };
@@ -274,6 +277,10 @@ export interface UiDictionary {
     podPlay: string;
     podPrev: string;
     podNext: string;
+    noscriptTitle: string;
+    noscriptBody: string;
+    noscriptCtaProjects: string;
+    noscriptCtaHome: string;
     controlsAria: string;
     keys: KeySpec[];
   };
@@ -518,6 +525,7 @@ export const UI: Record<Locale, UiDictionary> = {
       soundOn: 'Sound on',
       fullShowcase: 'Full showcase →',
       hint: 'Click the LED panel or use the remote buttons. Arrows navigate, play Snake/Pong/Tetris/Labyrinth, or switch palettes on ambient scenes.',
+      noscriptNote: 'Static preview shown while scripts are disabled. Enable JavaScript for the live 128×128 WebAssembly emulator, or open the standalone showcase.',
     },
     streetMap: {
       ariaLabel:
@@ -535,6 +543,8 @@ export const UI: Record<Locale, UiDictionary> = {
       tryBooth: 'Try',
       closeBooth: 'Close',
       openPage: 'Project page',
+      noscriptTitle: 'A walk down Carrer del Mar',
+      noscriptNote: 'Scripts are blocked or disabled, so every storefront on the street is linked below. Enable scripts anytime for the playable 2D walk.',
       stops: [
         { id: 'dopepod', label: 'dopepod', short: 'dopepod', kind: 'Podcasts', path: '/projects/dopepod', color: '#d94ca6', ink: '#f4f1ea' },
         { id: 'eat-prey-nap', label: 'Eat Prey Nap', short: 'Eat Prey Nap', kind: 'Cat game', path: '/projects/eat-prey-nap', color: '#f0c44d', ink: '#0b1430' },
@@ -623,6 +633,10 @@ export const UI: Record<Locale, UiDictionary> = {
       podPlay: 'Play',
       podPrev: 'Prev',
       podNext: 'Next',
+      noscriptTitle: 'The 3D seafront walk requires JavaScript & WebGL',
+      noscriptBody: 'Scripts are currently disabled or blocked. You can browse every project page, post, and build guide across the site cleanly without JavaScript.',
+      noscriptCtaProjects: 'Browse all projects',
+      noscriptCtaHome: 'Back to home',
       controlsAria: 'Controls',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
@@ -883,6 +897,7 @@ export const UI: Record<Locale, UiDictionary> = {
       soundOn: 'Sonido sí',
       fullShowcase: 'Web completa →',
       hint: 'Haz clic en el panel LED o usa los botones del mando. Las flechas navegan, juegan a Snake/Pong/Tetris/Laberinto o cambian de paleta en escenas ambientales.',
+      noscriptNote: 'Vista previa estática mientras los scripts están desactivados. Activa JavaScript para usar el emulador WebAssembly 128×128 o abre la web del proyecto.',
     },
     streetMap: {
       ariaLabel:
@@ -900,6 +915,8 @@ export const UI: Record<Locale, UiDictionary> = {
       tryBooth: 'Probar',
       closeBooth: 'Cerrar',
       openPage: 'Ficha',
+      noscriptTitle: 'Un paseo por Carrer del Mar',
+      noscriptNote: 'Los scripts están bloqueados o desactivados, así que cada local de la calle está enlazado abajo. Activa JavaScript cuando quieras para el paseo jugable en 2D.',
       stops: [
         { id: 'dopepod', label: 'dopepod', short: 'dopepod', kind: 'Podcasts', path: '/projects/dopepod', color: '#d94ca6', ink: '#f4f1ea' },
         { id: 'eat-prey-nap', label: 'Eat Prey Nap', short: 'Eat Prey Nap', kind: 'Juego gato', path: '/projects/eat-prey-nap', color: '#f0c44d', ink: '#0b1430' },
@@ -988,6 +1005,10 @@ export const UI: Record<Locale, UiDictionary> = {
       podPlay: 'Reproducir',
       podPrev: 'Anterior',
       podNext: 'Siguiente',
+      noscriptTitle: 'El paseo 3D necesita JavaScript y WebGL',
+      noscriptBody: 'Los scripts están desactivados o bloqueados. Puedes explorar igualmente todos los proyectos, artículos y guías técnicas sin JavaScript.',
+      noscriptCtaProjects: 'Ver proyectos',
+      noscriptCtaHome: 'Volver al inicio',
       controlsAria: 'Controles',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Mover' },
@@ -1248,6 +1269,7 @@ export const UI: Record<Locale, UiDictionary> = {
       soundOn: 'So sí',
       fullShowcase: 'Web completa →',
       hint: 'Fes clic al panell LED o fes servir els botons del comandament. Les fletxes naveguen, juguen a Snake/Pong/Tetris/Laberint o canvien la paleta a les escenes ambientals.',
+      noscriptNote: 'Previsualització estàtica mentre els scripts estan desactivats. Activa JavaScript per a l’emulador WebAssembly 128×128 o obre el web del projecte.',
     },
     streetMap: {
       ariaLabel:
@@ -1265,6 +1287,8 @@ export const UI: Record<Locale, UiDictionary> = {
       tryBooth: 'Prova',
       closeBooth: 'Tanca',
       openPage: 'Fitxa',
+      noscriptTitle: 'Un passeig per Carrer del Mar',
+      noscriptNote: 'Els scripts estan blocats o desactivats; cada local del carrer té el seu enllaç a sota. Activa JavaScript quan vulguis per al passeig jugable en 2D.',
       stops: [
         { id: 'dopepod', label: 'dopepod', short: 'dopepod', kind: 'Podcasts', path: '/projects/dopepod', color: '#d94ca6', ink: '#f4f1ea' },
         { id: 'eat-prey-nap', label: 'Eat Prey Nap', short: 'Eat Prey Nap', kind: 'Joc de gat', path: '/projects/eat-prey-nap', color: '#f0c44d', ink: '#0b1430' },
@@ -1353,6 +1377,10 @@ export const UI: Record<Locale, UiDictionary> = {
       podPlay: 'Reprodueix',
       podPrev: 'Anterior',
       podNext: 'Següent',
+      noscriptTitle: 'El passeig 3D necessita JavaScript i WebGL',
+      noscriptBody: 'Els scripts estan desactivats o blocats. Pots llegir igualment tots els projectes, articles i guies tècniques sense JavaScript.',
+      noscriptCtaProjects: 'Mostra els projectes',
+      noscriptCtaHome: 'Torna a l’inici',
       controlsAria: 'Controls',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Mou-te' },

@@ -8,7 +8,7 @@
   `lazy` (the home page) loads the game only when the stage nears the
   viewport, so three.js never weighs down the first paint.
 */
-import type { Locale } from '../i18n/utils';
+import { localePath, type Locale } from '../i18n/utils';
 import { getUi } from '../i18n/ui';
 
 interface Props {
@@ -20,9 +20,40 @@ const { lazy = false, id = 'walk', locale = 'en' } = Astro.props;
 const ui = getUi(locale).walk3d;
 const KEYS = ui.keys;
 const localePrefix = locale === 'en' ? '' : `/${locale}`;
+const fallbackLinks = [
+  { label: 'Path of Leash Resistance', href: localePath(locale, '/projects/path-of-leash-resistance') },
+  { label: 'stemma', href: localePath(locale, '/projects/stemma') },
+  { label: 'Coriolis', href: localePath(locale, '/projects/coriolis') },
+  { label: 'Eat Prey Nap', href: localePath(locale, '/projects/eat-prey-nap') },
+  { label: 'dopepod', href: localePath(locale, '/projects/dopepod') },
+  { label: 'Blog', href: localePath(locale, '/blog') },
+  { label: 'About', href: localePath(locale, '/about') },
+];
 ---
 
 <figure class="walk3d" data-walk-3d data-locale-prefix={localePrefix} data-lazy={lazy ? '' : undefined} id={id}>
+  <div class="walk-fallback">
+    <img
+      class="wf-img"
+      src="/img/projects/leash-street.jpg"
+      alt="Path of Leash Resistance street screenshot"
+      width="1200"
+      height="675"
+      loading="lazy"
+      decoding="async"
+    />
+    <div class="wf-copy">
+      <h2>{ui.noscriptTitle}</h2>
+      <p>{ui.noscriptBody}</p>
+      <div class="wf-actions">
+        <a class="wf-btn primary" href={localePath(locale, '/projects')}>{ui.noscriptCtaProjects}</a>
+        <a class="wf-btn" href={localePath(locale, '/')}>{ui.noscriptCtaHome}</a>
+      </div>
+      <ul class="wf-links">
+        {fallbackLinks.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+      </ul>
+    </div>
+  </div>
   <div
     class="stage"
     data-stage
@@ -178,6 +209,87 @@ const localePrefix = locale === 'en' ? '' : `/${locale}`;
     background: var(--feature-bg);
     overflow: hidden;
     border: 1px solid var(--line);
+  }
+  .walk-fallback {
+    display: none;
+  }
+  :global(html:not(.js)) .walk-fallback {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) 1fr;
+    gap: 24px;
+    align-items: center;
+    padding: clamp(20px, 3.5vw, 34px);
+    color: var(--feature-ink);
+  }
+  :global(html:not(.js)) .stage,
+  :global(html:not(.js)) figcaption {
+    display: none;
+  }
+  .wf-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-m);
+    object-fit: cover;
+  }
+  .wf-copy h2 {
+    margin: 0 0 10px;
+    font: 800 clamp(22px, 3vw, 30px)/1.15 var(--font-display);
+    color: var(--feature-ink);
+  }
+  .wf-copy p {
+    margin: 0 0 18px;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--feature-ink-2);
+  }
+  .wf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .wf-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    color: var(--feature-ink);
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .wf-btn.primary {
+    background: var(--saffron);
+    border-color: var(--saffron);
+    color: var(--navy-deep);
+  }
+  .wf-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .wf-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--feature-ink);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  @media (max-width: 780px) {
+    :global(html:not(.js)) .walk-fallback {
+      grid-template-columns: 1fr;
+    }
   }
   .walk3d:global(.immersive) {
     /* Sized to the visible viewport (--vv-*, set by trackVisibleViewport) so the

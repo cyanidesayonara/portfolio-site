@@ -39,6 +39,33 @@ const KEYS = ui.keys;
   aria-label={ui.ariaLabel}
   aria-describedby="street-caption"
 >
+  <div class="static-street">
+    <svg class="static-skyline" viewBox="0 0 640 108" width="640" height="108" aria-hidden="true">
+      <rect width="640" height="68" fill="#14203d" />
+      <rect y="68" width="640" height="24" fill="#e4dbca" />
+      <rect y="92" width="640" height="16" fill="#4a4f5c" />
+      <rect x="20" y="16" width="84" height="52" rx="4" fill="#212d54" />
+      <rect x="20" y="16" width="84" height="8" fill="#d94ca6" />
+      <rect x="114" y="12" width="92" height="56" rx="4" fill="#f4f1ea" />
+      <rect x="114" y="12" width="92" height="8" fill="#f0c44d" />
+      <rect x="216" y="14" width="102" height="54" rx="4" fill="#f4f1ea" />
+      <rect x="216" y="14" width="102" height="8" fill="#ffb020" />
+      <rect x="328" y="16" width="88" height="52" rx="4" fill="#f4f1ea" />
+      <rect x="328" y="16" width="88" height="8" fill="#1fc9b7" />
+      <rect x="426" y="14" width="92" height="54" rx="4" fill="#0b0b0b" />
+      <rect x="426" y="14" width="92" height="8" fill="#5eea8c" />
+      <rect x="528" y="18" width="92" height="50" rx="4" fill="#f4f1ea" />
+      <rect x="528" y="18" width="92" height="8" fill="#e5487a" />
+      <ellipse cx="268" cy="80" rx="10" ry="6" fill="#1b1b1f" />
+      <circle cx="280" cy="79" r="5" fill="#1b1b1f" />
+      <line x1="258" y1="80" x2="236" y2="76" stroke="#d9403a" stroke-width="2.5" stroke-linecap="round" />
+      <circle cx="233" cy="76" r="6" fill="#1fc9b7" />
+    </svg>
+    <div class="static-copy">
+      <h3>{ui.noscriptTitle}</h3>
+      <p>{ui.noscriptNote}</p>
+    </div>
+  </div>
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
     <aside class="retro-booth" data-retro-booth hidden aria-live="polite">
@@ -89,9 +116,10 @@ const KEYS = ui.keys;
     <ul class="stops" aria-label={ui.stopsAria}>
       {
         STOPS.map((s) => (
-          <li>
+          <li data-stop-item={s.id}>
             <a href={s.href} data-stop={s.id} style={`--c:${s.color};--i:${s.ink}`}>
-              {s.short}
+              <span class="stop-name">{s.short}</span>
+              {s.kind && <span class="stop-kind">{s.kind}</span>}
             </a>
           </li>
         ))
@@ -301,6 +329,7 @@ const KEYS = ui.keys;
   .stops a {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     min-height: 44px;
     padding: 0 16px;
     border-radius: 999px;
@@ -310,6 +339,9 @@ const KEYS = ui.keys;
     text-decoration: none;
     transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   }
+  .stop-kind {
+    display: none;
+  }
   .stops a:hover,
   .stops a:global(.near) {
     background: var(--c);
@@ -318,6 +350,84 @@ const KEYS = ui.keys;
   }
   .stops a:global(.near) {
     transform: translateY(-2px);
+  }
+  .static-street {
+    display: none;
+  }
+  :global(html:not(.js)) .static-street {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) 1fr;
+    gap: 18px;
+    align-items: center;
+    padding: clamp(16px, 3vw, 24px);
+    background: var(--feature-bg);
+    color: var(--feature-ink);
+  }
+  .static-skyline {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-s);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .static-copy h3 {
+    margin: 0 0 6px;
+    font: 800 clamp(20px, 2.8vw, 26px)/1.15 var(--font-display);
+    color: var(--feature-ink);
+  }
+  .static-copy p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--feature-ink-2);
+  }
+  :global(html:not(.js)) .bar {
+    display: none;
+  }
+  :global(html:not(.js)) .stops {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 10px;
+  }
+  :global(html:not(.js)) [data-stop-item='station'],
+  :global(html:not(.js)) [data-stop-item='metro'],
+  :global(html:not(.js)) [data-stop-item='park'] {
+    display: none;
+  }
+  :global(html:not(.js)) .stops a {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    min-height: 54px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--c);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  :global(html:not(.js)) .stops a:hover {
+    background: var(--c);
+    border-color: var(--c);
+    color: var(--i);
+  }
+  :global(html:not(.js)) .stops a:hover .stop-kind {
+    color: var(--i);
+    opacity: 0.85;
+  }
+  :global(html:not(.js)) .stop-kind {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  @media (max-width: 720px) {
+    :global(html:not(.js)) .static-street {
+      grid-template-columns: 1fr;
+    }
   }
 
   .retro-booth {

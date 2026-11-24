@@ -170,6 +170,9 @@ const isCurrent = (base: string) => path === base || path.startsWith(base + '/')
   .theme-toggle:hover {
     background: var(--bg-sunk);
   }
+  :global(html:not(.js)) .theme-toggle {
+    display: none;
+  }
   .walk {
     min-height: 44px;
     font-size: 15px;

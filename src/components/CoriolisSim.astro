@@ -28,6 +28,15 @@ const ui = getUi(locale).coriolisSim;
 
   <div class="sim-stage">
     <div class="bezel">
+      <img
+        class="sim-poster"
+        src="/img/projects/coriolis-aurora.png"
+        alt="Coriolis 128 by 128 LED wall running the Aurora scene"
+        width="640"
+        height="640"
+        loading="lazy"
+        decoding="async"
+      />
       <canvas width="640" height="640" data-sim-canvas role="img" aria-label={ui.canvasAria}></canvas>
       <div class="sim-meta">
         <span data-sim-scene>{ui.loading}</span>
@@ -37,6 +46,7 @@ const ui = getUi(locale).coriolisSim;
 
     <div class="remote" aria-label={ui.remoteAria}>
       <p class="remote-label">{ui.remoteLabel}</p>
+      <p class="sim-noscript-note">{ui.noscriptNote}</p>
       <div class="dpad">
         <button type="button" class="up" data-key="1" aria-label={ui.upAria}>▲</button>
         <button type="button" class="left" data-key="3" aria-label={ui.leftAria}>◀</button>
@@ -394,6 +404,7 @@ const ui = getUi(locale).coriolisSim;
       })
       .catch((err) => {
         console.error('Coriolis WASM emulator error:', err);
+        root.classList.add('sim-fallback');
         if (sceneEl) sceneEl.textContent = 'Emulator unavailable';
       });
   }
@@ -584,5 +595,48 @@ const ui = getUi(locale).coriolisSim;
     font-size: 13px;
     color: var(--ink-soft-dark);
     line-height: 1.5;
+  }
+  .sim-poster,
+  .sim-noscript-note {
+    display: none;
+  }
+  .sim-poster {
+    width: 100%;
+    max-width: 560px;
+    aspect-ratio: 1;
+    height: auto;
+    margin-inline: auto;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+  .sim-noscript-note {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-soft-dark);
+  }
+  :global(html:not(.js)) .coriolis-sim canvas,
+  :global(html:not(.js)) .coriolis-sim .sim-meta,
+  :global(html:not(.js)) .coriolis-sim .quick,
+  :global(html:not(.js)) .coriolis-sim .dpad,
+  :global(html:not(.js)) .coriolis-sim .cmd-grid button,
+  :global(html:not(.js)) .coriolis-sim .remote-hint,
+  .coriolis-sim:global(.sim-fallback) canvas,
+  .coriolis-sim:global(.sim-fallback) .sim-meta,
+  .coriolis-sim:global(.sim-fallback) .quick,
+  .coriolis-sim:global(.sim-fallback) .dpad,
+  .coriolis-sim:global(.sim-fallback) .cmd-grid button,
+  .coriolis-sim:global(.sim-fallback) .remote-hint {
+    display: none;
+  }
+  :global(html:not(.js)) .coriolis-sim .sim-poster,
+  :global(html:not(.js)) .coriolis-sim .sim-noscript-note,
+  .coriolis-sim:global(.sim-fallback) .sim-poster,
+  .coriolis-sim:global(.sim-fallback) .sim-noscript-note {
+    display: block;
+  }
+  :global(html:not(.js)) .coriolis-sim .cmd-grid .full-emu,
+  .coriolis-sim:global(.sim-fallback) .cmd-grid .full-emu {
+    grid-column: 1 / -1;
   }
 </style>
