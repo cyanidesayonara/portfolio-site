@@ -1379,15 +1379,14 @@ const fallbackLinks = [
       right: 8px;
       bottom: 8px;
       width: auto;
-      max-height: 38%;
-      overflow: hidden;
+      max-height: 50%;
+      overflow: hidden auto;
       padding: 8px 10px;
       border-radius: 12px;
     }
     .panel header { align-items: center; margin-bottom: 6px; }
     .panel header b { font-size: 14px; }
     .panel header span { display: none; }
-    .panel .x { width: 26px; height: 26px; font-size: 16px; }
     .coriolis-controls {
       display: grid;
       grid-template-columns: auto 1fr;
@@ -1395,8 +1394,6 @@ const fallbackLinks = [
       align-items: center;
     }
     .remote {
-      grid-template-columns: repeat(3, 34px);
-      grid-template-rows: repeat(3, 28px);
       gap: 3px;
     }
     .remote button { font-size: 11px; }
@@ -1405,7 +1402,7 @@ const fallbackLinks = [
       gap: 4px;
       margin-top: 0;
     }
-    .cmds button { min-height: 30px; font-size: 11px; padding: 0 6px; }
+    .cmds button { font-size: 11px; padding: 0 6px; }
     .songs {
       grid-auto-flow: column;
       grid-auto-columns: 152px;
@@ -1416,17 +1413,41 @@ const fallbackLinks = [
     .songs :global(button) { padding: 4px 8px; overflow: hidden; }
     .songs :global(button b) { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .songs :global(button span) { font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .stems button { min-height: 28px; font-size: 11px; gap: 4px; }
+    .stems button { font-size: 11px; gap: 4px; }
     .lanes { height: 40px; margin-top: 6px; }
     .credit { display: none; }
     .cat-controls { gap: 4px; }
     .cat-controls button,
     .pod-transport button,
-    .pod-shows button { min-height: 28px; padding: 4px 8px; font-size: 11px; }
+    .pod-shows button { padding: 4px 8px; font-size: 11px; }
     .pod-now { margin-bottom: 5px; font-size: 11px; }
     .pod-shows { margin-top: 5px; }
   }
+  /* Finger-sized panel buttons wherever the drawers dock or the pointer is coarse. */
+  @media (max-width: 720px), (max-height: 520px), (pointer: coarse) {
+    .panel .x { width: 44px; height: 44px; margin: -4px -4px 0 0; font-size: 20px; }
+    .remote { grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 44px); }
+    .cmds button,
+    .songs :global(button),
+    .stems button,
+    .cat-controls button,
+    .pod-transport button,
+    .pod-shows button { min-height: 44px; }
+  }
+  /* Short screens: one row of controls, so big buttons still leave the booth screen visible. */
   @media (max-height: 520px) {
     .lanes { display: none; }
+    .panel header { margin-bottom: 2px; }
+    .remote { grid-template-columns: repeat(5, 44px); grid-template-rows: 44px; }
+    .remote button:nth-child(n) { grid-column: auto; grid-row: 1; }
+    .cmds { grid-template-columns: repeat(4, 1fr); }
+    .stemma-panel,
+    .pod-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 8px; }
+    .stemma-panel header,
+    .pod-panel header,
+    .pod-now { grid-column: 1 / -1; }
+    .songs { margin-bottom: 0; }
+    .stems { align-items: start; }
+    .pod-shows { margin-top: 0; }
   }
 </style>
