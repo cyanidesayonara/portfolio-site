@@ -35,13 +35,14 @@ The leash is real rope. The one you see is the one doing the physics: it wraps p
 
 ## What's in it
 
-- **Fifty-one walks in and around Barcelona**, from La Rambla and El Gòtic to Montjuïc, Sitges, Girona, Tarragona, Vic and Montserrat, plus a tutorial walk that teaches one trick at a time. Each walk can be played in any weather, by day or at night.
-- **Ten chases**: a street sweeper at dawn, wild boars, the correfoc's fire devils through Gràcia, the Dimoni's firework float, airport security, Les Atraccions' mascot chase, a runaway snow groomer down La Molina, and wild goats down Montserrat among them.
-- **Five statue bosses**: El Mamut, El Drac the mosaic salamander, Els Lleons, La Lleona in Girona, and El Gat.
-- **Seven dogs**, each with a knack and skill goal of her own, plus buried finds, training, collars, bandanas and coats.
+- **Walks in and around Barcelona**, from La Rambla and El Gòtic to Montjuïc, Sitges, Girona and Montserrat, plus a tutorial that teaches one trick at a time. Each walk can be played in any weather, by day or at night.
+- **Chases and statue bosses**, from a street sweeper at dawn to El Drac, the mosaic salamander.
+- **A choice of dogs**, each with a knack and skill goal of her own, plus buried finds, training, collars, bandanas and coats.
 - **Dares and combo tricks**: swing round a pole, grind a ledge, fling your human, or take a dare for its own tune.
-- **Nine skies and six times of day**, in English, Catalan and Spanish, with adjustable screen shake, flashes, text size and controls.
+- **English, Catalan and Spanish**, with adjustable screen shake, flashes, text size and controls.
 - No ads, no purchases, no account. Plays offline.
+
+The game keeps growing, so the full list of walks, dogs, chases and bosses, along with what's new, lives on [the game's own site](https://cyanidesayonara.github.io/path-of-leash-resistance/).
 
 ![Outrunning the street sweeper chase](/img/projects/leash-sweeper.webp)
 

@@ -6,7 +6,7 @@ import PostList from '../PostList.astro';
 import CoriolisSim from '../CoriolisSim.astro';
 import { getPostsForProject, type LocalizedEntry } from '../../i18n/content';
 import projectMeta from '../../data/project-meta.json';
-import { localePath, type Locale } from '../../i18n/utils';
+import { BCP47, localePath, type Locale } from '../../i18n/utils';
 import { getUi, tKind } from '../../i18n/ui';
 
 interface Props {
@@ -23,7 +23,20 @@ const ui = getUi(locale);
 const p = project.data;
 const { Content } = await render(project);
 const relatedPosts = await getPostsForProject(locale, slug);
-const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?: string | null }>)[slug];
+interface ProjectMeta {
+  repo?: string;
+  latestTag?: string | null;
+  mainWalks?: number;
+  bossCount?: number;
+  commits?: number;
+}
+const meta = (projectMeta.projects as Record<string, ProjectMeta>)[slug];
+const fmtNum = new Intl.NumberFormat(BCP47[locale]);
+const numbers = [
+  { label: ui.common.factWalks, value: meta?.mainWalks },
+  { label: ui.common.factBosses, value: meta?.bossCount },
+  { label: ui.common.factCommits, value: meta?.commits },
+].flatMap(({ label, value }) => (value ? [{ label, value: fmtNum.format(value) }] : []));
 ---
 
 <Base title={p.title} description={p.summary} image={p.cover} type="article" locale={locale}>
@@ -77,6 +90,21 @@ const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?
               <a class="release-pill" href={`https://github.com/${meta.repo}/releases/tag/${meta.latestTag}`}>
                 {meta.latestTag}
               </a>
+            </div>
+          )
+        }
+        {
+          numbers.length > 0 && (
+            <div class="number-facts">
+              <h2>{ui.common.byTheNumbers}</h2>
+              <dl>
+                {numbers.map((n) => (
+                  <div>
+                    <dt>{n.label}</dt>
+                    <dd>{n.value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           )
         }
@@ -169,8 +197,26 @@ const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?
     font-size: 18px;
     margin-bottom: 12px;
   }
-  .release-fact {
+  .release-fact,
+  .number-facts {
     margin-top: 24px;
+  }
+  .number-facts dl {
+    margin: 0;
+  }
+  .number-facts dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 4px;
+  }
+  .number-facts dt {
+    color: var(--ink-2);
+  }
+  .number-facts dd {
+    margin: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
   .release-pill {
     display: inline-flex;
