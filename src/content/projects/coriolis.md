@@ -22,7 +22,7 @@ Aurora, then Borealis, then Coriolis. This is the third generation of my LED wal
 
 ## Coriolis: 128×128
 
-The simulator is the main development environment. The scene switching, launcher, settings and overlays are shared line for line between the simulator and the firmware, and scenes draw into an abstract frame buffer instead of touching hardware, so what runs on the desktop is what will run on the wall. All the images here were captured from the simulator.
+The simulator is the main development environment. The scene switching, launcher, settings, smooth transitions and overlays are shared line for line between the simulator and the firmware, and scenes draw into an abstract frame buffer instead of touching hardware, so what runs on the desktop is what will run on the wall. All the images here were captured from the simulator.
 
 <div class="gallery">
 
@@ -35,12 +35,12 @@ The simulator is the main development environment. The scene switching, launcher
 
 </div>
 
-- **Clocks**: digital, analog and a word clock, plus weather and a calendar.
-- **Ambient art**: aurora, lava, fireplace, rain, starfield, mandala, an aquarium and the Game of Life.
-- **Fitness**: guided exercise, tabata, breathing and focus timers.
-- **Games**: snake, pong, a labyrinth and more.
+- **Clocks & schedule**: digital, analog and word clocks, weather and calendar, scheduled Night Mode with auto-dimming, and a movable, resizable clock overlay on top of any scene.
+- **Ambient art**: aurora, lava, fireplace, rain, starfield, mandala, an aquarium, spirographs and the Game of Life, with smooth slide and crossfade scene transitions.
+- **Fitness**: bilateral yoga flows and guided exercise routines with smoothed kinematic figures, tabata, breathing, focus timers and a DFPlayer Mini voice pack for spoken cues.
+- **Games & hardware**: Tetris, snake, pong and a raycast labyrinth, plus an NEC IR remote driver and dynamic brightness limiting for the Teensy 4.1 hardware.
 
-The project comes with a user's manual and a build guide, both in the repository.
+The repository includes both a PDF user's manual and a build guide.
 
 ## Where it started: Borealis, 64×64
 
