@@ -3,21 +3,21 @@
     "path-of-leash-resistance": {
       "repo": "cyanidesayonara/path-of-leash-resistance",
       "defaultBranch": "main",
-      "latestTag": "v1.76",
-      "latestCommitSha": "97a2097",
+      "latestTag": "v1.77",
+      "latestCommitSha": "9dde06d",
       "latestCommitDate": "2026-11-24",
+      "commits": 2267,
+      "mergedPrs": 647,
       "walksTotal": 52,
       "mainWalks": 51,
       "bossCount": 5,
-      "commits": 2242,
-      "mergedPrs": 563,
-      "testFiles": 284
+      "testFiles": 285
     },
     "stemma": {
       "repo": "cyanidesayonara/stemma",
       "defaultBranch": "main",
       "latestTag": "v3.1.0",
-      "latestCommitSha": "36aa145",
+      "latestCommitSha": "9985619",
       "latestCommitDate": "2026-11-24"
     },
     "coriolis": {
@@ -29,9 +29,9 @@
     },
     "eat-prey-nap": {
       "repo": "cyanidesayonara/eat-prey-nap",
-      "defaultBranch": "master",
+      "defaultBranch": "main",
       "latestTag": null,
-      "latestCommitSha": "cd8eed1",
+      "latestCommitSha": "993566a",
       "latestCommitDate": "2026-11-24"
     },
     "dopepod": {
@@ -39,7 +39,7 @@
       "defaultBranch": "master",
       "latestTag": null,
       "latestCommitSha": "92ffd4c",
-      "latestCommitDate": "2024-12-17"
+      "latestCommitDate": "2024-12-16"
     }
   }
 }

@@ -51,9 +51,13 @@ jobs:
           git checkout -B "$BRANCH"
           git add public src/data/project-meta.json
           git commit -m "Sync project metadata and assets"
-          git push origin "$BRANCH" --force-with-lease
-          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
-            gh pr edit "$BRANCH" --body-file sync-report.md
+          # The branch belongs to this job and is rebuilt from main on every run. The
+          # checkout has no tracking ref for it, so --force-with-lease would reject.
+          git push --force origin "$BRANCH"
+          # Only reuse an open pull request; a merged one keeps the same branch name.
+          PR="$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --body-file sync-report.md
           else
             gh pr create --base main --head "$BRANCH" --title "Sync project metadata and assets" --body-file sync-report.md
           fi

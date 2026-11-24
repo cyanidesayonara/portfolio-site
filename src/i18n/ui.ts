@@ -58,6 +58,10 @@ export interface UiDictionary {
     relatedPostsHeading: string;
     projectLabel: string;
     latestRelease: string;
+    byTheNumbers: string;
+    factWalks: string;
+    factBosses: string;
+    factCommits: string;
   };
   home: {
     eyebrow: string;
@@ -338,6 +342,10 @@ export const UI: Record<Locale, UiDictionary> = {
       relatedPostsHeading: 'Related posts',
       projectLabel: 'Project',
       latestRelease: 'Latest release',
+      byTheNumbers: 'By the numbers',
+      factWalks: 'Walks',
+      factBosses: 'Statue bosses',
+      factCommits: 'Commits',
     },
     home: {
       eyebrow: 'Generalist full-stack developer',
@@ -712,6 +720,10 @@ export const UI: Record<Locale, UiDictionary> = {
       relatedPostsHeading: 'Artículos relacionados',
       projectLabel: 'Proyecto',
       latestRelease: 'Última versión',
+      byTheNumbers: 'En cifras',
+      factWalks: 'Paseos',
+      factBosses: 'Estatuas jefe',
+      factCommits: 'Commits',
     },
     home: {
       eyebrow: 'Desarrollador full-stack generalista',
@@ -1086,6 +1098,10 @@ export const UI: Record<Locale, UiDictionary> = {
       relatedPostsHeading: 'Articles relacionats',
       projectLabel: 'Projecte',
       latestRelease: 'Última versió',
+      byTheNumbers: 'En xifres',
+      factWalks: 'Passeigs',
+      factBosses: 'Estàtues cap',
+      factCommits: 'Commits',
     },
     home: {
       eyebrow: 'Desenvolupador full-stack generalista',

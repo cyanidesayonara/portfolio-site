@@ -35,13 +35,14 @@ La correa es una cuerda real. La que ves en pantalla es la misma que hace la fí
 
 ## Qué incluye
 
-- **Cincuenta y un paseos por Barcelona y alrededores**, desde La Rambla y El Gòtic hasta Montjuïc, Sitges, Girona, Tarragona, Vic y Montserrat, además de un paseo tutorial que enseña cada truco poco a poco. Cada ruta se puede jugar con cualquier clima, de día o de noche.
-- **Diez persecuciones**: una barredora al amanecer, jabalíes, los diablos de fuego del correfoc por Gràcia, la carroza pirotécnica del Dimoni, seguridad del aeropuerto, la mascota de Les Atraccions, una máquina pisanieves desbocada bajando La Molina y cabras montesas por Montserrat, entre otras.
-- **Cinco estatuas jefe**: El Mamut, El Drac la salamandra de mosaico, Els Lleons, La Lleona en Girona y El Gat.
-- **Siete perros**, cada uno con su propia habilidad y objetivo técnico, además de objetos enterrados, adiestramiento, collares, pañuelos y abrigos.
+- **Paseos por Barcelona y alrededores**, desde La Rambla y El Gòtic hasta Montjuïc, Sitges, Girona y Montserrat, además de un tutorial que enseña cada truco poco a poco. Cada ruta se puede jugar con cualquier clima, de día o de noche.
+- **Persecuciones y estatuas jefe**, desde una barredora al amanecer hasta El Drac, la salamandra de mosaico.
+- **Varios perros para elegir**, cada uno con su propia habilidad y objetivo técnico, además de objetos enterrados, adiestramiento, collares, pañuelos y abrigos.
 - **Retos y combos**: da la vuelta a un poste, desliza por un bordillo, lanza a tu humano o acepta un reto con sintonía propia.
-- **Nueve cielos y seis horas del día**, en inglés, catalán y español, con sacudida de pantalla, destellos, tamaño de texto y controles ajustables.
+- **Inglés, catalán y español**, con sacudida de pantalla, destellos, tamaño de texto y controles ajustables.
 - Sin anuncios, sin compras y sin cuenta. Funciona sin conexión.
+
+El juego sigue creciendo, así que la lista completa de paseos, perros, persecuciones y jefes, junto con las novedades, está en [la web del juego](https://cyanidesayonara.github.io/path-of-leash-resistance/es/).
 
 ![Escapando de la persecución de la barredora](/img/projects/leash-sweeper.webp)
 
