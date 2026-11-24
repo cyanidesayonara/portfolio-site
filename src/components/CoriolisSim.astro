@@ -1,57 +1,63 @@
 ---
 /*
-  Interactive 128x128 Coriolis LED wall simulator, embedded on /projects/coriolis.
-  Supports keyboard (same bindings as the C++ raylib simulator) and clickable IR
-  remote buttons, plus quick-jump chips for flagship scenes.
+  Interactive 128x128 Coriolis LED wall emulator on /projects/coriolis.
+  Runs the real C++11 core/ and scenes/ engine compiled to WebAssembly
+  (/coriolis/coriolis.js + /coriolis/coriolis.wasm) with keyboard controls
+  and virtual IR remote buttons.
 */
 ---
 
-<section class="coriolis-sim" data-coriolis-sim tabindex="0" aria-label="Interactive Coriolis 128 by 128 LED wall simulator">
+<section class="coriolis-sim" data-coriolis-sim tabindex="0" aria-label="Interactive Coriolis 128 by 128 LED wall emulator">
   <div class="sim-head">
     <div>
-      <span class="sim-badge">Live simulator · 128×128 LED matrix</span>
+      <span class="sim-badge">Live C++11 emulator · 128×128 LED matrix (WebAssembly)</span>
       <h2>Try the wall display in your browser</h2>
     </div>
     <div class="quick" role="group" aria-label="Quick scenes">
-      <button type="button" data-scene="clock">Clock</button>
-      <button type="button" data-scene="coriolis">Coriolis</button>
-      <button type="button" data-scene="aurora">Aurora</button>
-      <button type="button" data-scene="fire">Fireplace</button>
-      <button type="button" data-scene="yoga">Yoga</button>
-      <button type="button" data-scene="snake">Snake</button>
-      <button type="button" data-scene="tetris">Tetris</button>
-      <button type="button" data-scene="labyrinth">Labyrinth</button>
+      <button type="button" data-scene-idx="0">Clock</button>
+      <button type="button" data-scene-idx="1">Analog</button>
+      <button type="button" data-scene-idx="16">Coriolis</button>
+      <button type="button" data-scene-idx="24">Aurora</button>
+      <button type="button" data-scene-idx="23">Fireplace</button>
+      <button type="button" data-scene-idx="9">Yoga</button>
+      <button type="button" data-scene-idx="10">Exercise</button>
+      <button type="button" data-scene-idx="11">Breathe</button>
+      <button type="button" data-scene-idx="6">Snake</button>
+      <button type="button" data-scene-idx="7">Tetris</button>
+      <button type="button" data-scene-idx="8">Labyrinth</button>
     </div>
   </div>
 
   <div class="sim-stage">
     <div class="bezel">
-      <canvas width="640" height="640" data-sim-canvas role="img" aria-label="Simulated 128 by 128 LED panel; the current scene and palette are named below it"></canvas>
+      <canvas width="640" height="640" data-sim-canvas role="img" aria-label="Emulated 128 by 128 LED panel; the current scene and palette are named below it"></canvas>
       <div class="sim-meta">
-        <span data-sim-scene>Hello</span>
-        <span data-sim-palette>Rainbow</span>
+        <span data-sim-scene>Loading emulator…</span>
+        <span data-sim-palette></span>
       </div>
     </div>
 
     <div class="remote" aria-label="Virtual IR remote">
       <p class="remote-label">IR Remote &amp; Controls</p>
       <div class="dpad">
-        <button type="button" class="up" data-key="Up" aria-label="Up">▲</button>
-        <button type="button" class="left" data-key="Left" aria-label="Left">◀</button>
-        <button type="button" class="ok" data-key="Select">OK</button>
-        <button type="button" class="right" data-key="Right" aria-label="Right">▶</button>
-        <button type="button" class="down" data-key="Down" aria-label="Down">▼</button>
+        <button type="button" class="up" data-key="1" aria-label="Up">▲</button>
+        <button type="button" class="left" data-key="3" aria-label="Left">◀</button>
+        <button type="button" class="ok" data-key="5">OK</button>
+        <button type="button" class="right" data-key="4" aria-label="Right">▶</button>
+        <button type="button" class="down" data-key="2" aria-label="Down">▼</button>
       </div>
 
       <div class="cmd-grid">
-        <button type="button" data-cmd="Menu"><kbd>M</kbd> Launcher</button>
-        <button type="button" data-cmd="Settings"><kbd>S</kbd> Settings</button>
-        <button type="button" data-cmd="Overlay"><kbd>C</kbd> Clock overlay</button>
-        <button type="button" data-key="Back"><kbd>⌫</kbd> Back</button>
-        <button type="button" data-cmd="Next"><kbd>Space</kbd> Next scene</button>
-        <button type="button" data-cmd="Home"><kbd>H</kbd> Home</button>
+        <button type="button" data-cmd="1"><kbd>M</kbd> Launcher</button>
+        <button type="button" data-cmd="2"><kbd>S</kbd> Settings</button>
+        <button type="button" data-cmd="3"><kbd>C</kbd> Clock overlay</button>
+        <button type="button" data-key="6"><kbd>⌫</kbd> Back</button>
+        <button type="button" data-cmd="4"><kbd>Space</kbd> Next scene</button>
+        <button type="button" data-cmd="5"><kbd>H</kbd> Home</button>
         <button type="button" data-rotate><kbd>R</kbd> Rotate 90°</button>
+        <button type="button" data-night aria-pressed="false"><kbd>N</kbd> Night mode</button>
         <button type="button" data-audio aria-pressed="false"><kbd>A</kbd> Sound off</button>
+        <a class="full-emu" href="https://cyanidesayonara.github.io/coriolis/#try" rel="noopener">Full showcase →</a>
       </div>
 
       <p class="remote-hint">
@@ -62,86 +68,243 @@
 </section>
 
 <script>
-  import { CoriolisSimulator, type SimCommand, type SimKey } from '../scripts/coriolis/sim';
+  interface CoriolisWasmModule {
+    HEAPU8: Uint8Array;
+    UTF8ToString(ptr: number): string;
+    _coriolis_init(showSplash: number): void;
+    _coriolis_set_time(y: number, m: number, d: number, h: number, min: number, s: number): void;
+    _coriolis_tick(nowMs: number): number;
+    _coriolis_rgba_ptr(): number;
+    _coriolis_key(keyId: number): number;
+    _coriolis_cmd(cmdId: number): void;
+    _coriolis_set_held(keyId: number, down: number): void;
+    _coriolis_show(sceneIndex: number): void;
+    _coriolis_rotate(): void;
+    _coriolis_toggle_night(): number;
+    _coriolis_night_enabled(): number;
+    _coriolis_active_name(): number;
+    _coriolis_palette_name(): number;
+  }
+
+  declare global {
+    interface Window {
+      CoriolisModule?: (opts: { locateFile: (path: string) => string }) => Promise<CoriolisWasmModule>;
+      _coriolisAudio?: {
+        play(cueId: number): void;
+        voice(clip: number): void;
+        loop(cueId: number): void;
+        setVolume(v: number): void;
+      };
+    }
+  }
+
+  const MATRIX_W = 128;
+  const MATRIX_H = 128;
+  const PIXEL_BYTES = MATRIX_W * MATRIX_H * 4;
 
   const root = document.querySelector<HTMLElement>('[data-coriolis-sim]');
   const canvas = root?.querySelector<HTMLCanvasElement>('[data-sim-canvas]');
-  const ctx2d = canvas?.getContext('2d');
+  const ctx2d = canvas?.getContext('2d', { alpha: false });
   const sceneEl = root?.querySelector<HTMLElement>('[data-sim-scene]');
   const palEl = root?.querySelector<HTMLElement>('[data-sim-palette]');
   const audioBtn = root?.querySelector<HTMLButtonElement>('[data-audio]');
+  const nightBtn = root?.querySelector<HTMLButtonElement>('[data-night]');
 
   if (root && canvas && ctx2d) {
-    const sim = new CoriolisSimulator();
-    let active = false;
-
-    const syncMeta = () => {
-      if (sceneEl) sceneEl.textContent = sim.activeLabel();
-      if (palEl) palEl.textContent = sim.paletteName();
+    // Web Audio cue synthesizer matching SimAudio / site/emu.js
+    const CUE_MAP: Record<number, [number, number, boolean]> = {
+      1: [880, 90, false],
+      2: [660, 170, false],
+      3: [523, 240, false],
+      4: [988, 110, false],
+      5: [1175, 35, true],
+      6: [523, 220, false],
+      7: [440, 90, false],
+      8: [392, 280, false],
+      9: [190, 55, true],
+      11: [1046, 45, false],
+      12: [320, 340, true],
+      13: [640, 25, false],
+      14: [784, 140, false],
+    };
+    let audioEnabled = false;
+    let audioVolume = 20;
+    let audioCtx: AudioContext | null = null;
+    const ensureAudioCtx = () => {
+      if (!audioCtx && window.AudioContext) audioCtx = new AudioContext();
+      if (audioCtx && audioCtx.state === 'suspended') void audioCtx.resume().catch(() => {});
+    };
+    const playTone = (freq: number, ms: number, descend: boolean) => {
+      if (!audioEnabled || audioVolume <= 0) return;
+      ensureAudioCtx();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const dur = ms / 1000;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const peak = Math.min(0.25, (audioVolume / 30) * 0.22);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      if (descend) osc.frequency.linearRampToValueAtTime(freq * 0.4, now + dur);
+      gain.gain.setValueAtTime(peak, now);
+      gain.gain.linearRampToValueAtTime(0.0001, now + dur);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + dur + 0.01);
+    };
+    window._coriolisAudio = {
+      play: (cueId) => { const s = CUE_MAP[cueId]; if (s) playTone(s[0], s[1], s[2]); },
+      voice: () => playTone(700, 70, false),
+      loop: () => {},
+      setVolume: (v) => { audioVolume = v; },
     };
 
-    const KEYMAP: Record<string, SimKey> = {
-      ArrowUp: 'Up',
-      KeyW: 'Up',
-      ArrowDown: 'Down',
-      KeyS: 'Down',
-      ArrowLeft: 'Left',
-      KeyA: 'Left',
-      ArrowRight: 'Right',
-      KeyD: 'Right',
-      Enter: 'Select',
-      Backspace: 'Back',
-      Escape: 'Back',
+    const offscreen = document.createElement('canvas');
+    offscreen.width = MATRIX_W;
+    offscreen.height = MATRIX_H;
+    const offCtx = offscreen.getContext('2d', { alpha: false })!;
+    const imgData = offCtx.createImageData(MATRIX_W, MATRIX_H);
+
+    // Subtle HUB75 LED pixel-pitch mask baked once for the 640x640 panel.
+    const gridMask = document.createElement('canvas');
+    gridMask.width = canvas.width;
+    gridMask.height = canvas.height;
+    {
+      const g = gridMask.getContext('2d')!;
+      const cell = canvas.width / MATRIX_W;
+      g.fillStyle = 'rgba(0, 0, 0, 0.36)';
+      for (let i = 0; i < canvas.width; i += cell) g.fillRect(i + cell - 1, 0, 1, canvas.height);
+      for (let j = 0; j < canvas.height; j += cell) g.fillRect(0, j + cell - 1, canvas.width, 1);
+    }
+
+    let mod: CoriolisWasmModule | null = null;
+    let rgbaPtr = 0;
+    let startPerf = performance.now();
+    let active = false;
+    let lastScene = '';
+    let lastPalette = '';
+    let lastNight = -1;
+
+    const syncMeta = () => {
+      if (!mod) return;
+      const sc = mod.UTF8ToString(mod._coriolis_active_name());
+      const pal = mod.UTF8ToString(mod._coriolis_palette_name());
+      const night = mod._coriolis_night_enabled();
+      if (sc !== lastScene) {
+        lastScene = sc;
+        if (sceneEl) sceneEl.textContent = sc;
+      }
+      if (pal !== lastPalette) {
+        lastPalette = pal;
+        if (palEl) palEl.textContent = pal;
+      }
+      if (night !== lastNight) {
+        lastNight = night;
+        nightBtn?.setAttribute('aria-pressed', night ? 'true' : 'false');
+      }
+    };
+
+    const syncClock = () => {
+      if (!mod) return;
+      const d = new Date();
+      mod._coriolis_set_time(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds());
+    };
+
+    const paintFrame = () => {
+      if (!mod || !rgbaPtr) return;
+      imgData.data.set(mod.HEAPU8.subarray(rgbaPtr, rgbaPtr + PIXEL_BYTES));
+      offCtx.putImageData(imgData, 0, 0);
+      ctx2d.imageSmoothingEnabled = false;
+      ctx2d.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+      ctx2d.drawImage(gridMask, 0, 0);
+    };
+
+    const clearHeld = () => {
+      if (!mod) return;
+      for (let k = 1; k <= 6; k++) mod._coriolis_set_held(k, 0);
+    };
+
+    const syncAudioBtn = () => {
+      if (!audioBtn) return;
+      audioBtn.setAttribute('aria-pressed', String(audioEnabled));
+      audioBtn.innerHTML = `<kbd>A</kbd> ${audioEnabled ? 'Sound on' : 'Sound off'}`;
+    };
+    const toggleAudio = () => {
+      audioEnabled = !audioEnabled;
+      if (audioEnabled) ensureAudioCtx();
+      syncAudioBtn();
+    };
+    audioBtn?.addEventListener('click', toggleAudio);
+    nightBtn?.addEventListener('click', () => {
+      if (!mod) return;
+      mod._coriolis_toggle_night();
+      syncMeta();
+    });
+
+    const KEYMAP: Record<string, number> = {
+      ArrowUp: 1,
+      ArrowDown: 2,
+      ArrowLeft: 3,
+      ArrowRight: 4,
+      Enter: 5,
+      Backspace: 6,
+      Escape: 6,
     };
 
     canvas.addEventListener('click', () => {
       active = true;
-      root.focus();
+      root.focus({ preventScroll: true });
     });
-
     root.addEventListener('focus', () => { active = true; });
-    root.addEventListener('blur', () => { active = false; sim.clearHeld(); });
+    root.addEventListener('blur', () => { active = false; clearHeld(); });
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!active && document.activeElement !== root) return;
+    root.addEventListener('keydown', (e) => {
+      if (!mod || (!active && document.activeElement !== root)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const now = performance.now();
       const mapped = KEYMAP[e.code];
-      if (mapped && !['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) {
+      if (mapped) {
         e.preventDefault();
-        sim.setHeld(mapped, true);
-        if (!e.repeat || ['Up', 'Down', 'Left', 'Right'].includes(mapped)) sim.key(mapped, now);
+        if (audioEnabled) ensureAudioCtx();
+        mod._coriolis_set_held(mapped, 1);
+        if (!e.repeat || mapped <= 4) mod._coriolis_key(mapped);
         syncMeta();
         return;
       }
-      if (e.code === 'KeyM') { e.preventDefault(); sim.command('Menu', now); }
-      else if (e.code === 'KeyS') { e.preventDefault(); sim.command('Settings', now); }
-      else if (e.code === 'KeyC') { e.preventDefault(); sim.command('Overlay', now); }
-      else if (e.code === 'Space') { e.preventDefault(); sim.command('Next', now); }
-      else if (e.code === 'KeyH') { e.preventDefault(); sim.command('Home', now); }
-      else if (e.code === 'KeyR') { e.preventDefault(); sim.rotate(now); }
-      else if (e.code === 'KeyA') { e.preventDefault(); toggleAudio(); }
+      if (e.repeat) return;
+      switch (e.code) {
+        case 'KeyM': e.preventDefault(); mod._coriolis_cmd(1); break;
+        case 'KeyS': e.preventDefault(); mod._coriolis_cmd(2); break;
+        case 'KeyC': e.preventDefault(); mod._coriolis_cmd(3); break;
+        case 'Space': e.preventDefault(); mod._coriolis_cmd(4); break;
+        case 'KeyH': e.preventDefault(); mod._coriolis_cmd(5); break;
+        case 'KeyR': e.preventDefault(); mod._coriolis_rotate(); break;
+        case 'KeyN': e.preventDefault(); mod._coriolis_toggle_night(); break;
+        case 'KeyA': e.preventDefault(); toggleAudio(); break;
+        default: return;
+      }
       syncMeta();
-    };
+    });
 
-    const onKeyUp = (e: KeyboardEvent) => {
+    root.addEventListener('keyup', (e) => {
+      if (!mod) return;
       const mapped = KEYMAP[e.code];
-      if (mapped) sim.setHeld(mapped, false);
-    };
-
-    root.addEventListener('keydown', onKeyDown);
-    root.addEventListener('keyup', onKeyUp);
+      if (mapped) mod._coriolis_set_held(mapped, 0);
+    });
 
     root.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((btn) => {
-      const k = btn.dataset.key as SimKey;
+      const k = parseInt(btn.dataset.key!, 10);
       const down = (ev: Event) => {
         ev.preventDefault();
-        root.focus();
-        sim.setHeld(k, true);
-        sim.key(k, performance.now());
-        syncMeta();
+        root.focus({ preventScroll: true });
+        if (audioEnabled) ensureAudioCtx();
+        if (mod) {
+          mod._coriolis_set_held(k, 1);
+          mod._coriolis_key(k);
+          syncMeta();
+        }
       };
-      const up = () => sim.setHeld(k, false);
+      const up = () => { if (mod) mod._coriolis_set_held(k, 0); };
       btn.addEventListener('pointerdown', down);
       btn.addEventListener('pointerup', up);
       btn.addEventListener('pointerleave', up);
@@ -149,59 +312,52 @@
     });
 
     root.querySelectorAll<HTMLButtonElement>('[data-cmd]').forEach((btn) => {
+      const cmd = parseInt(btn.dataset.cmd!, 10);
       btn.addEventListener('click', () => {
-        root.focus();
-        sim.command(btn.dataset.cmd as SimCommand, performance.now());
-        syncMeta();
+        root.focus({ preventScroll: true });
+        if (audioEnabled) ensureAudioCtx();
+        if (mod) {
+          mod._coriolis_cmd(cmd);
+          syncMeta();
+        }
       });
     });
 
-    root.querySelectorAll<HTMLButtonElement>('[data-scene]').forEach((btn) => {
+    root.querySelectorAll<HTMLButtonElement>('[data-scene-idx]').forEach((btn) => {
+      const idx = parseInt(btn.dataset.sceneIdx!, 10);
       btn.addEventListener('click', () => {
-        root.focus();
-        sim.selectSceneById(btn.dataset.scene!, performance.now());
-        syncMeta();
+        root.focus({ preventScroll: true });
+        if (audioEnabled) ensureAudioCtx();
+        if (mod) {
+          mod._coriolis_show(idx);
+          syncMeta();
+        }
       });
     });
 
     root.querySelector<HTMLButtonElement>('[data-rotate]')?.addEventListener('click', () => {
-      sim.rotate(performance.now());
-      syncMeta();
+      if (mod) {
+        mod._coriolis_rotate();
+        syncMeta();
+      }
     });
 
-    // The sim's own settings menu can also toggle audio, so the button follows the setting.
-    let shownAudio: boolean | null = null;
-    const syncAudio = () => {
-      const on = sim.settings.audioEnabled;
-      if (!audioBtn || on === shownAudio) return;
-      shownAudio = on;
-      audioBtn.setAttribute('aria-pressed', String(on));
-      audioBtn.innerHTML = `<kbd>A</kbd> ${on ? 'Sound on' : 'Sound off'}`;
-    };
-    const toggleAudio = () => {
-      sim.settings.audioEnabled = !sim.settings.audioEnabled;
-      syncAudio();
-    };
-    audioBtn?.addEventListener('click', toggleAudio);
-
-    // Run only while on screen and the tab is visible; with reduced motion,
-    // hold the first frame until someone interacts with the panel.
     let engaged = !matchMedia('(prefers-reduced-motion: reduce)').matches;
     let onScreen = true;
     let rafId = 0;
     const frame = () => {
-      const now = performance.now();
-      if (sim.tick(now)) {
-        sim.renderToCanvas(ctx2d, 5, 1);
+      if (mod) {
+        syncClock();
+        const elapsed = Math.max(0, Math.floor(performance.now() - startPerf));
+        if (mod._coriolis_tick(elapsed)) paintFrame();
         syncMeta();
-        syncAudio();
       }
       rafId = requestAnimationFrame(frame);
     };
     const setRunning = () => {
-      const run = engaged && onScreen && !document.hidden;
+      const run = Boolean(mod) && engaged && onScreen && !document.hidden;
       if (run && !rafId) rafId = requestAnimationFrame(frame);
-      else if (!run && rafId) { cancelAnimationFrame(rafId); rafId = 0; sim.clearHeld(); }
+      else if (!run && rafId) { cancelAnimationFrame(rafId); rafId = 0; clearHeld(); }
     };
     new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; setRunning(); }).observe(canvas);
     document.addEventListener('visibilitychange', setRunning);
@@ -209,11 +365,34 @@
     root.addEventListener('focus', engage);
     root.addEventListener('pointerdown', engage);
 
-    sim.tick(performance.now());
-    sim.renderToCanvas(ctx2d, 5, 1);
-    syncMeta();
-    syncAudio();
-    setRunning();
+    const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
+      if (typeof window.CoriolisModule === 'function') { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+
+    void loadScript('/coriolis/coriolis.js')
+      .then(() => {
+        if (typeof window.CoriolisModule !== 'function') throw new Error('CoriolisModule missing');
+        return window.CoriolisModule({ locateFile: (path) => `/coriolis/${path}` });
+      })
+      .then((instance) => {
+        mod = instance;
+        startPerf = performance.now();
+        syncClock();
+        mod._coriolis_init(1);
+        rgbaPtr = mod._coriolis_rgba_ptr();
+        paintFrame();
+        syncMeta();
+        setRunning();
+      })
+      .catch((err) => {
+        console.error('Coriolis WASM emulator error:', err);
+        if (sceneEl) sceneEl.textContent = 'Emulator unavailable';
+      });
   }
 </script>
 
@@ -362,7 +541,8 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
-  .cmd-grid button {
+  .cmd-grid button,
+  .cmd-grid .full-emu {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -373,10 +553,17 @@
     color: var(--stone);
     font: 500 13px/1.2 var(--font-body);
     text-align: left;
+    text-decoration: none;
     cursor: pointer;
   }
-  .cmd-grid button:hover {
+  .cmd-grid button:hover,
+  .cmd-grid .full-emu:hover {
     border-color: var(--saffron);
+  }
+  .cmd-grid .full-emu {
+    color: var(--led);
+    justify-content: center;
+    font-weight: 600;
   }
   .cmd-grid button[aria-pressed='true'] {
     border-color: var(--led);
