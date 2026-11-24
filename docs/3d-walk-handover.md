@@ -17,7 +17,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 - **Node:** 22.23.4 or newer. On this Windows machine, use `npx.cmd -y node@22.23.5 node_modules/astro/bin/astro.mjs check` and `... build`.
 - **Preview:** `.claude/launch.json` runs `astro preview` on port 4321. Rebuild `dist/` to see changes, then reload `http://127.0.0.1:4321/walk?walktest`.
 - **`?walktest`** adds a perf readout (fps, worst frame, draw calls, triangles, geometries, build time, district, streaming slice time) and `window.__walk`:
-  - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`.
+  - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`, `dogSwimming`, `humanSwimming`.
   - **Driving the game:** `key(code, down)`, `tick(frames)` (runs fixed 60 Hz updates and renders), `teleport(x, z)` (also snaps the camera), `collide(p, r, y)`.
   - **`camera` + `render()`:** aim the camera by hand and render one frame (then `canvas.gl.toDataURL()` in the same task) to inspect distant scenery.
   - **`plaza`:** the Plaça del Mercat runtime (`plazaLife.ts`): `quests()`, `chasing()`, and `debug` (`butcher`, `boti`, `fris`, `paper`, `pigeons`).
@@ -89,15 +89,19 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 ## Next up
 
 1. **Move the metro entrance (later):** it sits at the west end of the Rambla (`metro` in `data/seafront.json`; the 2D street has its own across the road from `Estació`). Santtu wants it deeper in town, where the real station is, once the level spreads that far. All its signs stay generic ("Metro", "L2", "SORTIDA").
-2. **Swimming animation (Santtu, for later):** when the water gets deep enough, both characters should swim. Today Millie just floats at `WATER_Y - SWIM_SINK` once the water is deeper than `SWIM_DEPTH` (`dogSwimming` in `game3d.ts`) with no paddling, and the human stops at waist depth (`HUMAN_WADE`) and says they are not swimming. Wanted: a dog paddle for Millie (legs, head up, wake), and a swim stroke for the human so they can follow her out instead of stopping. The sea is the only deep water now; any other body of water added later should reuse the same `surface === 'water'` and depth checks.
-3. **Test on real phones and tablets:** fullscreen modes, touch buttons, audio by ear. Nothing has been verified on hardware yet. Also check that real fullscreen comes back on the first key press or tap after the train (automation can't produce a real user gesture).
-4. **Saved-progress trade-offs (Phase 5):** saved counts add this visit's progress on top of the saved count, so a favor repeated after a reload counts again (quest flags in `plazaLife`/`hillLife` are per page load), and the Home door finish and its bones can be replayed. Persist quest flags if this matters.
-5. **Plaça del Mercat and Dalt de la Vila polish:** reference photos for the real squares and streets; more ambient walkers and shoppers; maybe a market interior. The grass bank behind the Museu is climbable up to the top-square wall (harmless dead end). Scattering plaza or hilltop pigeons doesn't count toward the `birds` goal.
-6. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
-7. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
-8. **Next phases:** more of the town (toward the harbor, the shopping center and the inland highway, per the expansion plan), each district with its own pipicà, quests and goals area in `progress.ts`.
+2. **Test on real phones and tablets:** fullscreen modes, touch buttons, audio by ear. Nothing has been verified on hardware yet. Also check that real fullscreen comes back on the first key press or tap after the train (automation can't produce a real user gesture).
+3. **Plaça del Mercat and Dalt de la Vila reference pass:** reference photos for the real squares and streets, and maybe a market interior.
+4. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
+5. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
+6. **Next phases:** more of the town (toward the harbor, the shopping center and the inland highway, per the expansion plan), each district with its own pipicà, quests and goals area in `progress.ts`.
 
 ## Polish backlog (from Santtu's playtesting)
+
+- **Done (swimming, whirl, progress & plaza/hill polish):**
+  - **Swimming:** past the shoreline (`SHORE_Z` in `level.ts`), the seabed slopes down faster (`0.095`) so Millie (`SWIM_DEPTH`) and her human (`HUMAN_SWIM_DEPTH`) reach swimming depth a short walk from shore, with dog-paddle and breaststroke animations (`models.ts`), wakes, and full animated `makePerson` NPC swimmers (`life.ts`).
+  - **Leash whirl direction:** `Leash.poleWinding()` and contact-aware `ends()` (`leash.ts`) pair with `-Math.sign(coil)` unwinding in `startWhirl()` and active-whirl gating on `WhirlDetector` (`game3d.ts`) so the human always unwinds around the pole instead of spinning into tighter wraps.
+  - **Saved progress:** `walk3d-progress-v1` (`progress.ts`) persists completed quest, find, hurdle, stray cat, and Home finish keys (`done[]`, compatible with older v1 saves) so repeated favors and the Home door bones cannot be double-counted after reload.
+  - **Plaça & hill polish:** added a market clock gable, east flower/produce stall and florist, terracotta planters, fountain/mirador/church-square seated locals, extra pedestrian loops, church threshold and gable cross; wired plaza and hilltop pigeons to the `birds` goal (`plazaLife.ts`, `hillLife.ts`); and raised hillside retaining/cheek wall colliders (`terrain.ts`, `hill.ts`) to prevent jumping onto the grass bank behind the Museu.
 
 - **Metro entrance (PR #6):** Santtu would like it deeper in town, where the real station is, once the level spreads out that far; fine where it is for now.
 

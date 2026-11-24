@@ -268,21 +268,51 @@ export class Leash {
     for (let i = N - 2; i >= 1; i--) {
       const c = pts[i].c;
       if (c) {
-        if (c.kind === 'pole') { this.nearestPole = c; this.nearestPoleCoil = seen.get(c) ?? 0; }
+        if (c.kind === 'pole') {
+          this.nearestPole = c;
+          this.nearestPoleCoil = this.poleWinding(c);
+        }
         break;
       }
     }
   }
 
-  /** Tangent direction at each end (chord over 3 segments), pointing along the rope. */
+  /** Total turning angle (radians) along interior segments within reach of a pole. */
+  poleWinding(pole: Obstacle, reach = pole.r + 0.65) {
+    const { N, pts } = this;
+    const r2 = reach * reach;
+    let near = 0;
+    for (let i = 1; i < N - 1; i++) {
+      const p = pts[i];
+      if ((p.x - pole.x) ** 2 + (p.z - pole.z) ** 2 >= r2) continue;
+      const ax = p.x - pts[i - 1].x, az = p.z - pts[i - 1].z;
+      const bx = pts[i + 1].x - p.x, bz = pts[i + 1].z - p.z;
+      if (ax * ax + az * az <= 1e-6 || bx * bx + bz * bz <= 1e-6) continue;
+      near += wrap(Math.atan2(bz, bx) - Math.atan2(az, ax));
+    }
+    return Math.abs(near) < 0.05 ? 0 : near;
+  }
+
+  /** Tangent direction at each end, pointing along the rope (1 segment when coiled at an obstacle). */
   ends() {
     const { N, pts } = this;
-    const d = pts[0], d3 = pts[3], h = pts[N - 1], h3 = pts[N - 4];
-    const dl = Math.hypot(d3.x - d.x, d3.z - d.z) || 1;
-    const hl = Math.hypot(h3.x - h.x, h3.z - h.z) || 1;
+    const tangent = (end: number, step: number) => {
+      let j = end + step * 3;
+      for (let k = 1; k <= 3; k++) {
+        if (pts[end + step * k].c) { j = end + step; break; }
+      }
+      let dx = pts[j].x - pts[end].x, dz = pts[j].z - pts[end].z;
+      let len = Math.hypot(dx, dz);
+      if (len <= 1e-4) {
+        dx = pts[end + step].x - pts[end].x;
+        dz = pts[end + step].z - pts[end].z;
+        len = Math.hypot(dx, dz) || 1;
+      }
+      return { x: dx / len, z: dz / len };
+    };
     return {
-      dog: { x: (d3.x - d.x) / dl, z: (d3.z - d.z) / dl },
-      human: { x: (h3.x - h.x) / hl, z: (h3.z - h.z) / hl },
+      dog: tangent(0, 1),
+      human: tangent(N - 1, -1),
     };
   }
 }
@@ -365,6 +395,12 @@ export class WhirlDetector {
   cooldown = 0;
   coilSum = 0;
   frames = 0;
+  reset(cooldown = 0.9) {
+    this.hold = 0;
+    this.coilSum = 0;
+    this.frames = 0;
+    this.cooldown = Math.max(this.cooldown, cooldown);
+  }
   update(leash: Leash, human: { x: number; z: number }, dt: number): { pole: Obstacle; coil: number } | null {
     if (this.cooldown > 0) this.cooldown -= dt;
     const pole = leash.nearestPole;

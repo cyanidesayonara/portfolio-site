@@ -61,7 +61,9 @@ const PIER = SEAFRONT_LAYOUT.pier;
 export const SWIM = SEAFRONT_LAYOUT.swim;
 export const PIPICA = SEAFRONT_LAYOUT.pipica;
 
-const sandFloor = (z: number) => (z > -24 ? SAND_Y : SAND_Y - (-24 - z) * 0.035);
+const SHORE_Z = -24 - (SAND_Y - WATER_Y) / 0.035; // -58.2857, where sandFloor crosses WATER_Y
+const sandFloor = (z: number) =>
+  z > -24 ? SAND_Y : z >= SHORE_Z ? SAND_Y - (-24 - z) * 0.035 : WATER_Y - (SHORE_Z - z) * 0.095;
 const pierDeckY = (z: number) => (z > PIER.root ? GROUND_Y : z > PIER.rise ? GROUND_Y + ((PIER.root - z) / (PIER.root - PIER.rise)) * (PIER.high - GROUND_Y) : PIER.high);
 
 // ---- Instancing collector -------------------------------------------------------------

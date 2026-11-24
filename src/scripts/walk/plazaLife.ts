@@ -33,6 +33,7 @@ export interface PlazaCtx {
   addBones: (n: number, why?: string) => void;
   completeGoal: (id: string) => void;
   bumpGoal: (id: string, n: number) => void;
+  onDone?: (key: string) => void;
   burst: (x: number, y: number, z: number, color: number, n?: number, spd?: number, up?: number, life?: number, g?: number) => void;
   offLeash: () => boolean;
   /** No other chase running and none just finished. */
@@ -71,6 +72,7 @@ export function createPlazaLife(ctx: PlazaCtx) {
     if (quests[k]) return;
     quests[k] = true;
     done++;
+    ctx.onDone?.(`plaza:${k}`);
     ctx.addBones(reward, msg);
     ctx.bumpGoal('plaza', done);
   };
@@ -88,6 +90,11 @@ export function createPlazaLife(ctx: PlazaCtx) {
   const waiter = person({ top: 0xf4f1ea, trousers: 0x1a1a1a, hair: 0x1a1a1a, hairStyle: 'short', prop: 'none' }, PLAZA.waiter.x, PLAZA.waiter.z, Math.PI);
   const regular = person({ top: 0x1fc9b7, trousers: 0x3d73c7, hair: 0xb08850, hairStyle: 'ponytail', prop: 'none' }, PLAZA.regular.x, PLAZA.regular.z, Math.PI);
   const butcherM = person({ top: 0xf4f1ea, trousers: 0x3d3d45, hair: 0x2a1d14, hairStyle: 'short', prop: 'none', height: 1.04 }, PLAZA.butcher.x, PLAZA.butcher.z, -Math.PI / 2);
+  const florist = person({ top: 0x5f9e4a, trousers: 0x2a2f3d, hair: 0x6b4026, hairStyle: 'bun', prop: 'none', height: 0.96 }, PLAZA.florist.x, PLAZA.florist.z, -Math.PI / 2);
+  const fountainLocals = [
+    person({ top: 0xe5487a, trousers: 0x40455c, hair: 0x2a1d14, hairStyle: 'long', prop: 'coffee', height: 0.95 }, 6, 121.7, -Math.PI / 2),
+    person({ top: 0x4c6185, trousers: 0x6b5a48, hair: 0x8a8a8a, hairStyle: 'short', prop: 'none', height: 0.98 }, -9.4, 112, 0),
+  ];
   // The butcher's red apron.
   const apron = box(0.42, 0.62, 0.04, M(0xc23b32, 0.7));
   apron.position.set(0.14, 0.95, 0);
@@ -113,14 +120,19 @@ export function createPlazaLife(ctx: PlazaCtx) {
     return { b, hx, hz, hy, x: hx, z: hz, y: hy, vx: 0, vy: 0, vz: 0, fly: 0, gone: false };
   });
   const scare = (forGood: boolean) => {
+    let any = false;
     for (const p of pigeons) {
       if (p.fly > 0 || p.gone) continue;
       const a = rand(0, Math.PI * 2);
       p.vx = Math.cos(a) * rand(2, 4); p.vz = Math.sin(a) * rand(2, 4) + 2; p.vy = rand(3, 5);
       p.fly = forGood ? 99 : 7; // the ones only startled come back after a while
       p.gone = forGood;
+      any = true;
     }
-    audio.flutter();
+    if (any) {
+      audio.flutter();
+      ctx.completeGoal('birds');
+    }
   };
   const inTerrace = (x: number, z: number) => x > PLAZA.terrace.x0 && x < PLAZA.terrace.x1 && z > PLAZA.terrace.z0 && z < PLAZA.terrace.z1;
   const terraceCenter = { x: (PLAZA.terrace.x0 + PLAZA.terrace.x1) / 2, z: (PLAZA.terrace.z0 + PLAZA.terrace.z1) / 2 };
@@ -236,8 +248,11 @@ export function createPlazaLife(ctx: PlazaCtx) {
     vendor.animate(time, { speed: 0, pose: 'stand' });
     grandpa.animate(time, { speed: 0, pose: 'sit' });
     waiter.animate(time, { speed: 0, pose: 'stand' });
+    florist.animate(time + 2, { speed: 0, pose: 'stand' });
+    fountainLocals.forEach((p, idx) => p.animate(time + idx, { speed: 0, pose: 'sit' }));
     regular.animate(time, { speed: 0, pose: regularPose });
     regularPose = 'stand';
+    if (dist(dog, PLAZA.florist) < 3.6) say('florist', 'Flors i fruita fresca!', 1.8, 'paper', 14);
 
     // Newspaper.
     if (paper.held) { const m = mouth(); paperM.position.set(m.x, m.y - 0.05, m.z); paperM.rotation.y = -dog.heading; }
@@ -433,14 +448,32 @@ export function createPlazaLife(ctx: PlazaCtx) {
     fris.held = false; fris.flight = null; fris.inHand = true; fris.throwT = 0.8;
   };
 
+  const restore = (doneKeys: ReadonlySet<string>) => {
+    if (doneKeys.has('plaza:paper')) {
+      quests.paper = true;
+      paper.held = false;
+      paperM.visible = false;
+    }
+    if (doneKeys.has('plaza:terrace')) {
+      quests.terrace = true;
+      for (const p of pigeons) { p.gone = true; p.fly = 0; p.b.group.visible = false; }
+    }
+    if (doneKeys.has('plaza:fetch')) {
+      quests.fetch = true;
+      fris.count = Math.max(fris.count, 3);
+    }
+    done = Number(quests.paper) + Number(quests.terrace) + Number(quests.fetch);
+  };
+
   return {
-    update, pickup, drop, bark, prompt, reset,
+    update, pickup, drop, bark, prompt, reset, restore,
     chasing: () => chase !== null,
     quests: () => ({ ...quests }),
     bubbles: () => [
       { id: 'vendor', x: vendor.group.position.x, y: Y + 2.1, z: vendor.group.position.z },
       { id: 'grandpa', x: PLAZA.grandpa.x, y: Y + 1.6, z: PLAZA.grandpa.z },
       { id: 'waiter', x: PLAZA.waiter.x, y: Y + 2.1, z: PLAZA.waiter.z },
+      { id: 'florist', x: PLAZA.florist.x, y: Y + 2.1, z: PLAZA.florist.z },
       { id: 'regular', x: PLAZA.regular.x, y: Y + 2.1, z: PLAZA.regular.z },
       { id: 'butcher', x: butcher.x, y: Y + 2.2, z: butcher.z },
     ],

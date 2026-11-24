@@ -74,6 +74,7 @@ export const HILL = {
   pedPaths: [
     [[-1.6, 174.5], [-1.6, 186], [-1.6, 199.5], [14, 199.5], [14, 187], [14, 175.2], [1.6, 174.8]],
     [[-9.25, 199.5], [-9.25, 221], [0, 224], [18, 224], [18, 228.5], [-16, 228.5], [-9.25, 222]],
+    [[2.0, 200], [2.0, 221.5], [14, 221.5], [19, 227], [0, 227], [-2.0, 221], [-2.0, 200], [11.5, 200]],
   ] as [number, number][][],
 };
 
@@ -277,12 +278,13 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
         builder.addBox(x, TOP_Y + 0.42, z0 + 0.08, x + 0.12, TOP_Y + 0.88, z1 - 0.08, coping, { skipBottom: true });
       }
       builder.addBox(x0 - 0.04, TOP_Y + 0.88, z0 - 0.04, x1 + 0.04, TOP_Y + 0.98, z1 + 0.04, coping);
-      addBox({ x0, x1, z0, z1, top: TOP_Y + 0.98, kind: 'wall' });
+      // Keep the balustrade visually open while tall enough in physics to prevent jumping onto hillside banks.
+      addBox({ x0, x1, z0, z1, top: TOP_Y + 1.8, kind: 'wall' });
       return;
     }
     builder.addBox(x0, yBot, z0, x1, yTop, z1, stone, { skipBottom: true });
     builder.addBox(x0 - 0.03, yTop, z0 - 0.03, x1 + 0.03, yTop + 0.08, z1 + 0.03, coping);
-    addBox({ x0, x1, z0, z1, top: yTop + 0.08, kind: 'wall' });
+    addBox({ x0, x1, z0, z1, top: yTop + 0.9, kind: 'wall' });
   };
   // Bottom garden curbs flanking the lower climb and east stairs.
   retainingWall(-22, -4.35, 177.8, 178.15, BASE_Y - 0.2, BASE_Y + 0.85);
@@ -309,7 +311,7 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
       const syTop = y0 + ((i + 1) / segs) * (y1 - y0) + 0.8;
       builder.addBox(x0, syBot, sz0, x1, syTop, sz1, stone, { skipBottom: true });
     }
-    addBox({ x0, x1, z0, z1, top: y1 + 0.8, kind: 'wall' });
+    addBox({ x0, x1, z0, z1, top: y1 + 1.6, kind: 'wall' });
   };
   curbWall(-4.35, -4.0, 178, 196, BASE_Y, MID_Y);
   curbWall(4.0, 4.35, 178, 196, BASE_Y, MID_Y);
@@ -359,6 +361,30 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   }
   builder.addBox(-2.2, TOP_Y, CH.z0 - 0.08, 2.2, TOP_Y + 4.4, CH.z0 + 0.04, 0x3f2b1d);
   builder.addBox(-2.6, TOP_Y + 4.4, CH.z0 - 0.18, 2.6, TOP_Y + 5.0, CH.z0 + 0.04, trimCol);
+  builder.addBox(-2.8, TOP_Y, CH.z0 - 0.65, 2.8, TOP_Y + 0.18, CH.z0, trimCol); // church stone threshold step
+  // Stone cross finial crowning the nave gable.
+  builder.addBox(-0.14, TOP_Y + 16.8, CH.z0 + 0.9, 0.14, TOP_Y + 18.4, CH.z0 + 1.18, trimCol);
+  builder.addBox(-0.55, TOP_Y + 17.65, CH.z0 + 0.92, 0.55, TOP_Y + 17.92, CH.z0 + 1.16, trimCol);
+  // Old-town stone gate piers at the foot of the climb + terracotta planters along the terraces.
+  for (const gx of [-4.25, 4.25]) {
+    builder.addBox(gx - 0.35, BASE_Y, 177.2, gx + 0.35, BASE_Y + 2.1, 177.9, stone);
+    builder.addBox(gx - 0.42, BASE_Y + 2.1, 177.13, gx + 0.42, BASE_Y + 2.3, 177.97, coping);
+    addBox({ x0: gx - 0.4, x1: gx + 0.4, z0: 177.15, z1: 177.95, top: BASE_Y + 2.4, kind: 'wall' });
+  }
+  const potMat = M(0xb2563a, 0.85);
+  const bushMat = M(0x4e8c40, 0.85, 0, { flatShading: true });
+  const bushGeo = new THREE.IcosahedronGeometry(0.34, 1);
+  const pot = (px: number, py: number, pz: number) => {
+    place(cyl(0.26, 0.19, 0.38, potMat, 10), px, py + 0.19, pz);
+    place(new THREE.Mesh(bushGeo, bushMat), px, py + 0.58, pz);
+    addBox({ x0: px - 0.32, x1: px + 0.32, z0: pz - 0.32, z1: pz + 0.32, top: py + 0.95, kind: 'planter' });
+  };
+  pot(15.5, MID_Y, 198.0);
+  pot(15.5, MID_Y, 202.4);
+  pot(-4.9, TOP_Y, 218.5);
+  pot(4.9, TOP_Y, 218.5);
+  pot(-3.2, TOP_Y, 231.4);
+  pot(3.2, TOP_Y, 231.4);
   // Rose window above the portal.
   const roseRing = cyl(1.65, 1.65, 0.2, M(trimCol, 0.85), 20);
   roseRing.rotation.x = Math.PI / 2;

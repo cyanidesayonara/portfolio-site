@@ -22,6 +22,7 @@ export interface HillCtx {
   addBones: (n: number, why?: string) => void;
   completeGoal: (id: string) => void;
   bumpGoal: (id: string, n: number) => void;
+  onDone?: (key: string) => void;
   burst: (x: number, y: number, z: number, color: number, n?: number, spd?: number, up?: number, life?: number, g?: number) => void;
   offLeash: () => boolean;
 }
@@ -60,6 +61,7 @@ export function createHillLife(ctx: HillCtx) {
     if (quests[k]) return;
     quests[k] = true;
     doneCount++;
+    ctx.onDone?.(`hill:${k}`);
     ctx.addBones(reward, msg);
     ctx.bumpGoal('hill_quests', doneCount);
   };
@@ -79,6 +81,14 @@ export function createHillLife(ctx: HillCtx) {
   const caretaker = person(
     { top: 0x6b5a48, trousers: 0x40455c, hair: 0xd8d8d8, hairStyle: 'short', prop: 'none', height: 0.96 },
     HILL.caretaker.x, TOP_Y, HILL.caretaker.z, -Math.PI / 2,
+  );
+  const miradorLocal = person(
+    { top: 0x9e4c47, trousers: 0x2a2f3d, hair: 0x8a8a8a, hairStyle: 'short', prop: 'coffee', height: 0.96 },
+    17.5, TOP_Y, 219.6, -Math.PI / 2,
+  );
+  const squareLocal = person(
+    { top: 0x667a5c, trousers: 0x6b5a48, hair: 0x2a1d14, hairStyle: 'ponytail', prop: 'phone', height: 0.98 },
+    15.4, TOP_Y, 224.0, Math.PI,
   );
 
   // ---- Animated bronze church bell ----
@@ -112,7 +122,10 @@ export function createHillLife(ctx: HillCtx) {
       p.fly = 6;
       any = true;
     }
-    if (any) audio.flutter();
+    if (any) {
+      audio.flutter();
+      ctx.completeGoal('birds');
+    }
   };
 
   // ---- Pigeons wheeling around the bell tower ----
@@ -149,12 +162,17 @@ export function createHillLife(ctx: HillCtx) {
 
     guide.animate(time, { speed: 0, pose: 'stand' });
     caretaker.animate(time + 1, { speed: 0, pose: 'stand' });
+    miradorLocal.animate(time + 2, { speed: 0, pose: 'sit' });
+    squareLocal.animate(time + 3, { speed: 0, pose: 'sit' });
 
     if (dist(dog, HILL.guide) < 4.5 && dog.y >= MID_Y - 1 && dog.y < TOP_Y - 1) {
       say('guide', 'Benvinguts al Museu! A dalt hi ha l\'Església.', 2.2, 'paper', 14);
     }
     if (dist(dog, HILL.caretaker) < 5.0 && dog.y >= TOP_Y - 1 && !quests.bell) {
       say('caretaker', 'Quines vistes des d\'aquí dalt!', 2.0, 'paper', 14);
+    }
+    if (dist(dog, { x: 17.5, z: 219.7 }) < 3.5 && dog.y >= TOP_Y - 1) {
+      say('miradorLocal', 'Es veu tot el mar des d\'aquí!', 2.0, 'paper', 16);
     }
 
     // Bell swing.
@@ -166,6 +184,9 @@ export function createHillLife(ctx: HillCtx) {
     }
 
     // Hilltop pigeons.
+    if (dog.y >= TOP_Y - 1 && Math.hypot(dog.vx, dog.vz) > 2.8 && pigeons.some((p) => p.fly <= 0 && dist(dog, p) < 2.2)) {
+      scatterPigeons();
+    }
     for (const p of pigeons) {
       if (p.fly > 0) {
         p.fly -= dt;
@@ -231,6 +252,7 @@ export function createHillLife(ctx: HillCtx) {
     // Generic Home door finish line.
     if (!homeDone && dog.y >= TOP_Y - 1 && dist(dog, HILL.home) < 2.2) {
       homeDone = true;
+      ctx.onDone?.('hill:home');
       hud.shout('HOME SWEET HOME', 'good');
       ctx.humanSay('What a walk! Time for dinner.', 2.6, 'win');
       ctx.addBones(10);
@@ -240,12 +262,13 @@ export function createHillLife(ctx: HillCtx) {
     }
   };
 
-  /** E: barking by the church portal rings the belfry bell and scatters hilltop pigeons. */
+  /** E: barking by the church portal rings the belfry bell, and barks near hilltop pigeons scatter them. */
   const bark = () => {
-    if (dog.y < TOP_Y - 1 || dist(dog, HILL.portal) > 7) return;
+    if (dog.y < TOP_Y - 1) return;
+    if (pigeons.some((p) => p.fly <= 0 && dist(dog, p) < 7)) scatterPigeons();
+    if (dist(dog, HILL.portal) > 7) return;
     bellRingT = 4.2;
     audio.chime();
-    scatterPigeons();
     if (!quests.bell) {
       say('caretaker', 'Ei, que no és migdia!', 2.2, 'loud');
       finishQuest('bell', 'CHURCH BELLS', 4);
@@ -264,15 +287,24 @@ export function createHillLife(ctx: HillCtx) {
     miradorT = 0;
   };
 
+  const restore = (doneKeys: ReadonlySet<string>) => {
+    if (doneKeys.has('hill:bell')) quests.bell = true;
+    if (doneKeys.has('hill:mirador')) quests.mirador = true;
+    if (doneKeys.has('hill:home')) homeDone = true;
+    doneCount = Number(quests.bell) + Number(quests.mirador);
+  };
+
   return {
     update,
     bark,
     prompt,
     reset,
+    restore,
     quests: () => ({ ...quests, home: homeDone }),
     bubbles: () => [
       { id: 'guide', x: HILL.guide.x, y: MID_Y + 2.1, z: HILL.guide.z },
       { id: 'caretaker', x: HILL.caretaker.x, y: TOP_Y + 2.1, z: HILL.caretaker.z },
+      { id: 'miradorLocal', x: 17.5, y: TOP_Y + 1.7, z: 219.7 },
     ],
     debug: {
       get bellRingT() { return bellRingT; },

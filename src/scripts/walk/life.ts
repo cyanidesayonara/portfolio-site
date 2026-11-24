@@ -157,16 +157,22 @@ export function createLife(ctx: LifeCtx) {
   // ---- Swimmers and a paddle boarder ------------------------------------------------------
   const WATER_Y = -1.6;
   const capCols = [0xe5487a, 0xffb020, 0xf4f1ea, 0x3d73c7, 0x1fc9b7];
+  const capGeo = new THREE.SphereGeometry(0.128, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
   const swimmers = Array.from({ length: 6 }, (_, k) => {
-    const g = new THREE.Group();
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), M(pickOne(NPC_SKINS), 0.7));
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.125, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(capCols[k % capCols.length], 0.5));
-    cap.position.y = 0.02;
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.4, 3, 6), M(pickOne(NPC_SKINS), 0.7));
-    arm.position.set(0, 0, 0.18);
-    g.add(head, cap, arm);
-    scene.add(g);
-    return { g, arm, x: rand(-70, 70), z: rand(-64, -80), dir: Math.random() < 0.5 ? 1 : -1, speed: rand(0.3, 0.6), seed: rand(0, 6) };
+    const p = makePerson({
+      shorts: true,
+      top: capCols[k % capCols.length],
+      trousers: pickOne([0x1b1b1f, 0x2a5aa8, 0xe5487a, 0x1fc9b7]),
+      skin: pickOne(NPC_SKINS),
+      hairStyle: 'bald',
+      prop: 'none',
+      height: rand(0.94, 1.04),
+    });
+    const cap = new THREE.Mesh(capGeo, M(capCols[k % capCols.length], 0.5));
+    cap.position.y = 0.06;
+    p.head.add(cap);
+    scene.add(collapseRig(p.group));
+    return { p, x: rand(-70, 70), z: rand(-68, -84), dir: Math.random() < 0.5 ? 1 : -1, speed: rand(0.3, 0.6), seed: rand(0, 6) };
   });
   const sup = (() => {
     const p = anyone({ shorts: true, top: 0x3d3d45 });
@@ -390,13 +396,11 @@ export function createLife(ctx: LifeCtx) {
       if (s.x > 75) s.dir = -1;
       if (s.x < -75) s.dir = 1;
       const vis = beachOut && (near(s.x, s.z) || Math.abs(dog.z - s.z) < 60);
-      s.g.visible = vis;
+      s.p.group.visible = vis;
       if (!vis) continue;
-      s.g.position.set(s.x, WATER_Y + 0.04 + Math.sin(time * 1.6 + s.seed) * 0.04, s.z);
-      s.g.rotation.y = s.dir > 0 ? 0 : Math.PI;
-      const stroke = time * 2.2 + s.seed;
-      s.arm.position.set(Math.cos(stroke) * 0.2, Math.max(-0.1, Math.sin(stroke) * 0.22), 0.18 * Math.sign(Math.sin(stroke * 0.5) || 1));
-      s.arm.rotation.z = stroke;
+      s.p.group.position.set(s.x, WATER_Y - 0.68, s.z);
+      s.p.group.rotation.y = s.dir > 0 ? 0 : Math.PI;
+      s.p.animate(time + s.seed, { speed: s.speed * 2.2, pose: 'swim' });
     }
     {
       sup.x += sup.dir * 0.6 * dt;

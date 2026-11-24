@@ -228,7 +228,7 @@ export function makeDog(look: DogLook = MILLIE): DogModel {
     const dtA = Number.isFinite(lastT) ? Math.max(0, Math.min(0.1, t - lastT)) : 0;
     lastT = t;
     const moving = s.speed > 0.15;
-    gait += dtA * (4 + Math.min(s.speed, 6) * 2.4);
+    gait += dtA * (s.swim ? Math.max(4.5, 4 + Math.min(s.speed, 6) * 2.4) : 4 + Math.min(s.speed, 6) * 2.4);
     wagP += dtA * (6 + s.wag * 12);
     const amp = Math.min(0.75, s.speed * 0.16);
     // A trot (diagonal pairs) that turns into a gallop (front pair, back pair) at speed.
@@ -239,14 +239,16 @@ export function makeDog(look: DogLook = MILLIE): DogModel {
       if (s.air) leg.rotation.z = i < 2 ? -0.6 : 0.7;
     });
     if (s.swim) {
-      // Doggy paddle: quick small strokes, chin up, tail out behind.
-      legs.forEach((leg, i) => { leg.rotation.z = Math.sin(gait * 1.5 + (i % 2 ? Math.PI : 0) + (i < 2 ? 0 : 0.8)) * 0.55; });
+      // Doggy paddle: quick alternating strokes, chin up, tail out behind.
+      legs.forEach((leg, i) => {
+        leg.rotation.z = Math.sin(gait * 1.6 + (i % 2 ? Math.PI : 0) + (i < 2 ? 0 : 0.8)) * (0.45 + Math.min(0.3, s.speed * 0.12));
+      });
     }
     if (s.peeing) legs[3].rotation.x = -1.0;
     else legs[3].rotation.x = 0;
-    body.position.y = moving ? Math.abs(Math.sin(gait)) * 0.03 * Math.min(1, s.speed / 3) : 0;
-    body.rotation.z = s.swim ? 0.14 + Math.sin(gait) * 0.03 : s.dig ? -0.22 : moving ? (gallop ? Math.sin(gait) * 0.09 : Math.sin(gait * 2) * 0.02) : 0;
-    head.rotation.z = s.dig ? -0.35 : Math.sin(t * 1.3) * 0.05;
+    body.position.y = s.swim ? Math.sin(t * 2.6) * 0.025 : moving ? Math.abs(Math.sin(gait)) * 0.03 * Math.min(1, s.speed / 3) : 0;
+    body.rotation.z = s.swim ? 0.16 + Math.sin(gait) * 0.03 : s.dig ? -0.22 : moving ? (gallop ? Math.sin(gait) * 0.09 : Math.sin(gait * 2) * 0.02) : 0;
+    head.rotation.z = s.swim ? 0.28 + Math.sin(t * 2.2) * 0.04 : s.dig ? -0.35 : Math.sin(t * 1.3) * 0.05;
     head.rotation.y = Math.sin(t * 0.7) * 0.12;
     tail.rotation.y = Math.sin(wagP) * (0.22 + s.wag * 0.28);
     tail.rotation.z = s.swim ? -0.15 : s.dig ? -0.2 : 0.1 + s.wag * 0.2;
@@ -278,7 +280,7 @@ export const NPC_TOPS = [0x4c6185, 0x9e4c47, 0x667a5c, 0xc7bda8, 0x3d3d45, 0xb28
 export const NPC_HAIRS = [0x2a1d14, 0x6b4026, 0x1a1a1a, 0xb08850, 0x8a8a8a, 0x5b3a29];
 export const NPC_SKINS = [0xf2c49e, 0xe0ac7e, 0xc68a5e, 0x8d5a3b, 0xf5d2b5];
 
-export type Pose = 'walk' | 'phone' | 'selfie' | 'sit' | 'whirl' | 'stumble' | 'ride' | 'fish' | 'lie' | 'stand' | 'scoot';
+export type Pose = 'walk' | 'phone' | 'selfie' | 'sit' | 'whirl' | 'stumble' | 'ride' | 'fish' | 'lie' | 'stand' | 'scoot' | 'swim';
 
 export interface PersonModel {
   group: THREE.Group;
@@ -439,7 +441,7 @@ export function makePerson(look: PersonLook): PersonModel {
   const animate: PersonModel['animate'] = (t, s) => {
     const dtA = Number.isFinite(lastT) ? Math.max(0, Math.min(0.1, t - lastT)) : 0;
     lastT = t;
-    walkF += dtA * (3 + Math.min(s.speed, 4.5) * 2.2);
+    walkF += dtA * (s.pose === 'swim' ? Math.max(2.6, 3 + Math.min(s.speed, 4.5) * 2.2) : 3 + Math.min(s.speed, 4.5) * 2.2);
     const run = Math.max(0, Math.min(1, (s.speed - 2.1) / 0.8));
     const amp = Math.min(0.6 + run * 0.2, s.speed * 0.42);
     const moveF = Math.min(1, s.speed / 2.2);
@@ -447,11 +449,25 @@ export function makePerson(look: PersonLook): PersonModel {
     const pull = s.pull ?? 0;
     const lf = arms[0].getObjectByName('fore') as THREE.Group;
     const rf = arms[1].getObjectByName('fore') as THREE.Group;
+    if (phone) phone.visible = s.pose !== 'swim';
     hips.position.y = 0.92;
     hips.rotation.set(0, 0, 0);
     torso.rotation.set(0, 0, 0);
     head.rotation.set(0, 0, 0);
     switch (s.pose) {
+      case 'swim':
+        // Pronated breaststroke / paddle: chest pitched down in the water, head held upright, leash hand forward.
+        hips.position.y = 0.28 + Math.sin(t * 2.4) * 0.025;
+        hips.rotation.z = -1.15;
+        torso.rotation.z = 0.25;
+        head.rotation.z = 0.95;
+        legs.forEach((l, i) => { l.rotation.z = 0.15 + Math.sin(walkF * 1.5 + i * Math.PI) * 0.38; });
+        knees.forEach((k, i) => { k.rotation.z = -0.28 - Math.max(0, Math.cos(walkF * 1.5 + i * Math.PI)) * 0.42; });
+        arms[0].rotation.set(0.15, 0, 1.15 + Math.sin(walkF) * 0.28);
+        lf.rotation.z = 0.45;
+        arms[1].rotation.set(-0.45 - Math.cos(walkF) * 0.35, 0, 1.2 + Math.sin(walkF) * 0.55);
+        rf.rotation.set(0, 0, 0.4 + Math.max(0, Math.sin(walkF)) * 0.4);
+        break;
       case 'sit':
         hips.position.y = 0.5;
         legs.forEach((l) => { l.rotation.z = 1.45; });
