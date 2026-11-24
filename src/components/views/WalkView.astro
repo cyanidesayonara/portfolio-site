@@ -21,15 +21,15 @@ const credits = songs.songs.map((s) => ({
 }));
 ---
 
-<Base title={ui.title} description={ui.description} locale={locale}>
+<Base title={ui.title} description={ui.description} image="/img/projects/leash-street.jpg" locale={locale}>
   <section class="wrap head">
-    <span class="eyebrow">{ui.eyebrow}</span>
     <h1>{ui.heading}</h1>
-    <p class="lede">{ui.lede}</p>
+    <span class="eyebrow">{ui.eyebrow}</span>
   </section>
 
   <section class="wrap game">
     <Walk3D locale={locale} />
+    <p class="lede">{ui.lede}</p>
     <p class="credits">
       {ui.creditsPrefix}
       {credits.map((c, i) => (
@@ -45,16 +45,24 @@ const credits = songs.songs.map((s) => ({
 <style>
   .head {
     display: flex;
-    flex-direction: column;
-    gap: 14px;
-    padding-block: clamp(24px, 4vw, 48px) 24px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 14px;
+    padding-block: 6px 10px;
+  }
+  .head .eyebrow {
+    margin: 0;
   }
   h1 {
-    font-size: clamp(38px, 6vw, 68px);
+    font-size: clamp(24px, 3vw, 34px);
+    margin: 0;
   }
   .lede {
-    max-width: 760px;
-    font-size: 18px;
+    margin-top: 14px;
+    max-width: 780px;
+    font-size: 14.5px;
+    line-height: 1.5;
     color: var(--ink-2);
   }
   .game {

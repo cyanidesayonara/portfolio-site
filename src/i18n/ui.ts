@@ -209,6 +209,7 @@ export interface UiDictionary {
     fullscreen: string;
     fullscreenTitle: string;
     controlsAria: string;
+    moreControls: string;
     stopsAria: string;
     tryBooth: string;
     closeBooth: string;
@@ -282,6 +283,7 @@ export interface UiDictionary {
     noscriptCtaProjects: string;
     noscriptCtaHome: string;
     controlsAria: string;
+    moreControls: string;
     keys: KeySpec[];
   };
 }
@@ -341,7 +343,7 @@ export const UI: Record<Locale, UiDictionary> = {
       eyebrow: 'Generalist full-stack developer',
       headline: 'Vibe coding, minus the vibes.',
       lede:
-        "I'm Santtu, a generalist developer and consultant at Gofore. I've spent years building software by hand, and now I build with AI agents too, held to the same standard: planned up front, tested, and reviewed before anything ships. No guesswork, no trial and error, and an end result as reliable as anything I've written line by line.",
+        "I'm Santtu, a generalist developer and consultant at Gofore. I've spent years building software by hand, and now I build with AI agents too, held to the same standard: planned up front, tested, and reviewed before anything ships. Automated tests and CI catch regressions while feel is tuned through playtesting, giving an end result as reliable as anything I've written line by line.",
       ctaProjects: 'See the projects',
       ctaHowIBuild: 'How I build',
       streetAria: 'Take Millie for a walk',
@@ -349,7 +351,7 @@ export const UI: Record<Locale, UiDictionary> = {
       allProjectsLink: 'All projects',
       howHeading: 'I direct, the agents type.',
       howBody:
-        "Briefs in, branches out, and nothing merges that I haven't read and played. That's how a whole batch of new levels for Path of Leash Resistance gets built at once.",
+        "Briefs in, branches out, and nothing merges without passing tests and CI; every player-facing change is played and accepted before it lands. That's how a whole batch of new levels for Path of Leash Resistance gets built at once.",
       howCta: 'Read how it works',
       steps: [
         { title: 'Brief', desc: 'One written task per agent' },
@@ -432,13 +434,13 @@ export const UI: Record<Locale, UiDictionary> = {
       eyebrow: 'How I build',
       heading: 'I direct, the agents type.',
       lede:
-        'I build my projects the way a small studio works. I write the plan and the briefs, coding agents build in parallel, each on its own branch, and I review, play and test everything before it merges. The judgment stays mine; the typing is shared.',
+        'I build my projects the way a small studio works. I write the plan and the briefs, coding agents build in parallel, each on its own branch, automated tests and CI gate every merge, and I play and accept every player-facing change. The judgment stays mine; the typing is shared.',
       statsAria: 'Path of Leash Resistance in numbers',
       stats: [
         { value: '1,982', label: 'commits since the first one in July 2026' },
         { value: '467', label: 'pull requests merged' },
         { value: '265', label: 'test files guarding the game' },
-        { value: '42', label: 'hand-built walks in and around Barcelona' },
+        { value: '51', label: 'hand-built walks in and around Barcelona' },
       ],
       statsNote: 'Path of Leash Resistance, as of November 2026.',
       s1Heading: '1. Write it down first',
@@ -539,6 +541,7 @@ export const UI: Record<Locale, UiDictionary> = {
       fullscreen: 'Fullscreen',
       fullscreenTitle: 'Real fullscreen',
       controlsAria: 'Controls',
+      moreControls: 'All controls',
       stopsAria: 'Stops on the street',
       tryBooth: 'Try',
       closeBooth: 'Close',
@@ -638,6 +641,7 @@ export const UI: Record<Locale, UiDictionary> = {
       noscriptCtaProjects: 'Browse all projects',
       noscriptCtaHome: 'Back to home',
       controlsAria: 'Controls',
+      moreControls: 'All controls',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Move' },
         { keys: ['Shift'], label: 'Run' },
@@ -713,7 +717,7 @@ export const UI: Record<Locale, UiDictionary> = {
       eyebrow: 'Desarrollador full-stack generalista',
       headline: 'Vibe coding, sin vibras.',
       lede:
-        'Soy Santtu, desarrollador generalista y consultor en Gofore. Llevo años escribiendo software a mano y ahora también construyo con agentes de IA bajo el mismo listón: planificado de antemano, probado y revisado antes de publicar nada. Sin intuiciones ni ensayo y error, con un resultado tan fiable como cualquier código que haya escrito línea a línea.',
+        'Soy Santtu, desarrollador generalista y consultor en Gofore. Llevo años escribiendo software a mano y ahora también construyo con agentes de IA bajo el mismo listón: planificado de antemano, probado y revisado antes de publicar nada. Las pruebas automáticas y CI vigilan las regresiones mientras la jugabilidad se afina probando cada partida, con un resultado tan fiable como cualquier código que haya escrito línea a línea.',
       ctaProjects: 'Ver los proyectos',
       ctaHowIBuild: 'Cómo construyo',
       streetAria: 'Saca a pasear a Millie',
@@ -721,7 +725,7 @@ export const UI: Record<Locale, UiDictionary> = {
       allProjectsLink: 'Todos los proyectos',
       howHeading: 'Yo dirijo, los agentes escriben.',
       howBody:
-        'Encargos claros, ramas separadas y nada se fusiona sin que antes lo haya leído y probado. Así es como se construye de golpe toda una tanda de niveles nuevos para Path of Leash Resistance.',
+        'Encargos claros, ramas separadas y nada se fusiona sin pasar las pruebas y CI; cada cambio visible para el jugador se juega y acepta antes de entrar. Así es como se construye de golpe toda una tanda de niveles nuevos para Path of Leash Resistance.',
       howCta: 'Cómo funciona',
       steps: [
         { title: 'Encargo', desc: 'Una tarea escrita por agente' },
@@ -804,13 +808,13 @@ export const UI: Record<Locale, UiDictionary> = {
       eyebrow: 'Cómo construyo',
       heading: 'Yo dirijo, los agentes escriben.',
       lede:
-        'Construyo mis proyectos como lo haría un pequeño estudio. Yo redacto el plan y los encargos, los agentes programan en paralelo cada uno en su propia rama, y yo lo reviso, lo pruebo y lo juego todo antes de fusionar. El criterio sigue siendo mío; teclear es trabajo compartido.',
+        'Construyo mis proyectos como lo haría un pequeño estudio. Yo redacto el plan y los encargos, los agentes programan en paralelo cada uno en su propia rama, las pruebas automáticas y CI filtran cada fusión, y yo juego y acepto cada cambio visible para el jugador. El criterio sigue siendo mío; teclear es trabajo compartido.',
       statsAria: 'Path of Leash Resistance en cifras',
       stats: [
         { value: '1,982', label: 'commits desde el primero en julio de 2026' },
         { value: '467', label: 'pull requests fusionadas' },
         { value: '265', label: 'archivos de pruebas protegiendo el juego' },
-        { value: '42', label: 'paseos hechos a mano por Barcelona y alrededores' },
+        { value: '51', label: 'paseos hechos a mano por Barcelona y alrededores' },
       ],
       statsNote: 'Path of Leash Resistance, a noviembre de 2026.',
       s1Heading: '1. Dejarlo escrito primero',
@@ -911,6 +915,7 @@ export const UI: Record<Locale, UiDictionary> = {
       fullscreen: 'Pantalla completa',
       fullscreenTitle: 'Pantalla completa real',
       controlsAria: 'Controles',
+      moreControls: 'Todos los controles',
       stopsAria: 'Paradas de la calle',
       tryBooth: 'Probar',
       closeBooth: 'Cerrar',
@@ -1010,6 +1015,7 @@ export const UI: Record<Locale, UiDictionary> = {
       noscriptCtaProjects: 'Ver proyectos',
       noscriptCtaHome: 'Volver al inicio',
       controlsAria: 'Controles',
+      moreControls: 'Todos los controles',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Mover' },
         { keys: ['Shift'], label: 'Correr' },
@@ -1085,7 +1091,7 @@ export const UI: Record<Locale, UiDictionary> = {
       eyebrow: 'Desenvolupador full-stack generalista',
       headline: 'Vibe coding, sense vibes.',
       lede:
-        "Soc en Santtu, desenvolupador generalista i consultor a Gofore. Fa anys que escric programari a mà i ara també construeixo amb agents d'IA sota el mateix llistó: planificat per endavant, provat i revisat abans de publicar res. Sense temptejos ni assaig i error, amb un resultat tan fiable com qualsevol codi que hagi escrit línia per línia.",
+        "Soc en Santtu, desenvolupador generalista i consultor a Gofore. Fa anys que escric programari a mà i ara també construeixo amb agents d'IA sota el mateix llistó: planificat per endavant, provat i revisat abans de publicar res. Les proves automàtiques i CI vigilen les regressions mentre el tacte s'afina jugant-hi, amb un resultat tan fiable com qualsevol codi que hagi escrit línia per línia.",
       ctaProjects: 'Veure els projectes',
       ctaHowIBuild: 'Com construeixo',
       streetAria: 'Treu la Millie a passejar',
@@ -1093,7 +1099,7 @@ export const UI: Record<Locale, UiDictionary> = {
       allProjectsLink: 'Tots els projectes',
       howHeading: 'Jo dirigeixo, els agents escriuen.',
       howBody:
-        "Encàrrecs clars, branques separades i res no s'integra sense que abans ho hagi llegit i provat. Així és com es construeix de cop tota una tanda de nivells nous per a Path of Leash Resistance.",
+        "Encàrrecs clars, branques separades i res no s'integra sense passar les proves i CI; cada canvi visible per al jugador es juga i s'accepta abans d'entrar. Així és com es construeix de cop tota una tanda de nivells nous per a Path of Leash Resistance.",
       howCta: 'Com funciona',
       steps: [
         { title: 'Encàrrec', desc: 'Una tasca escrita per agent' },
@@ -1176,13 +1182,13 @@ export const UI: Record<Locale, UiDictionary> = {
       eyebrow: 'Com construeixo',
       heading: 'Jo dirigeixo, els agents escriuen.',
       lede:
-        "Construeixo els meus projectes com ho faria un petit estudi. Jo redacto el pla i els encàrrecs, els agents programen en paral·lel cadascú en la seva branca, i jo ho reviso, ho provo i ho jugo tot abans de fusionar. El criteri continua sent meu; picar codi és feina compartida.",
+        "Construeixo els meus projectes com ho faria un petit estudi. Jo redacto el pla i els encàrrecs, els agents programen en paral·lel cadascú en la seva branca, les proves automàtiques i CI filtren cada fusió, i jo jugo i accepto cada canvi visible per al jugador. El criteri continua sent meu; picar codi és feina compartida.",
       statsAria: 'Path of Leash Resistance en xifres',
       stats: [
         { value: '1,982', label: 'commits des del primer el juliol de 2026' },
         { value: '467', label: 'pull requests fusionades' },
         { value: '265', label: 'fitxers de proves protegint el joc' },
-        { value: '42', label: 'passeigs fets a mà per Barcelona i rodalies' },
+        { value: '51', label: 'passeigs fets a mà per Barcelona i rodalies' },
       ],
       statsNote: 'Path of Leash Resistance, a novembre de 2026.',
       s1Heading: '1. Deixar-ho escrit primer',
@@ -1283,6 +1289,7 @@ export const UI: Record<Locale, UiDictionary> = {
       fullscreen: 'Pantalla completa',
       fullscreenTitle: 'Pantalla completa real',
       controlsAria: 'Controls',
+      moreControls: 'Tots els controls',
       stopsAria: 'Parades del carrer',
       tryBooth: 'Prova',
       closeBooth: 'Tanca',
@@ -1382,6 +1389,7 @@ export const UI: Record<Locale, UiDictionary> = {
       noscriptCtaProjects: 'Mostra els projectes',
       noscriptCtaHome: 'Torna a l’inici',
       controlsAria: 'Controls',
+      moreControls: 'Tots els controls',
       keys: [
         { keys: ['W', 'A', 'S', 'D'], label: 'Mou-te' },
         { keys: ['Shift'], label: 'Corre' },

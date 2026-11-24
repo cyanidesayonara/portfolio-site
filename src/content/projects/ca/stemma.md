@@ -5,7 +5,7 @@ summary: Un reproductor de música per a Windows que separa qualsevol cançó en
 kind: Desktop app
 stack: [Python, PySide6, ONNX Runtime, HTDemucs, DirectML, librosa]
 years: "2026"
-cover: /img/projects/stemma-practice.png
+cover: /img/projects/stemma-practice.webp
 coverAlt: Vista de pràctica de stemma amb formes d'ona apilades per pista i mesclador a sota
 coverDark: true
 coverPosition: "88% 50%"
@@ -30,7 +30,7 @@ Importa una cançó, separa-la en pistes (veu, bateria, baix, guitarra, piano, a
 - **Entrenador de bucle**: amb un bucle actiu, la velocitat puja un graó a cada repetició fins que toques al tempo complet.
 - Velocitat en directe preservant l'afinació, transposició de ±7 semitons, detecció automàtica de tempo, tonalitat i pols, metrònom sincronitzat amb compte previ i temes clar i fosc.
 
-![Enregistrant preses damunt les pistes](/img/projects/stemma-takes.png)
+![Enregistrant preses damunt les pistes](/img/projects/stemma-takes.webp)
 
 ## Separació
 

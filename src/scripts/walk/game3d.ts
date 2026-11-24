@@ -271,9 +271,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const markedSpots = new Set<object>();
 
   const goals: GoalRow[] = [
+    { id: 'whirl', label: 'Fling your human with a pole whirl', done: false, area: 'any' },
     { id: 'mark', label: 'Mark 5 spots (Q)', done: false, count: 0, target: 5, area: 'any' },
     { id: 'birds', label: 'Scatter the gulls or pigeons (E)', done: false, area: 'any' },
-    { id: 'whirl', label: 'Fling your human with a pole whirl', done: false, area: 'any' },
     { id: 'finds', label: 'Dig up 3 finds on the beach (Space)', done: false, count: 0, target: 3, area: 'seafront' },
     { id: 'hurdles', label: 'Clear the 3 hurdles in the pipicà (V)', done: false, count: 0, target: 3, area: 'seafront' },
     { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false, area: 'seafront' },
@@ -2863,11 +2863,40 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     perfTick(frameMs, now);
     rafId = requestAnimationFrame(loop);
   };
+  let contextLost = false;
+  let lostOverlay: HTMLElement | null = null;
   const setRunning = () => {
-    const run = engaged && onScreen && !document.hidden;
+    const run = engaged && onScreen && !document.hidden && !contextLost;
     if (run && !rafId) { prev = performance.now(); rafId = requestAnimationFrame(loop); }
     else if (!run && rafId) { cancelAnimationFrame(rafId); rafId = 0; releaseAll(); }
   };
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    contextLost = true;
+    setRunning();
+    if (!lostOverlay) {
+      lostOverlay = document.createElement('div');
+      lostOverlay.className = 'webgl-lost';
+      const box = document.createElement('div');
+      box.className = 'webgl-lost-box';
+      const p = document.createElement('p');
+      p.textContent = '3D view paused while the graphics context resets.';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Reload page';
+      btn.addEventListener('click', () => location.reload());
+      box.append(p, btn);
+      lostOverlay.appendChild(box);
+      host.appendChild(lostOverlay);
+    }
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    contextLost = false;
+    lostOverlay?.remove();
+    lostOverlay = null;
+    renderer.render(scene, camera);
+    setRunning();
+  });
   new IntersectionObserver(([e]) => { onScreen = e.isIntersecting || full; setRunning(); }).observe(host);
   document.addEventListener('visibilitychange', setRunning);
   const engage = () => {

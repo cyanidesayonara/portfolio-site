@@ -5,7 +5,7 @@ summary: Descobreix i escolta milers de pòdcasts gratuïts. Va començar com el
 kind: Mobile app
 stack: [Flutter, Django REST Framework, PostgreSQL, Celery, Redis, Scrapy, Docker]
 years: "2017 fins avui"
-cover: /img/projects/dop3pod.png
+cover: /img/projects/dop3pod.webp
 coverAlt: L'aplicació mòbil dopepod
 links:
   - label: Google Play
@@ -24,7 +24,7 @@ Un reproductor de pòdcasts que ha evolucionat des d'una aplicació web fins a u
 
 El dopepod original va néixer com el meu projecte final de CS50. Utilitzava Django amb PostgreSQL al backend i jQuery al frontend. L'API d'iTunes proveïa el catàleg de pòdcasts i uns scrapers propis n'enriquien les metadades.
 
-![La versió web original](/img/projects/dopepod.png)
+![La versió web original](/img/projects/dopepod.webp)
 
 ## Versió mòbil (`dop3pod`)
 

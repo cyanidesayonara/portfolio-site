@@ -6,7 +6,7 @@ kind: Game
 stack: [Godot 4, GDScript, Física Verlet de cuerda, Audio sintetizado, GitHub Actions]
 years: "2026"
 cover: /img/projects/leash-street.jpg
-coverAlt: Un perro tira de su humano distraído con el móvil cruzando un carril bici de Barcelona con una correa roja larga
+coverAlt: Un perro tira de su humano distraído con el móvil sobre el pavimento ondulado de La Rambla junto a un carril bici con una correa roja
 links:
   - label: Jugar en el navegador
     href: https://cyanidesayonara.github.io/path-of-leash-resistance/
@@ -49,4 +49,4 @@ La correa es una cuerda real. La que ves en pantalla es la misma que hace la fí
 - **Todo está dibujado por código.** No hay archivos de sprites: cada perro, farola y baldosa de trencadís es un vector dibujado en `_draw()`, agrupado en lotes para que la versión web vaya fluida.
 - **Toda la música y los efectos están sintetizados en código** y prerrenderizados para las versiones publicadas.
 - **Las entregas están automatizadas**: una etiqueta de versión compila y sube las versiones web y Windows a itch.io y empaqueta la entrega para Microsoft Store.
-- **Construido con un equipo de agentes de programación con IA.** Cada paseo se redacta como un encargo, lo construye un agente en su propio worktree y rama, y se juega y revisa antes de fusionarse. Más detalles en [Cómo construyo](/es/how-i-build).
+- **Construido con un equipo de agentes de programación con IA.** Cada paseo se redacta como un encargo, lo construye un agente en su propio worktree y rama, pasa las pruebas automáticas y CI, y cada cambio visible para el jugador se juega y acepta antes de fusionarse. Más detalles en [Cómo construyo](/es/how-i-build).

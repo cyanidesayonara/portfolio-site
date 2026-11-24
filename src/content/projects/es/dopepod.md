@@ -5,7 +5,7 @@ summary: Descubre y escucha miles de podcasts gratuitos. Empezó como mi proyect
 kind: Mobile app
 stack: [Flutter, Django REST Framework, PostgreSQL, Celery, Redis, Scrapy, Docker]
 years: "2017 hasta hoy"
-cover: /img/projects/dop3pod.png
+cover: /img/projects/dop3pod.webp
 coverAlt: La aplicación móvil dopepod
 links:
   - label: Google Play
@@ -24,7 +24,7 @@ Un reproductor de podcasts que ha evolucionado desde una aplicación web hasta u
 
 El dopepod original nació como mi proyecto final de CS50. Usaba Django con PostgreSQL en el servidor y jQuery en el cliente. La API de iTunes aportaba el catálogo de podcasts y unos scrapers propios enriquecían los metadatos.
 
-![La versión web original](/img/projects/dopepod.png)
+![La versión web original](/img/projects/dopepod.webp)
 
 ## Versión móvil (`dop3pod`)
 

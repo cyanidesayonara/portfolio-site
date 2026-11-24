@@ -55,9 +55,7 @@ Borealis va ser un fork del [projecte Aurora](https://github.com/pixelmatix/auro
 El vaig muntar la primavera del 2016, abans de saber programar. Tot el que vaig fer llavors va ser canviar alguns números i comentar funcions que no feia servir per estalviar memòria: a 64×64 anava perillosament a prop dels 64 KB de RAM del Teensy. Anys més tard hi vaig tornar ja sabent programar per netejar aquell codi, i allò va acabar creixent fins a Coriolis.
 
 <div class="gallery">
-
-![Patró de Borealis](/img/projects/borealis-1.webp)
-![Patró de Borealis](/img/projects/borealis-2.webp)
-![Patró de Borealis](/img/projects/borealis-3.webp)
-
+  <a class="anim-toggle" href="/img/projects/borealis-1.webp" data-anim="/img/projects/borealis-1.webp" data-poster="/img/projects/borealis-1-poster.jpg" data-label-play="Mostra l'animació" data-label-stop="Mostra la imatge"><img src="/img/projects/borealis-1-poster.jpg" alt="Patró de Borealis 1" loading="lazy" decoding="async" /><span class="anim-badge">Mostra l'animació</span></a>
+  <a class="anim-toggle" href="/img/projects/borealis-2.webp" data-anim="/img/projects/borealis-2.webp" data-poster="/img/projects/borealis-2-poster.jpg" data-label-play="Mostra l'animació" data-label-stop="Mostra la imatge"><img src="/img/projects/borealis-2-poster.jpg" alt="Patró de Borealis 2" loading="lazy" decoding="async" /><span class="anim-badge">Mostra l'animació</span></a>
+  <a class="anim-toggle" href="/img/projects/borealis-3.webp" data-anim="/img/projects/borealis-3.webp" data-poster="/img/projects/borealis-3-poster.jpg" data-label-play="Mostra l'animació" data-label-stop="Mostra la imatge"><img src="/img/projects/borealis-3-poster.jpg" alt="Patró de Borealis 3" loading="lazy" decoding="async" /><span class="anim-badge">Mostra l'animació</span></a>
 </div>

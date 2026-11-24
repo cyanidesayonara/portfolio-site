@@ -4,7 +4,7 @@ tagline: Gestión de inventario para un almacén de repuestos de un distrito hos
 summary: Una aplicación Django que sustituyó los registros en papel del almacén del Distrito Hospitalario de Helsinki, con lectura QR e importación y exportación en Excel.
 kind: Web app
 stack: [Python, Django, jQuery, PostgreSQL, Docker]
-cover: /img/projects/varastolista.png
+cover: /img/projects/varastolista.webp
 coverAlt: La interfaz de inventario de Varastolista
 links:
   - label: Código en GitHub

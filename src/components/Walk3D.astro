@@ -18,7 +18,8 @@ interface Props {
 }
 const { lazy = false, id = 'walk', locale = 'en' } = Astro.props;
 const ui = getUi(locale).walk3d;
-const KEYS = ui.keys;
+const CORE_KEYS = ui.keys.filter((k) => ['W', 'Space', 'E'].includes(k.keys[0]));
+const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]));
 const localePrefix = locale === 'en' ? '' : `/${locale}`;
 const fallbackLinks = [
   { label: 'Path of Leash Resistance', href: localePath(locale, '/projects/path-of-leash-resistance') },
@@ -173,20 +174,39 @@ const fallbackLinks = [
     </div>
   </div>
   <figcaption>
-    <ul class="keys" aria-label={ui.controlsAria}>
-      {
-        KEYS.map((k) => (
-          <li>
-            <span class="caps">
-              {k.keys.map((key) => (
-                <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
-              ))}
-            </span>
-            <span>{k.label}</span>
-          </li>
-        ))
-      }
-    </ul>
+    <div class="keys-row">
+      <ul class="keys" aria-label={ui.controlsAria}>
+        {
+          CORE_KEYS.map((k) => (
+            <li>
+              <span class="caps">
+                {k.keys.map((key) => (
+                  <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+                ))}
+              </span>
+              <span>{k.label}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <details class="more-keys">
+        <summary>{ui.moreControls}</summary>
+        <ul class="keys extra-keys">
+          {
+            EXTRA_KEYS.map((k) => (
+              <li>
+                <span class="caps">
+                  {k.keys.map((key) => (
+                    <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+                  ))}
+                </span>
+                <span>{k.label}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </details>
+    </div>
   </figcaption>
 </figure>
 
@@ -308,7 +328,7 @@ const fallbackLinks = [
   }
   .stage {
     position: relative;
-    height: clamp(440px, 64vh, 720px);
+    height: clamp(340px, calc(100svh - 205px), 680px);
     background: linear-gradient(#5fa8e0, #cfe6f2);
     overflow: hidden;
     user-select: none;
@@ -334,6 +354,34 @@ const fallbackLinks = [
     padding: 32px;
     color: var(--stone);
     max-width: 52ch;
+  }
+  .stage :global(.webgl-lost) {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(11, 20, 48, 0.88);
+    color: var(--stone);
+    text-align: center;
+    z-index: 9;
+  }
+  .stage :global(.webgl-lost-box) {
+    max-width: 36ch;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .stage :global(.webgl-lost button) {
+    min-height: 36px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--saffron);
+    color: var(--navy-deep);
+    font: 700 13px var(--font-display);
+    cursor: pointer;
   }
 
   .focus-hint {
@@ -1210,11 +1258,17 @@ const fallbackLinks = [
 
   /* ---- Caption: keycaps ---- */
   figcaption {
-    padding: 12px clamp(14px, 3vw, 22px) 14px;
+    padding: 10px clamp(14px, 3vw, 22px) 12px;
     background: var(--feature-bg);
     color: var(--feature-ink);
   }
   .walk3d:global(.immersive) figcaption { display: none; }
+  .keys-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 18px;
+  }
   .keys {
     display: flex;
     flex-wrap: wrap;
@@ -1224,6 +1278,33 @@ const fallbackLinks = [
     list-style: none;
     font-size: 13px;
     color: var(--feature-ink-2);
+  }
+  .more-keys {
+    font-size: 12.5px;
+    color: var(--feature-ink-2);
+  }
+  .more-keys[open] {
+    width: 100%;
+  }
+  .more-keys summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--feature-ink);
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  .more-keys summary::-webkit-details-marker { display: none; }
+  .more-keys summary::after { content: '+'; font-weight: 800; }
+  .more-keys[open] summary::after { content: '-'; }
+  .extra-keys {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
   }
   .keys li { display: inline-flex; align-items: center; gap: 6px; }
   .caps { display: inline-flex; gap: 3px; }

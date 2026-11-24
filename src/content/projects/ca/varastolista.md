@@ -4,7 +4,7 @@ tagline: Gestió d'inventari per a un magatzem de recanvis d'un districte hospit
 summary: Una aplicació Django que va substituir els registres en paper del magatzem del Districte Hospitalari d'Hèlsinki, amb lectura QR i importació i exportació en Excel.
 kind: Web app
 stack: [Python, Django, jQuery, PostgreSQL, Docker]
-cover: /img/projects/varastolista.png
+cover: /img/projects/varastolista.webp
 coverAlt: La interfície d'inventari de Varastolista
 links:
   - label: Codi a GitHub

@@ -80,8 +80,9 @@ export class Leash {
       if (t <= 0 || t >= 1) continue; // the vertex pass handles the ends
       const s = (o.x - a.x) * nx + (o.z - a.z) * nz; // signed distance of the pole from the line
       if (Math.abs(s) > min + len) continue;
+      const lockSide = !this.whirl && this.freeSlip <= 0 && this.stretch <= 1.35;
       let side: number;
-      if (plen2 > 1e-10) {
+      if (lockSide && plen2 > 1e-10) {
         const pt = ((o.x - prevX[i]) * pex + (o.z - prevZ[i]) * pez) / plen2;
         const ps = (pex * (o.z - prevZ[i]) - pez * (o.x - prevX[i])) / Math.sqrt(plen2);
         // Only trust last frame's side if the pole was alongside that segment too.

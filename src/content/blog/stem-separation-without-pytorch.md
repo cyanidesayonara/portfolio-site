@@ -4,7 +4,7 @@ description: "How stemma runs HTDemucs, MDX-Net and beat tracking locally on Win
 date: 2026-10-14
 tags: [python, onnx, directml, audio, dsp]
 project: stemma
-cover: /img/projects/stemma-takes.png
+cover: /img/projects/stemma-takes.webp
 coverAlt: stemma mixer showing separated instrument stems and recorded takes
 ---
 

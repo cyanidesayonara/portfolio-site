@@ -6,7 +6,7 @@ kind: Game
 stack: [Godot 4, GDScript, Verlet rope physics, Synthesized audio, GitHub Actions]
 years: "2026"
 cover: /img/projects/leash-street.jpg
-coverAlt: A dog pulls its phone-distracted owner across a Barcelona bike lane on a long red leash
+coverAlt: A dog pulling its phone-distracted human along La Rambla's wavy paving next to a bike lane on a red leash
 links:
   - label: Play in the browser
     href: https://cyanidesayonara.github.io/path-of-leash-resistance/
@@ -49,4 +49,4 @@ The leash is real rope. The one you see is the one doing the physics: it wraps p
 - **Everything is drawn in code.** There are no sprite files: every dog, lamppost and tile of trencadís is a vector drawn in `_draw()`, batched to keep the web build fast.
 - **All music and sound is synthesized in code**, then pre-rendered for release builds.
 - **Releases are automated**: a version tag builds and pushes the web and Windows builds to itch.io and packages the Microsoft Store version.
-- **Built with a team of AI coding agents.** Each walk is written up as a brief, built by an agent in its own worktree and branch, and played and reviewed before it merges. More on that in [How I build](/how-i-build).
+- **Built with a team of AI coding agents.** Each walk is written up as a brief, built by an agent in its own worktree and branch, gated by automated tests and CI, with every player-facing change played and accepted before it merges. More on that in [How I build](/how-i-build).

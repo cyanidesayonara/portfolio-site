@@ -5,7 +5,7 @@ summary: A Windows music player that splits any song into stems, so you can drop
 kind: Desktop app
 stack: [Python, PySide6, ONNX Runtime, HTDemucs, DirectML, librosa]
 years: "2026"
-cover: /img/projects/stemma-practice.png
+cover: /img/projects/stemma-practice.webp
 coverAlt: The stemma practice view, with a stacked waveform per stem and a mixer below
 coverDark: true
 coverPosition: "88% 50%"
@@ -30,7 +30,7 @@ Import a song, separate it into stems (vocals, drums, bass, guitar, piano, other
 - **Loop Trainer**: with a loop set, the speed steps up one preset on each repeat until you're playing at full tempo.
 - Live pitch-preserving speed, transposition of ±7 semitones, automatic tempo, key and beat detection, a synced metronome with count-in, and light and dark themes.
 
-![Recording takes over the stems](/img/projects/stemma-takes.png)
+![Recording takes over the stems](/img/projects/stemma-takes.webp)
 
 ## Separation
 

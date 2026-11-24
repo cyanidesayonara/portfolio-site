@@ -206,3 +206,21 @@ const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?
     margin-bottom: 24px;
   }
 </style>
+
+<script>
+  document.querySelectorAll<HTMLAnchorElement>('.prose .gallery a.anim-toggle').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      const anim = link.dataset.anim;
+      const poster = link.dataset.poster;
+      const img = link.querySelector('img');
+      if (!anim || !poster || !img) return;
+      e.preventDefault();
+      const playing = link.classList.toggle('playing');
+      img.src = playing ? anim : poster;
+      const badge = link.querySelector('.anim-badge');
+      if (badge) {
+        badge.textContent = (playing ? link.dataset.labelStop : link.dataset.labelPlay) ?? '';
+      }
+    });
+  });
+</script>

@@ -4,7 +4,7 @@ description: "How stemma goes from a Python and PySide6 repo to a signed Microso
 date: 2026-11-06
 tags: [python, pyside6, windows, msix, ci]
 project: stemma
-cover: /img/projects/stemma-practice.png
+cover: /img/projects/stemma-practice.webp
 coverAlt: The stemma practice view with stacked stem waveforms and practice controls
 ---
 

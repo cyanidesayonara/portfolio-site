@@ -25,7 +25,8 @@ const STOPS = ui.stops.map((s) => ({
   color: s.color,
   ink: s.ink,
 }));
-const KEYS = ui.keys;
+const CORE_KEYS = ui.keys.filter((k) => ['W', 'Space', 'E'].includes(k.keys[0]));
+const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]));
 ---
 
 <figure
@@ -99,20 +100,39 @@ const KEYS = ui.keys;
         <button class="sound" type="button" data-fs="screen" aria-pressed="false" title={ui.fullscreenTitle}>{ui.fullscreen}</button>
       </div>
     </div>
-    <ul class="keys" aria-label={ui.controlsAria}>
-      {
-        KEYS.map((k) => (
-          <li>
-            <span class="caps">
-              {k.keys.map((key) => (
-                <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
-              ))}
-            </span>
-            <span class="what">{k.label}</span>
-          </li>
-        ))
-      }
-    </ul>
+    <div class="keys-row">
+      <ul class="keys" aria-label={ui.controlsAria}>
+        {
+          CORE_KEYS.map((k) => (
+            <li>
+              <span class="caps">
+                {k.keys.map((key) => (
+                  <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+                ))}
+              </span>
+              <span class="what">{k.label}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <details class="more-keys">
+        <summary>{ui.moreControls}</summary>
+        <ul class="keys extra-keys">
+          {
+            EXTRA_KEYS.map((k) => (
+              <li>
+                <span class="caps">
+                  {k.keys.map((key) => (
+                    <kbd class:list={{ wide: key.length > 1 }}>{key}</kbd>
+                  ))}
+                </span>
+                <span class="what">{k.label}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </details>
+    </div>
     <ul class="stops" aria-label={ui.stopsAria}>
       {
         STOPS.map((s) => (
@@ -219,22 +239,57 @@ const KEYS = ui.keys;
     .sound { padding: 0 11px; font-size: 13px; }
   }
   /* Keycaps for the controls: shown once the game runs, on keyboards only. */
-  .keys {
+  .keys-row {
     display: none;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px 18px;
-    margin: 0;
     padding: 12px 0 0;
     border-top: 1px solid var(--line);
-    list-style: none;
   }
-  .street:global(.live) .keys {
+  .street:global(.live) .keys-row {
     display: flex;
   }
   @media (pointer: coarse) {
-    .street:global(.live) .keys {
+    .street:global(.live) .keys-row {
       display: none;
     }
+  }
+  .keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .more-keys {
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .more-keys[open] {
+    width: 100%;
+  }
+  .more-keys summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--ink);
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .more-keys summary::-webkit-details-marker { display: none; }
+  .more-keys summary::after { content: '+'; font-weight: 800; }
+  .more-keys[open] summary::after { content: '-'; }
+  .extra-keys {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
   }
   .keys li {
     display: inline-flex;

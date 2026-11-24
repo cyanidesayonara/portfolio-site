@@ -4,7 +4,7 @@ description: "Cómo stemma ejecuta HTDemucs, MDX-Net y detección de pulsos loca
 date: 2026-10-14
 tags: [python, onnx, directml, audio, dsp]
 project: stemma
-cover: /img/projects/stemma-takes.png
+cover: /img/projects/stemma-takes.webp
 coverAlt: Mezclador de stemma mostrando pistas de instrumentos separadas y tomas grabadas
 ---
 

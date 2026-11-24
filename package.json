@@ -12,7 +12,8 @@
     "preview": "astro preview",
     "astro": "astro",
     "sync:check": "node tools/sync-projects.mjs",
-    "sync:apply": "node tools/sync-projects.mjs --apply"
+    "sync:apply": "node tools/sync-projects.mjs --apply",
+    "test": "node --test tests/*.test.ts"
   },
   "dependencies": {
     "@astrojs/rss": "4.0.19",

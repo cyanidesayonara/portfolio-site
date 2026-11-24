@@ -6,7 +6,7 @@ kind: Game
 stack: [Godot 4, GDScript, Física Verlet de corda, Àudio sintetitzat, GitHub Actions]
 years: "2026"
 cover: /img/projects/leash-street.jpg
-coverAlt: Un gos estira el seu humà distret amb el mòbil travessant un carril bici de Barcelona amb una corretja vermella llarga
+coverAlt: Un gos estira el seu humà distret amb el mòbil pel paviment ondulat de La Rambla al costat d'un carril bici amb una corretja vermella
 links:
   - label: Juga al navegador
     href: https://cyanidesayonara.github.io/path-of-leash-resistance/
@@ -49,4 +49,4 @@ La corretja és una corda real. La que veus en pantalla és la mateixa que calcu
 - **Tot està dibuixat per codi.** No hi ha fitxers d'sprites: cada gos, fanal i panot de trencadís és un vector dibuixat dins `_draw()`, agrupat per lots perquè la versió web vagi fluida.
 - **Tota la música i els efectes són sintetitzats en codi** i prerenderitzats per a les versions publicades.
 - **Els llançaments són automatitzats**: una etiqueta de versió compila i puja les versions web i Windows a itch.io i empaqueta la versió de Microsoft Store.
-- **Construït amb un equip d'agents de programació amb IA.** Cada passeig s'escriu com un encàrrec, el construeix un agent al seu propi worktree i branca, i es juga i revisa abans de fusionar. Més detalls a [Com construeixo](/ca/how-i-build).
+- **Construït amb un equip d'agents de programació amb IA.** Cada passeig s'escriu com un encàrrec, el construeix un agent al seu propi worktree i branca, passa les proves automàtiques i CI, i cada canvi visible per al jugador es juga i s'accepta abans de fusionar-se. Més detalls a [Com construeixo](/ca/how-i-build).

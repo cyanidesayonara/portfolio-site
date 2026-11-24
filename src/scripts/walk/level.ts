@@ -729,6 +729,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (Math.abs(x) < 8) continue;
     addLamp(makeSpotMast(), x, GROUND_Y, -1.5);
   }
+  // Extra promenade mast right beside spawn so pole whirling is an immediate first-screen hook.
+  addLamp(makeSpotMast(), -24, GROUND_Y, -1.5);
   for (let x = -80; x <= 80; x += 12) {
     if (Math.abs(x) < 6 || (x > -54 && x < -42)) continue;
     // Concrete block bench with a wooden seat.

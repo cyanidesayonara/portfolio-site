@@ -3,7 +3,7 @@ title: "Comparant Claude 3.5 i 3.7: fent una app per compartir despeses"
 description: Dues versions de Claude van rebre el mateix encàrrec per a una aplicació de despeses compartides en Flutter i van prendre camins ben diferents.
 date: 2025-04-08
 tags: [ai, claude, flutter]
-cover: /img/posts/ai-comparison.png
+cover: /img/posts/ai-comparison.webp
 coverAlt: Dos robots que representen Claude 3.5 i 3.7 jugant al Rock 'em Sock 'em Robots, generada per ChatGPT
 ---
 

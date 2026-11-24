@@ -4,7 +4,7 @@ description: "Com passa stemma d'un repositori en Python i PySide6 a un paquet M
 date: 2026-11-06
 tags: [python, pyside6, windows, msix, ci]
 project: stemma
-cover: /img/projects/stemma-practice.png
+cover: /img/projects/stemma-practice.webp
 coverAlt: Vista de pràctica de stemma amb formes d'ona apilades per pista i controls
 ---
 

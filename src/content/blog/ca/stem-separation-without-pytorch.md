@@ -4,7 +4,7 @@ description: "Com stemma executa HTDemucs, MDX-Net i detecció de pols en local 
 date: 2026-10-14
 tags: [python, onnx, directml, audio, dsp]
 project: stemma
-cover: /img/projects/stemma-takes.png
+cover: /img/projects/stemma-takes.webp
 coverAlt: Mesclador de stemma mostrant pistes d'instruments separades i preses enregistrades
 ---
 

@@ -5,7 +5,7 @@ summary: Un reproductor de música para Windows que separa cualquier canción en
 kind: Desktop app
 stack: [Python, PySide6, ONNX Runtime, HTDemucs, DirectML, librosa]
 years: "2026"
-cover: /img/projects/stemma-practice.png
+cover: /img/projects/stemma-practice.webp
 coverAlt: Vista de práctica de stemma con formas de onda apiladas por pista y mezclador abajo
 coverDark: true
 coverPosition: "88% 50%"
@@ -30,7 +30,7 @@ Importa una canción, sepárala en pistas (voz, batería, bajo, guitarra, piano,
 - **Entrenador de bucle**: con un bucle activo, la velocidad sube un escalón en cada repetición hasta alcanzar el tempo completo.
 - Velocidad en vivo manteniendo el tono, transposición de ±7 semitonos, detección automática de tempo, tonalidad y pulso, metrónomo sincronizado con cuenta previa y temas claro y oscuro.
 
-![Grabando tomas sobre las pistas](/img/projects/stemma-takes.png)
+![Grabando tomas sobre las pistas](/img/projects/stemma-takes.webp)
 
 ## Separación
 
