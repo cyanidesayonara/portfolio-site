@@ -25,6 +25,8 @@ Tu humano va pegado al móvil y camina en piloto automático. Tú estás al otro
 
 ## Cómo se juega
 
+![Clip de juego de Path of Leash Resistance mostrando giros alrededor de un poste y tirones de correa](/img/projects/leash-hero.webp)
+
 Tu humano pesa cuatro veces más que tú y gana cualquier tirón recto. Así que ganas como gana un perro: plántate en el momento justo, enreda la correa alrededor de una farola para dejarlo anclado y ladra para frenarlo en seco en el bordillo. Enróllalo alrededor de un poste y sigue tirando para que salga girando como un tethered ball.
 
 La correa es una cuerda real. La que ves en pantalla es la misma que hace la física: se enrolla en los postes, se tensa al límite, resbala con un tirón seco y se enreda con las correas de otros paseantes.
@@ -40,6 +42,8 @@ La correa es una cuerda real. La que ves en pantalla es la misma que hace la fí
 - **Retos y combos**: da la vuelta a un poste, desliza por un bordillo, lanza a tu humano o acepta un reto con sintonía propia.
 - **Nueve cielos y seis horas del día**, en inglés, catalán y español, con sacudida de pantalla, destellos, tamaño de texto y controles ajustables.
 - Sin anuncios, sin compras y sin cuenta. Funciona sin conexión.
+
+![Escapando de la persecución de la barredora](/img/projects/leash-sweeper.webp)
 
 ![Montserrat](/img/projects/leash-montserrat.jpg)
 

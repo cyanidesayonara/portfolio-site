@@ -63,6 +63,10 @@ const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?
     }
 
     <div class="wrap body">
+      <div class="prose">
+        {isFallback && <p class="fallback-note">{ui.common.englishFallbackNotice}</p>}
+        <Content />
+      </div>
       <aside class="facts" aria-label={ui.common.projectFactsAria}>
         <h2>{ui.common.builtWith}</h2>
         <ul class="chips">{p.stack.map((s) => <li>{s}</li>)}</ul>
@@ -77,10 +81,6 @@ const meta = (projectMeta.projects as Record<string, { repo?: string; latestTag?
           )
         }
       </aside>
-      <div class="prose">
-        {isFallback && <p class="fallback-note">{ui.common.englishFallbackNotice}</p>}
-        <Content />
-      </div>
     </div>
   </article>
 

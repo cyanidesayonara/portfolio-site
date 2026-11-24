@@ -25,6 +25,8 @@ Your human is glued to their phone and walking on autopilot. You are on the othe
 
 ## How it plays
 
+![Path of Leash Resistance gameplay clip showing pole whirling and leash pulls](/img/projects/leash-hero.webp)
+
 Your human is four times your weight and wins every straight tug. So you win the way a dog does: dig in at the right moment, wind the leash round a lamppost to hold them fast, and bark to stop them dead at the curb. Wind them round a pole and keep pulling, and they whirl off the coil like a tetherball.
 
 The leash is real rope. The one you see is the one doing the physics: it wraps poles, cinches when taut, slips off under a hard wrench, and tangles with other people's leashes.
@@ -40,6 +42,8 @@ The leash is real rope. The one you see is the one doing the physics: it wraps p
 - **Dares and combo tricks**: swing round a pole, grind a ledge, fling your human, or take a dare for its own tune.
 - **Nine skies and six times of day**, in English, Catalan and Spanish, with adjustable screen shake, flashes, text size and controls.
 - No ads, no purchases, no account. Plays offline.
+
+![Outrunning the street sweeper chase](/img/projects/leash-sweeper.webp)
 
 ![Montserrat](/img/projects/leash-montserrat.jpg)
 

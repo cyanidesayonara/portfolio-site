@@ -25,6 +25,8 @@ El teu humà va enganxat al mòbil i camina amb el pilot automàtic. Tu ets a l'
 
 ## Com s'hi juga
 
+![Clip de joc de Path of Leash Resistance mostrant girs al voltant d'un pal i estrebades de corretja](/img/projects/leash-hero.webp)
+
 El teu humà pesa quatre vegades més que tu i guanya qualsevol estrebada en línia recta. Així que guanyes com guanya un gos: planta't en el moment just, enrosca la corretja al voltant d'un fanal per ancorar-lo i borda per clavar-lo en sec a la vorera. Fes-li donar la volta a un pal i continua estirant perquè surti volant com en una baldufa.
 
 La corretja és una corda real. La que veus en pantalla és la mateixa que calcula la física: s'enrotlla als pals, es tensa al límit, rellisca amb una sacsejada seca i s'embulla amb les corretges d'altres passejants.
@@ -40,6 +42,8 @@ La corretja és una corda real. La que veus en pantalla és la mateixa que calcu
 - **Reptes i combos**: fes girar l'humà al voltant d'un pal, llisca per un ressalt, llança'l pels aires o accepta un repte amb música pròpia.
 - **Nou cels i sis hores del dia**, en anglès, català i espanyol, amb intensitat de tremolor de pantalla, centelleigs, mida de text i controls ajustables.
 - Sense anuncis, sense compres i sense compte. Juga fora de línia.
+
+![Fugint de la persecució de l'escombradora](/img/projects/leash-sweeper.webp)
 
 ![Montserrat](/img/projects/leash-montserrat.jpg)
 

@@ -14,7 +14,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 ## Running and testing
 
-- **Node:** 22.23.4 or newer. On this Windows machine, use `npx.cmd -y node@22.23.5 node_modules/astro/bin/astro.mjs check` and `... build`.
+- **Node:** 22.23.4 or newer. On this Windows machine, use `npx.cmd -y node@22.23.5 node_modules/astro/bin/astro.mjs check` and `... build`, `npx.cmd -y node@22.23.5 --test tests\leash.test.ts` (`npm test`), and `npx.cmd -y node@22.23.5 tools/smoke-check.mjs` (`npm run test:smoke`). Both `npm test` and `npm run test:smoke` run in `.github/workflows/pages-deploy.yml`.
 - **Preview:** `.claude/launch.json` runs `astro preview` on port 4321. Rebuild `dist/` to see changes, then reload `http://127.0.0.1:4321/walk?walktest`.
 - **`?walktest`** adds a perf readout (fps, worst frame, draw calls, triangles, geometries, build time, district, streaming slice time) and `window.__walk`:
   - **State:** `dog`, `human`, `leash`, `level`, `goals`, `quest`, `chase`, `sweeper`, `life`, `riders`, `beachDevils`, `streamer`, `loadStats`, `info`, `dogSwimming`, `humanSwimming`, `booths`.
@@ -34,7 +34,8 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 
 | File | What it does |
 | --- | --- |
-| `game3d.ts` | Everything at runtime: renderer, loading bar, input (focus-gated), physics at 120 Hz, the human's AI, leash, goals, quests, chases (La Neteja, correfoc, Dimoni), NPC walkers and cyclists, train, cameras (street, follow and overhead; wheel and `-`/`=` zoom; drag and `[`/`]` orbit), HUD wiring, minimap, theme and sky, fullscreen, the `?walktest` hooks. |
+| `game3d.ts` | Core runtime orchestrator: renderer & context-loss recovery, loading bar, focus-gated input (including `Escape` blur), physics at 120 Hz, human AI, NPCs/cyclists/train, cameras, minimap, fullscreen, and `?walktest` hooks. |
+| `particles.ts`, `sky.ts`, `goals.ts`, `boothPanels.ts` | Modules extracted from `game3d.ts`: particle/stain pools, sky dome + sun/rim/rain rig, 17-goal checklist + localStorage persistence, and the four boardwalk booth panels (`Coriolis`, `Eat Prey Nap`, `dopepod`, `stemma`). |
 | `level.ts` | `buildLevelSteps()`: the level as a generator that yields between sections, so it builds behind a loading bar. It produces geometry, colliders, floor and surface functions, quest and NPC data, and the districts (three resident, plus the streamed plaza and hill). Exports layout constants (`GROUND_Y`, `WATER_Y`, `PIPICA`, `SWIM`, …), `pipicaAt()`, `pipicaBenches`, and `churchLandmark`. |
 | `plaza.ts` | Phase 3: Plaça del Mercat as a streamable district (`makePlazaDistrict()`): the square, fountain, trees, newsstand, café terrace, market hall, butcher's stall, second pipicà, Carrer Major's signs and north exit fingerpost, built in small steps with colliders added straight to the grid (tagged `plaza`). `PLAZA` holds the shared positions. |
 | `plazaLife.ts` | The plaza at runtime: vendor, grandpa, waiter, dog-park regular and butcher; the newspaper, terrace and fetch quests; the botifarra chase (with simple alley routing). Hooks into `game3d.ts` for pickup/drop, bark, prompts, bubbles and the shared one-chase-at-a-time rule. |
