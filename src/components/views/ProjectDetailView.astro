@@ -255,18 +255,43 @@ const numbers = [
 
 <script>
   document.querySelectorAll<HTMLAnchorElement>('.prose .gallery a.anim-toggle').forEach((link) => {
+    const { anim, poster } = link.dataset;
+    const img = link.querySelector('img');
+    const badge = link.querySelector('.anim-badge');
+    if (!anim || !poster || !img) return;
+    let video: HTMLVideoElement | null = null;
+
+    const setPlaying = (playing: boolean) => {
+      link.classList.toggle('playing', playing);
+      if (badge) badge.textContent = (playing ? link.dataset.labelStop : link.dataset.labelPlay) ?? '';
+    };
+    const stop = () => {
+      video?.pause();
+      video?.replaceWith(img);
+      video = null;
+      setPlaying(false);
+    };
+
+    // The clip is only fetched once someone asks for it; without JS the link opens it.
     link.addEventListener('click', (e) => {
-      const anim = link.dataset.anim;
-      const poster = link.dataset.poster;
-      const img = link.querySelector('img');
-      if (!anim || !poster || !img) return;
       e.preventDefault();
-      const playing = link.classList.toggle('playing');
-      img.src = playing ? anim : poster;
-      const badge = link.querySelector('.anim-badge');
-      if (badge) {
-        badge.textContent = (playing ? link.dataset.labelStop : link.dataset.labelPlay) ?? '';
+      if (video) {
+        stop();
+        return;
       }
+      const clip = document.createElement('video');
+      clip.muted = true;
+      clip.loop = true;
+      clip.playsInline = true;
+      clip.poster = poster;
+      clip.setAttribute('aria-label', img.alt);
+      clip.src = anim;
+      video = clip;
+      img.replaceWith(clip);
+      setPlaying(true);
+      clip.play().catch(() => {
+        if (video === clip) stop();
+      });
     });
   });
 </script>
