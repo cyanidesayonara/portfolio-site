@@ -5,7 +5,9 @@
 import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim';
 import { WalkAudio, STEM_GROUPS, type StemGroup, type SongMeta } from './audio';
 import { Hud } from './hud';
-import { EatPreyNapSim, DopepodSim, CAT_PALETTES, CAT_SIZES } from './booths';
+import { EatPreyNapSim, CAT_PALETTES, CAT_SIZES } from './booths';
+import { mountPodControls, type PodLabels } from '../podcast/controls';
+import type { PodcastPlayer } from '../podcast/player';
 
 export type BoothKind = 'coriolis' | 'stemma' | 'cat' | 'pod';
 
@@ -16,7 +18,8 @@ export interface BoothPanelsOpts {
   audio: WalkAudio;
   coriolis: CoriolisSimulator;
   catSim: EatPreyNapSim;
-  podSim: DopepodSim;
+  podcast: PodcastPlayer;
+  podLabels: PodLabels;
   completeGoal: (id: string) => void;
   setSound: (on: boolean) => void;
   onCatPounce: () => void;
@@ -25,7 +28,7 @@ export interface BoothPanelsOpts {
 
 /** Wires DOM controls and panel open/focus state for all four boardwalk booths. */
 export function createBoothPanels(opts: BoothPanelsOpts) {
-  const { root, host, hud, audio, coriolis, catSim, podSim, completeGoal, setSound } = opts;
+  const { root, host, hud, audio, coriolis, catSim, podcast, podLabels, completeGoal, setSound } = opts;
   const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s);
 
   let coriolisFocus = false;
@@ -151,59 +154,54 @@ export function createBoothPanels(opts: BoothPanelsOpts) {
     triggerCatPounce(ms.u, ms.v);
   });
 
-  // dopepod panel
-  const podNowEl = q<HTMLElement>('[data-pod-now]');
-  const podPlayBtn = q<HTMLButtonElement>('[data-pod-play]');
+  // dopepod panel: real podcasts. Closing it leaves them playing; walking away fades them out.
+  const podBody = q<HTMLElement>('[data-pod-body]');
   let podToastDone = false;
 
-  const syncPodUi = () => {
-    const st = podSim.getState();
-    if (podNowEl) podNowEl.textContent = `${st.showName} · ${st.episodeTitle}`;
-    if (podPlayBtn) {
-      podPlayBtn.setAttribute('aria-pressed', String(st.playing));
-      podPlayBtn.textContent = st.playing ? 'Pause' : 'Play';
+  /** Play or pause, turning the sound on first (as picking a stemma song does). */
+  const togglePod = () => {
+    if (podcast.feed !== 'ready') {
+      void podcast.open();
+      return;
     }
-    root.querySelectorAll<HTMLButtonElement>('[data-pod-show]').forEach((b) => {
-      b.setAttribute('aria-pressed', String(Number(b.dataset.podShow) === st.showIdx));
-    });
+    if (!podcast.active && !audio.on) setSound(true);
+    podcast.toggle();
+  };
+  const syncPod = podBody
+    ? mountPodControls(podBody, {
+        player: podcast,
+        labels: podLabels,
+        onToggle: togglePod,
+        onClick: () => audio.click(),
+        onClose: () => {
+          setPod(false);
+          host.focus({ preventScroll: true });
+        },
+      })
+    : null;
+  let ducked = false;
+  podcast.onChange = () => {
+    syncPod?.();
+    if (podcast.active !== ducked) {
+      ducked = podcast.active;
+      audio.setMusicLevel(ducked ? 0.12 : 1);
+    }
   };
 
   const setPod = (open: boolean) => {
     podOpen = open;
     if (open) {
       closeOtherBooths('pod');
-      syncPodUi();
+      void podcast.open();
       if (!podToastDone) {
         podToastDone = true;
-        hud.toast('dopepod', 'Switch podcasts or scrub episodes from the booth.', '#d94ca6');
+        hud.toast('dopepod', podLabels.toast, '#d94ca6');
       }
     }
     syncPanels();
   };
 
   q('[data-pod-close]')?.addEventListener('click', () => setPod(false));
-  podPlayBtn?.addEventListener('click', () => {
-    podSim.togglePlay();
-    audio.click();
-    syncPodUi();
-  });
-  q('[data-pod-prev]')?.addEventListener('click', () => {
-    podSim.prevEpisode();
-    audio.click();
-    syncPodUi();
-  });
-  q('[data-pod-next]')?.addEventListener('click', () => {
-    podSim.nextEpisode();
-    audio.click();
-    syncPodUi();
-  });
-  root.querySelectorAll<HTMLButtonElement>('[data-pod-show]').forEach((b) =>
-    b.addEventListener('click', () => {
-      podSim.selectShow(Number(b.dataset.podShow ?? 0));
-      audio.click();
-      syncPodUi();
-    }),
-  );
 
   // stemma jukebox panel
   const renderSongs = () => {
@@ -329,7 +327,7 @@ export function createBoothPanels(opts: BoothPanelsOpts) {
     syncCatUi,
     triggerCatPounce,
     setPod,
-    syncPodUi,
+    togglePod,
     setStemma,
     nextSong,
     drawLanes,

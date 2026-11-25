@@ -9,6 +9,8 @@
   Enter digs in too, except at a shop door, where it goes in. On touch
   screens a tap walks there and on-screen buttons run, dig, pee and bark.
 */
+import { PodcastPlayer } from '../podcast/player';
+import { mountPodControls, readPodLabels } from '../podcast/controls';
 import {
   WH, FACADE, WALK_TOP, LANE, CAR_LANES, FAR_CURB, FAR_EDGE,
   buildWorld, drawStatic, drawTops, drawMetroTop, drawNightLights, doorX, doorY,
@@ -154,7 +156,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const isRetroId = (id: string): id is RetroBoothId =>
     id === 'eat-prey-nap' || id === 'dopepod' || id === 'coriolis' || id === 'stemma';
   const eatSim = new EatPreyNapSim({ width: 160, height: 100, pixelated: true });
-  const podSim = new DopepodSim({ width: 160, height: 100, pixelated: true });
+  const podcast = new PodcastPlayer();
+  const podLabels = readPodLabels(fig.querySelector('[data-retro-booth]'));
+  const podSim = new DopepodSim({ player: podcast, labels: podLabels, width: 160, height: 100, pixelated: true });
   const coriolis = new CoriolisSimulator('coriolis');
   const cCor = document.createElement('canvas');
   cCor.width = cCor.height = 128;
@@ -170,6 +174,25 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const rbCanvas = fig.querySelector<HTMLCanvasElement>('[data-retro-canvas]');
   const rbCtrl = fig.querySelector<HTMLElement>('[data-retro-controls]');
   const rbCtx = rbCanvas?.getContext('2d') ?? null;
+  let syncPod: (() => void) | null = null;
+  let ducked = false;
+  podcast.onChange = () => {
+    syncPod?.();
+    if (podcast.active !== ducked) {
+      ducked = podcast.active;
+      sound.setMusicLevel(ducked ? 0.1 : 1);
+    }
+    renderRetroDrawer();
+  };
+  /** Play or pause, turning the street's sound on first if it is off. */
+  const togglePod = () => {
+    if (podcast.feed !== 'ready') {
+      void podcast.open();
+      return;
+    }
+    if (!podcast.active && !wantSound) setSound(true);
+    podcast.toggle();
+  };
 
   const syncRetroControls = () => {
     if (!rbCtrl || !retroOpen) return;
@@ -184,16 +207,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       watchB?.setAttribute('aria-pressed', String(ms.watchOnly));
       if (stat) stat.textContent = `Catches: ${ms.catches} · Tap screen to pounce`;
     } else if (retroOpen === 'dopepod') {
-      const st = podSim.getState();
-      const playB = rbCtrl.querySelector<HTMLButtonElement>('[data-rb="play"]');
-      if (playB) {
-        playB.textContent = st.playing ? 'Pause' : 'Play';
-        playB.setAttribute('aria-pressed', String(st.playing));
-      }
-      rbCtrl.querySelectorAll<HTMLButtonElement>('[data-rb^="show-"]').forEach((b) => {
-        b.setAttribute('aria-pressed', String(Number(b.dataset.rb!.slice(5)) === st.showIdx));
-      });
-      if (stat) stat.textContent = `${st.showName} · ${st.episodeTitle}`;
+      syncPod?.();
     } else if (retroOpen === 'stemma') {
       (['vox', 'drums', 'bass', 'keys'] as const).forEach((k) => {
         rbCtrl.querySelector<HTMLButtonElement>(`[data-rb="stem-${k}"]`)?.setAttribute('aria-pressed', String(!stemMuted[k]));
@@ -211,6 +225,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   const closeRetroBooth = () => {
     if (!retroOpen) return;
     retroOpen = null;
+    podcast.stop();
     coriolis.clearHeld();
     if (rbEl) rbEl.hidden = true;
     sayCaption();
@@ -218,7 +233,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   const openRetroBooth = (id: RetroBoothId) => {
     takeLeash();
+    if (id !== 'dopepod') podcast.stop();
     retroOpen = id;
+    syncPod = null;
     held.clear();
     target = null;
     complete('booth', 'try an app booth');
@@ -226,6 +243,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (rbTitle) rbTitle.textContent = stopObj?.label ?? id;
     if (rbLink) rbLink.href = links.get(id)?.getAttribute('href') ?? stopObj?.href ?? '#';
     if (rbCtrl) {
+      rbCtrl.classList.toggle('pod', id === 'dopepod');
+      // The podcast controls announce themselves; the ticking clock must not.
+      rbCtrl.setAttribute('aria-live', id === 'dopepod' ? 'off' : 'polite');
       if (id === 'eat-prey-nap') {
         rbCtrl.innerHTML = [
           `<button type="button" data-rb="pal">Pal</button>`,
@@ -235,16 +255,17 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
           `<span class="rb-stat" data-rb-stat></span>`,
         ].join('');
       } else if (id === 'dopepod') {
-        const showBtns = ['Devcast', 'HUB75', 'stemma', 'Cat']
-          .map((lbl, i) => `<button type="button" data-rb="show-${i}">${lbl}</button>`)
-          .join('');
-        rbCtrl.innerHTML = [
-          `<button type="button" data-rb="prev">&lt;</button>`,
-          `<button type="button" data-rb="play">Play</button>`,
-          `<button type="button" data-rb="next">&gt;</button>`,
-          showBtns,
-          `<span class="rb-stat" data-rb-stat></span>`,
-        ].join('');
+        syncPod = mountPodControls(rbCtrl, {
+          player: podcast,
+          labels: podLabels,
+          onToggle: togglePod,
+          onClick: () => sound.hey(),
+          onClose: () => {
+            closeRetroBooth();
+            fig.focus({ preventScroll: true });
+          },
+        });
+        void podcast.open();
       } else if (id === 'coriolis') {
         rbCtrl.innerHTML = [
           `<button type="button" data-rb="key-Up">Up</button>`,
@@ -287,11 +308,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     else if (act === 'pounce') {
       const ms = eatSim.getMouseState();
       if (eatSim.pawAt(ms.u, ms.v) === 'catch') sound.pickup(); else sound.hey();
-    } else if (act === 'play') { podSim.togglePlay(); sound.pickup(); }
-    else if (act === 'prev') { podSim.prevEpisode(); sound.hey(); }
-    else if (act === 'next') { podSim.nextEpisode(); sound.hey(); }
-    else if (act.startsWith('show-')) { podSim.selectShow(Number(act.slice(5))); sound.pickup(); }
-    else if (act.startsWith('key-')) {
+    } else if (act.startsWith('key-')) {
       const k = act.slice(4) as SimKey;
       coriolis.setHeld(k, true);
       coriolis.key(k, nowMs);
@@ -1823,7 +1840,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         c.fillStyle = '#f4f1ea';
         c.fillRect(w1x + 24, wy + 6, 30, 3);
         c.fillStyle = st.accent;
-        c.fillRect(w1x + 24, wy + 13, 6 + Math.round(((t * 14) % 24)), 3);
+        c.fillRect(w1x + 24, wy + 13, 6 + Math.round(st.progress * 24), 3);
 
         c.fillStyle = '#0f162b';
         c.fillRect(w2x, wy, ww, wh);
@@ -1909,21 +1926,6 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     } else if (retroOpen === 'dopepod') {
       podSim.draw();
       rbCtx.drawImage(podSim.canvas, 0, 0);
-      const st = podSim.getState();
-      const stat = rbCtrl?.querySelector<HTMLElement>('[data-rb-stat]');
-      const statTxt = `${st.showName} · ${st.episodeTitle}`;
-      if (stat && stat.textContent !== statTxt) {
-        stat.textContent = statTxt;
-        rbCtrl?.querySelectorAll<HTMLButtonElement>('[data-rb^="show-"]').forEach((b) => {
-          b.setAttribute('aria-pressed', String(Number(b.dataset.rb!.slice(5)) === st.showIdx));
-        });
-      }
-      const playB = rbCtrl?.querySelector<HTMLButtonElement>('[data-rb="play"]');
-      const playTxt = st.playing ? 'Pause' : 'Play';
-      if (playB && playB.textContent !== playTxt) {
-        playB.textContent = playTxt;
-        playB.setAttribute('aria-pressed', String(st.playing));
-      }
     } else if (retroOpen === 'coriolis') {
       coriolis.renderToCanvas(cCorCtx, 1, 0);
       rbCtx.fillStyle = '#050814';
@@ -2095,7 +2097,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     wantSound = on;
     try { localStorage.setItem('street-sound', on ? 'on' : 'off'); } catch { /* storage blocked */ }
     if (on) sound.enable();
-    else sound.disable();
+    else {
+      sound.disable();
+      podcast.stop();
+    }
     if (soundBtn) {
       soundBtn.setAttribute('aria-pressed', String(on));
       soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
@@ -2172,6 +2177,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   fig.querySelector<HTMLButtonElement>('[data-restart]')?.addEventListener('click', () => { takeLeash(); restart(); });
   function goIn() {
     if (!near || boarding) return;
+    podcast.stop();
     const a = links.get(near.stop.id);
     if (near.stop.id === 'station' || near.stop.id === 'metro') {
       const url = new URL(a?.getAttribute('href') || near.stop.href, location.origin);
@@ -2205,6 +2211,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       if (near && isRetroId(near.stop.id)) { takeLeash(); openRetroBooth(near.stop.id); return; }
     }
     if (retroOpen) {
+      // Tab reaches the drawer's controls; dopepod's own buttons and links keep Enter and Space.
+      if (code === 'Tab') return;
+      if (retroOpen === 'dopepod' && inDrawer && ['Enter', 'NumpadEnter', 'Space'].includes(code)) return;
       e.preventDefault();
       if (retroOpen === 'coriolis') {
         const ck: Record<string, SimKey> = {
@@ -2225,8 +2234,11 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
         if (eatSim.pawAt(ms.u, ms.v) === 'catch') sound.pickup();
         syncRetroControls();
       } else if (!e.repeat && retroOpen === 'dopepod' && code === 'Space') {
-        podSim.togglePlay();
-        syncRetroControls();
+        togglePod();
+      } else if (!e.repeat && retroOpen === 'dopepod' && (code === 'ArrowRight' || code === 'ArrowLeft')) {
+        if (code === 'ArrowRight') podcast.next(); else podcast.prev();
+      } else if (retroOpen === 'dopepod' && (code === 'ArrowUp' || code === 'ArrowDown')) {
+        podcast.seek(podcast.time + (code === 'ArrowUp' ? 15 : -15));
       }
       return;
     }
@@ -2418,6 +2430,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       },
       eatSim,
       podSim,
+      podcast,
       get view() { return { camX, scale, offY }; },
       get target() { return target; },
       buttons: () => buttons(),

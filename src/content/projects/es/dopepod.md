@@ -1,24 +1,36 @@
 ---
 title: dopepod
-tagline: Un reproductor de podcasts que creció de aplicación web en Django a app móvil en Flutter.
-summary: Descubre y escucha miles de podcasts gratuitos. Empezó como mi proyecto final de CS50 y se rehízo con Flutter y Django REST Framework.
-kind: Mobile app
-stack: [Flutter, Django REST Framework, PostgreSQL, Celery, Redis, Scrapy, Docker]
+tagline: Un reproductor de podcasts gratuito que funciona por completo en tu navegador.
+summary: Un reproductor de podcasts estático en Svelte, sin cuenta ni servidor. Empezó como mi proyecto final de CS50 y lo he rehecho dos veces.
+kind: Web app
+stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages]
 years: "2017 hasta hoy"
-cover: /img/projects/dop3pod.webp
-coverAlt: La aplicación móvil dopepod
+cover: /img/projects/dopepod-web.webp
+coverAlt: La página de inicio de dopepod con su catálogo de podcasts y filtros por categoría
 links:
-  - label: Google Play
-    href: https://play.google.com/store/apps/details?id=com.cyanidesayonara.dopepod
-  - label: Código versión web
-    href: https://github.com/cyanidesayonara/dopepod
-  - label: Código versión móvil
+  - label: Abrir dopepod
+    href: https://cyanidesayonara.github.io/dop3pod/
+  - label: Código en GitHub
     href: https://github.com/cyanidesayonara/dop3pod
+  - label: Código versión web (v1)
+    href: https://github.com/cyanidesayonara/dopepod
 order: 10
 color: magenta
 ---
 
-Un reproductor de podcasts que ha evolucionado desde una aplicación web hasta una app móvil multiplataforma para descubrir y escuchar miles de podcasts gratuitos con facilidad.
+Un reproductor de podcasts que nació como aplicación web en Django, pasó a ser una app móvil con un backend completo y hoy es un sitio estático sin servidor que mantener.
+
+## Hoy: un reproductor estático
+
+La versión actual está escrita en Svelte y TypeScript y alojada en GitHub Pages. Explora un catálogo elegido a mano, reproduce y salta, cambia la velocidad, guarda favoritos y sigue donde lo dejaste. Todo lo que recuerda se queda en tu navegador.
+
+- **Sin backend:** una GitHub Action diaria lee los 40 feeds de podcasts del catálogo y publica pequeños archivos JSON y miniaturas de las portadas.
+- **El audio llega directo de quien lo publica:** no se copia ni se vuelve a alojar nada.
+- **Los feeds no son de fiar:** el analizador tolera XML defectuoso, solo acepta audio por https y reduce las descripciones a texto plano.
+
+![La página de un podcast con su lista de episodios](/img/projects/dopepod-show.webp)
+
+Las casetas de dopepod de esta web, en la [calle 2D](/es/) y el [paseo 3D](/es/walk), reproducen episodios reales del mismo catálogo.
 
 ## Versión web (v1)
 
@@ -26,10 +38,8 @@ El dopepod original nació como mi proyecto final de CS50. Usaba Django con Post
 
 ![La versión web original](/img/projects/dopepod.webp)
 
-## Versión móvil (`dop3pod`)
+## Versión móvil
 
-La versión 3 (`dop3pod`) rehízo el proyecto alrededor de un backend en Django REST Framework dockerizado y un cliente en Flutter:
+La siguiente reescritura, `dop3pod`, unía un backend en Django REST Framework dockerizado con un cliente en Flutter. Los workers de Celery, Redis y las arañas de Scrapy mantenían al día el directorio de podcasts y los episodios, y la app tenía búsqueda, listado de episodios y un reproductor persistente con lista de reproducción. Su código sigue en el [historial del repositorio](https://github.com/cyanidesayonara/dop3pod/tree/92ffd4c002a9dc4c05a3980c5833b6c2e61c82ef).
 
-- **Backend e indexación:** Django REST Framework sobre PostgreSQL, con workers de Celery, Redis como caché y bróker de mensajería y arañas de Scrapy manteniendo actualizados el directorio de podcasts y las listas de episodios.
-- **Cliente móvil:** aplicación Flutter conectada a la API REST con búsqueda de podcasts, listado de episodios y un reproductor superpuesto persistente con controles de lista de reproducción.
-- **Desarrollo en curso:** tras las actualizaciones de Docker y dependencias en `dop3pod` (junto con mejoras previas en autenticación de usuarios y el reproductor), he retomado el desarrollo activo sobre esta tercera generación.
+![La app móvil en Flutter](/img/projects/dop3pod.webp)

@@ -38,6 +38,8 @@ import {
   EatPreyNapSim, DopepodSim, createBoardwalkBoothScreens,
 } from './booths';
 import projectMeta from '../../data/project-meta.json';
+import { PodcastPlayer } from '../podcast/player';
+import { readPodLabels } from '../podcast/controls';
 
 type CamMode = 'street' | 'follow' | 'overhead';
 
@@ -114,7 +116,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   coriolisTex.colorSpace = THREE.SRGBColorSpace;
   coriolisTex.magFilter = THREE.NearestFilter;
   const catSim = new EatPreyNapSim();
-  const podSim = new DopepodSim();
+  const podcast = new PodcastPlayer();
+  const podLabels = readPodLabels(root.querySelector('[data-pod-panel]'));
+  const podSim = new DopepodSim({ player: podcast, labels: podLabels });
   const polrMeta = projectMeta.projects['path-of-leash-resistance'];
   const boothScreens = createBoardwalkBoothScreens({
     catSim,
@@ -764,7 +768,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // ---- Toolbar & boardwalk booth panels -----------------------------------------------
   const soundBtn = q<HTMLButtonElement>('[data-sound]');
   const setSound = (on: boolean) => {
-    if (on) audio.enable(); else audio.disable();
+    if (on) audio.enable();
+    else {
+      audio.disable();
+      podcast.stop();
+    }
     if (soundBtn) {
       soundBtn.setAttribute('aria-pressed', String(on));
       soundBtn.textContent = on ? (soundBtn.dataset.labelOn ?? 'Sound on') : (soundBtn.dataset.labelOff ?? 'Sound off');
@@ -777,7 +785,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     audio,
     coriolis,
     catSim,
-    podSim,
+    podcast,
+    podLabels,
     completeGoal,
     setSound,
     onCatPounce: () => { boothTofu.vy = Math.max(boothTofu.vy, 2.8); },
@@ -972,6 +981,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       : href;
   const goToStop = (stop: Level['stops'][number]) => {
     if (departing) return;
+    podcast.stop();
     if (stop.id === 'station') {
       departing = true;
       releaseAll();
@@ -1037,12 +1047,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
     if (panels.podOpen) {
       if (code === 'Escape' || code === 'KeyX') { e?.preventDefault(); if (!repeat) panels.setPod(false); return; }
-      if (!repeat && (code === 'Space' || code === 'KeyK')) { e?.preventDefault(); podSim.togglePlay(); audio.click(); panels.syncPodUi(); return; }
-      if (!repeat && (code === 'ArrowRight' || code === 'KeyL')) { e?.preventDefault(); podSim.nextEpisode(); audio.click(); panels.syncPodUi(); return; }
-      if (!repeat && (code === 'ArrowLeft' || code === 'KeyJ')) { e?.preventDefault(); podSim.prevEpisode(); audio.click(); panels.syncPodUi(); return; }
+      if (!repeat && (code === 'Space' || code === 'KeyK')) { e?.preventDefault(); panels.togglePod(); audio.click(); return; }
+      if (!repeat && (code === 'ArrowRight' || code === 'KeyL')) { e?.preventDefault(); podcast.next(); audio.click(); return; }
+      if (!repeat && (code === 'ArrowLeft' || code === 'KeyJ')) { e?.preventDefault(); podcast.prev(); audio.click(); return; }
+      if (code === 'ArrowUp' || code === 'ArrowDown') { e?.preventDefault(); podcast.seek(podcast.time + (code === 'ArrowUp' ? 15 : -15)); return; }
       if (!repeat && code.startsWith('Digit')) {
         const n = Number(code.slice(5)) - 1;
-        if (n >= 0 && n < 4) { e?.preventDefault(); podSim.selectShow(n); audio.click(); panels.syncPodUi(); return; }
+        if (podcast.shows[n]) { e?.preventDefault(); podcast.selectShow(n); audio.click(); return; }
       }
       return;
     }
@@ -1623,6 +1634,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       coriolis.renderToCanvas(cCtx, 4, 1);
       coriolisTex.needsUpdate = true;
     }
+    // Podcasts fade with the distance from their booth. iOS ignores volume, so past earshot they stop.
+    if (podcast.status !== 'stopped') {
+      const d = Math.hypot(dog.x - level.dopepod.x, dog.z - level.dopepod.z);
+      if (d > 34) podcast.stop();
+      else podcast.setVolume(Math.max(0, Math.min(1, 1 - (d - 4) / 28)) ** 1.5);
+    }
     // Live idling UIs across all boardwalk pavilions.
     const activeBoothId = panels.catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 16
       ? 'eat-prey-nap'
@@ -2152,10 +2169,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     let banner: string | null = null;
     if (panels.coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
     else if (panels.catFocus) { banner = 'Eat Prey Nap — click/tap screen to pounce, [P] palette, [S] size, [X] step back'; }
-    else if (panels.podOpen) { banner = 'dopepod — Space play/pause, arrows skip, [X] close'; }
+    else if (panels.podOpen) { banner = podLabels.banner; }
     else if (nearCoriolis()) { prompts.push({ key: 'X', label: 'Play the LED wall' }); }
     else if (nearCatBooth()) { prompts.push({ key: 'X', label: 'Play Eat Prey Nap' }); }
-    else if (nearPodBooth()) { prompts.push({ key: 'X', label: 'Open dopepod' }); }
+    else if (nearPodBooth()) { prompts.push({ key: 'X', label: podLabels.prompt }); }
     else if (nearStemma()) { prompts.push({ key: 'X', label: panels.stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
     if (found && !panels.coriolisFocus && !panels.catFocus && !panels.podOpen) {
       prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro to 2D street' : `Visit ${found.label}` });
@@ -2570,6 +2587,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get bones() { return bones; },
       get chase() { return chase; },
       debug,
+      podcast,
       booths: {
         get coriolisFocus() { return panels.coriolisFocus; },
         get stemmaOpen() { return panels.stemmaOpen; },

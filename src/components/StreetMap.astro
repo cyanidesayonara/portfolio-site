@@ -15,6 +15,7 @@ interface Props {
 }
 const { locale = 'en' } = Astro.props;
 const ui = getUi(locale).streetMap;
+const podLabels = JSON.stringify(getUi(locale).podPlayer);
 
 const STOPS = ui.stops.map((s) => ({
   id: s.id,
@@ -69,7 +70,7 @@ const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]
   </div>
   <div class="stage">
     <canvas aria-hidden="true"></canvas>
-    <aside class="retro-booth" data-retro-booth hidden aria-live="polite">
+    <aside class="retro-booth" data-retro-booth data-pod-labels={podLabels} hidden aria-live="polite">
       <header class="rb-head">
         <b data-retro-title>Eat Prey Nap</b>
         <div class="rb-actions">
@@ -538,7 +539,7 @@ const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]
   }
   .rb-body {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 10px;
     align-items: center;
   }
@@ -575,8 +576,50 @@ const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]
     color: #b7c2df;
     width: 100%;
   }
+  /* dopepod: the shared podcast controls, in pixels. */
+  .rb-ctrl:global(.pod) { --pod: #d94ca6; display: grid; gap: 5px; min-width: 0; }
+  .rb-ctrl :global(.pod-now) { margin: 0; font-size: 11px; color: #b7c2df; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rb-ctrl :global(.pod-now.bad) { color: #ffb3a7; white-space: normal; }
+  .rb-ctrl :global(.pod-transport),
+  .rb-ctrl :global(.pod-shows) { display: flex; flex-wrap: wrap; gap: 5px; }
+  .rb-ctrl :global(.pod-show) { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rb-ctrl :global(.pod-show[aria-pressed='true']),
+  .rb-ctrl :global(.play[aria-pressed='true']) { border-color: var(--pod); background: var(--pod); color: #0b1430; }
+  .rb-ctrl :global(button:disabled) { opacity: 0.45; cursor: default; }
+  .rb-ctrl :global(button:focus-visible),
+  .rb-ctrl :global(a:focus-visible),
+  .rb-ctrl :global(input:focus-visible) { outline: 2px solid #ffb020; outline-offset: 2px; }
+  .rb-ctrl :global(.pod-seek) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .rb-ctrl :global(.pod-range) {
+    appearance: none;
+    width: 100%;
+    height: 14px;
+    margin: 0;
+    border: 2px solid #3c4f82;
+    background: #070b18;
+    cursor: pointer;
+  }
+  .rb-ctrl :global(.pod-range::-webkit-slider-thumb) { appearance: none; width: 10px; height: 14px; background: var(--pod); }
+  .rb-ctrl :global(.pod-range::-moz-range-thumb) { width: 10px; height: 14px; border: 0; border-radius: 0; background: var(--pod); }
+  .rb-ctrl :global(.pod-clock) { font-size: 10px; color: #b7c2df; }
+  .rb-ctrl :global(.pod-open) { justify-self: start; font-size: 11px; font-weight: 700; color: #5eea8c; }
+  @media (pointer: coarse) {
+    .retro-booth:has(.pod) { max-height: calc(100% - 12px); overflow: auto; }
+    .retro-booth:has(.pod) .rb-close { width: 44px; height: 44px; }
+    .retro-booth:has(.pod) .rb-link { display: inline-flex; align-items: center; min-height: 44px; }
+    .rb-ctrl :global(.pod-transport button),
+    .rb-ctrl :global(.pod-show) { min-height: 44px; min-width: 44px; }
+    .rb-ctrl :global(.pod-range) { height: 44px; }
+    .rb-ctrl :global(.pod-range::-webkit-slider-thumb) { width: 16px; height: 40px; }
+    .rb-ctrl :global(.pod-range::-moz-range-thumb) { width: 16px; height: 40px; }
+    .rb-ctrl :global(.pod-open) { display: inline-flex; align-items: center; min-height: 44px; }
+  }
   @media (max-width: 600px) {
     .retro-booth { left: 6px; right: 6px; bottom: 6px; max-height: 44%; padding: 6px 8px; }
+    .retro-booth:has(.pod) { max-height: calc(100% - 12px); overflow: auto; }
+    .retro-booth:has(.pod) .rb-body { grid-template-columns: minmax(0, 1fr); }
+    .retro-booth:has(.pod) .rb-screen { display: none; }
+
     .rb-body { gap: 8px; }
     .rb-screen { width: 128px; height: 80px; }
     .rb-ctrl :global(button) { padding: 3px 6px; font-size: 10px; }

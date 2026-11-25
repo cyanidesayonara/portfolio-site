@@ -74,6 +74,11 @@ export class StreetSound {
     void this.ctx?.suspend();
   }
 
+  /** Turn the music down under a podcast (0..1, 1 = full). */
+  setMusicLevel(v: number) {
+    if (this.music && this.ctx) this.music.gain.setTargetAtTime(0.32 * v, this.ctx.currentTime, 0.3);
+  }
+
   pause() {
     if (this.on) void this.ctx?.suspend();
   }

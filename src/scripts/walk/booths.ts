@@ -3,6 +3,9 @@
   pavilions (/walk) and the 2D retro street stores (/).
 */
 import * as THREE from 'three';
+import { coverUrl, fmtTime } from '../podcast/feed';
+import type { PodcastPlayer } from '../podcast/player';
+import type { PodLabels } from '../podcast/controls';
 
 export type CatPalette = {
   name: string;
@@ -413,81 +416,19 @@ export class EatPreyNapSim {
   }
 }
 
-export interface PodcastShow {
-  id: string;
-  name: string;
-  host: string;
-  color: string;
-  episodes: { title: string; durSec: number }[];
-}
-
-export const PODCAST_SHOWS: PodcastShow[] = [
-  {
-    id: 'devcast',
-    name: 'Boardwalk Devcast',
-    host: 'Santtu & Crew',
-    color: '#e5487a',
-    episodes: [
-      { title: '51 walks and a Verlet leash', durSec: 1840 },
-      { title: 'Shipping desktop apps without PyTorch', durSec: 1420 },
-      { title: 'Why procedural art scales with agents', durSec: 1615 },
-    ],
-  },
-  {
-    id: 'hardware',
-    name: 'HUB75 Bench Notes',
-    host: 'LED Lab',
-    color: '#5eea8c',
-    episodes: [
-      { title: '128x128 in raylib, WASM, and Teensy', durSec: 1530 },
-      { title: '40 A rails, FM6126A, and VUSB pads', durSec: 1290 },
-      { title: 'DFPlayer voice packs on a mat', durSec: 980 },
-    ],
-  },
-  {
-    id: 'audio',
-    name: 'Stems & Practice',
-    host: 'stemma Radio',
-    color: '#1fc9b7',
-    episodes: [
-      { title: 'DirectML GPU fallback in practice', durSec: 1360 },
-      { title: 'Zero-latency phase vocoder mixing', durSec: 1710 },
-    ],
-  },
-  {
-    id: 'feline',
-    name: 'Dichromatic Telemetry',
-    host: 'Eat Prey Nap',
-    color: '#f0c44d',
-    episodes: [
-      { title: 'Yellow vs ink blue for cat eyes', durSec: 1120 },
-      { title: 'The 50 mm screen ruler & log-normal bursts', durSec: 1245 },
-    ],
-  },
-];
-
-export interface DopepodState {
-  showIdx: number;
-  episodeIdx: number;
-  showName: string;
-  episodeTitle: string;
-  playing: boolean;
-  progress: number;
-  durSec: number;
-  accent: string;
-}
-
+/** The dopepod booth's screen: draws what the shared podcast player is really doing. */
 export class DopepodSim {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
+  private player: PodcastPlayer;
+  private labels: PodLabels;
   private pixelMode: boolean;
-  private showIdx = 0;
-  private epIdx = 0;
-  private playing = false;
-  private progress = 0.28;
   private time = 0;
+  private covers = new Map<string, HTMLImageElement>();
 
-  constructor(opts: { width?: number; height?: number; pixelated?: boolean } = {}) {
+  constructor(opts: { player: PodcastPlayer; labels: PodLabels; width?: number; height?: number; pixelated?: boolean }) {
+    this.player = opts.player;
+    this.labels = opts.labels;
     this.canvas = document.createElement('canvas');
     this.canvas.width = opts.width ?? 256;
     this.canvas.height = opts.height ?? 160;
@@ -496,144 +437,149 @@ export class DopepodSim {
     this.draw();
   }
 
-  getState(): DopepodState {
-    const show = PODCAST_SHOWS[this.showIdx];
-    const ep = show.episodes[this.epIdx] ?? show.episodes[0];
-    return {
-      showIdx: this.showIdx,
-      episodeIdx: this.epIdx,
-      showName: show.name,
-      episodeTitle: ep.title,
-      playing: this.playing,
-      progress: this.progress,
-      durSec: ep.durSec,
-      accent: show.color,
-    };
-  }
-
-  togglePlay() {
-    this.playing = !this.playing;
-    this.draw();
-    return this.playing;
-  }
-
-  selectShow(idx: number) {
-    this.showIdx = ((idx % PODCAST_SHOWS.length) + PODCAST_SHOWS.length) % PODCAST_SHOWS.length;
-    this.epIdx = 0;
-    this.progress = 0.08;
-    this.playing = true;
-    this.draw();
-    return this.getState();
-  }
-
-  nextEpisode() {
-    const show = PODCAST_SHOWS[this.showIdx];
-    if (this.epIdx + 1 < show.episodes.length) {
-      this.epIdx++;
-    } else {
-      this.showIdx = (this.showIdx + 1) % PODCAST_SHOWS.length;
-      this.epIdx = 0;
-    }
-    this.progress = 0.05;
-    this.draw();
-    return this.getState();
-  }
-
-  prevEpisode() {
-    if (this.epIdx > 0) {
-      this.epIdx--;
-    } else {
-      this.showIdx = (this.showIdx - 1 + PODCAST_SHOWS.length) % PODCAST_SHOWS.length;
-      this.epIdx = PODCAST_SHOWS[this.showIdx].episodes.length - 1;
-    }
-    this.progress = 0.05;
-    this.draw();
-    return this.getState();
+  getState() {
+    const p = this.player;
+    return { accent: p.accent, playing: p.status === 'playing', progress: p.progress, episodeIdx: p.epIdx };
   }
 
   update(dt: number) {
     this.time += dt;
-    if (this.playing) {
-      const ep = PODCAST_SHOWS[this.showIdx].episodes[this.epIdx];
-      this.progress += (dt * 12) / Math.max(60, ep.durSec);
-      if (this.progress >= 1) this.nextEpisode();
+  }
+
+  /** The current show's cover once it has loaded. CORS-clean, or the WebGL texture would be tainted. */
+  private cover(): HTMLImageElement | null {
+    const show = this.player.show;
+    if (!show) return null;
+    let img = this.covers.get(show.id);
+    if (!img) {
+      img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = coverUrl(show);
+      this.covers.set(show.id, img);
     }
+    return img.complete && img.naturalWidth > 0 ? img : null;
+  }
+
+  private fit(txt: string, w: number) {
+    const c = this.ctx;
+    if (c.measureText(txt).width <= w) return txt;
+    let n = txt.length;
+    while (n > 1 && c.measureText(`${txt.slice(0, n)}…`).width > w) n--;
+    return `${txt.slice(0, n).trimEnd()}…`;
   }
 
   draw() {
     const c = this.ctx;
+    const { player, labels } = this;
     const W = this.canvas.width;
     const H = this.canvas.height;
-    const show = PODCAST_SHOWS[this.showIdx];
-    const ep = show.episodes[this.epIdx] ?? show.episodes[0];
+    const small = H < 130;
+    const accent = player.accent;
+    const playing = player.status === 'playing';
     const snap = (v: number) => (this.pixelMode ? Math.round(v / 2) * 2 : v);
+    const body = (weight: number, px: number) => {
+      c.font = `${weight} ${px}px 'Inter', system-ui, sans-serif`;
+    };
 
     c.fillStyle = '#0f162b';
     c.fillRect(0, 0, W, H);
 
     // Header bar
+    const headH = small ? 18 : 24;
     c.fillStyle = '#182447';
-    c.fillRect(0, 0, W, 24);
-    c.fillStyle = show.color;
-    c.fillRect(0, 22, W, 2);
+    c.fillRect(0, 0, W, headH);
+    c.fillStyle = accent;
+    c.fillRect(0, headH - 2, W, 2);
     c.fillStyle = '#f4f1ea';
     c.font = `800 10px 'Bricolage Grotesque', system-ui, sans-serif`;
     c.textAlign = 'left';
     c.textBaseline = 'middle';
-    c.fillText('dopepod', 10, 12);
-    c.fillStyle = this.playing ? '#5eea8c' : '#96a2c4';
+    c.fillText('dopepod', 8, headH / 2 - 1);
+    const failed = player.feed === 'failed' || player.status === 'error';
+    const busy = player.feed === 'loading' || player.status === 'loading';
+    const stat = failed ? labels.error : busy ? labels.loading : playing ? labels.playing : player.status === 'paused' ? labels.paused : labels.idle;
+    c.fillStyle = failed ? '#ff8a7a' : playing ? '#5eea8c' : '#96a2c4';
     c.textAlign = 'right';
-    c.font = `700 9px 'Inter', system-ui, sans-serif`;
-    c.fillText(this.playing ? 'PLAYING' : 'IDLE', W - 10, 12);
+    body(700, small ? 8 : 9);
+    c.fillText(this.fit(stat.toUpperCase(), W - 70), W - 8, headH / 2 - 1);
+    c.textAlign = 'left';
 
-    // Artwork square on left
-    const artX = 12, artY = 34, artS = 54;
-    c.fillStyle = show.color;
+    // Artwork, with decorative bars (the audio never goes through Web Audio)
+    const artX = small ? 8 : 12, artY = headH + (small ? 6 : 10), artS = small ? 40 : 54;
+    const cover = this.cover();
+    c.fillStyle = accent;
     c.fillRect(artX, artY, artS, artS);
-    c.fillStyle = 'rgba(11, 20, 48, 0.25)';
-    for (let k = 0; k < 5; k++) {
-      const h = 10 + Math.abs(Math.sin(k * 1.4 + (this.playing ? this.time * 5 : 0.4))) * 28;
-      c.fillRect(snap(artX + 8 + k * 8), snap(artY + artS - h - 6), 5, snap(h));
+    if (cover) {
+      c.imageSmoothingEnabled = !this.pixelMode;
+      c.drawImage(cover, artX, artY, artS, artS);
+    }
+    if (!cover || playing) {
+      c.fillStyle = cover ? accent : 'rgba(11, 20, 48, 0.3)';
+      const bw = Math.floor(artS / 7);
+      for (let k = 0; k < 5; k++) {
+        const h = artS * (0.16 + Math.abs(Math.sin(k * 1.4 + (playing ? this.time * 5 : 0.4))) * (cover ? 0.26 : 0.5));
+        c.fillRect(snap(artX + bw + k * bw * 1.1), snap(artY + artS - h - 2), bw - 1, snap(h));
+      }
     }
 
-    // Active show + episode text
-    const tx = artX + artS + 12;
-    c.textAlign = 'left';
-    c.fillStyle = show.color;
-    c.font = `700 9px 'Inter', system-ui, sans-serif`;
-    c.fillText(show.name.toUpperCase(), tx, 40, W - tx - 10);
+    const tx = artX + artS + (small ? 8 : 12);
+    const tw = W - tx - 8;
+    const { show, episode } = player;
+    if (!show || !episode) {
+      c.fillStyle = '#f4f1ea';
+      body(700, small ? 9 : 11);
+      const words = (failed ? labels.feedFailed : player.feed === 'loading' ? labels.loading : labels.hint).split(' ');
+      const lines: string[] = [];
+      for (const w of words) {
+        const last = lines[lines.length - 1];
+        if (last !== undefined && c.measureText(`${last} ${w}`).width <= tw) lines[lines.length - 1] = `${last} ${w}`;
+        else lines.push(w);
+      }
+      const lh = small ? 12 : 15;
+      lines.slice(0, small ? 5 : 8).forEach((l, i) => c.fillText(l, tx, artY + 8 + i * lh));
+      return;
+    }
+
+    c.fillStyle = accent;
+    body(700, small ? 8 : 9);
+    c.fillText(this.fit(show.title.toUpperCase(), tw), tx, artY + 6);
     c.fillStyle = '#f4f1ea';
-    c.font = `800 12px 'Bricolage Grotesque', system-ui, sans-serif`;
-    c.fillText(ep.title, tx, 56, W - tx - 10);
+    c.font = `800 ${small ? 10 : 12}px 'Bricolage Grotesque', system-ui, sans-serif`;
+    c.fillText(this.fit(episode.title, tw), tx, artY + (small ? 19 : 22));
     c.fillStyle = '#9aa6c8';
-    c.font = `600 9px 'Inter', system-ui, sans-serif`;
-    const curSec = Math.floor(ep.durSec * this.progress);
-    const fmtSec = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-    c.fillText(`${show.host} · ${fmtSec(curSec)} / ${fmtSec(ep.durSec)}`, tx, 72, W - tx - 10);
+    body(600, small ? 8 : 9);
+    const d = player.duration;
+    const clock = d ? `${fmtTime(player.time)} / ${fmtTime(d)}` : fmtTime(player.time);
+    c.fillText(this.fit(player.status === 'error' ? labels.playFailed : clock, tw), tx, artY + (small ? 31 : 38));
 
     // Scrubber bar
-    const sx = tx, sy = 83, sw = W - tx - 12;
+    const sy = artY + (small ? 38 : 49);
     c.fillStyle = '#243461';
-    c.fillRect(sx, sy, sw, 5);
-    c.fillStyle = show.color;
-    c.fillRect(sx, sy, Math.max(4, Math.round(sw * this.progress)), 5);
+    c.fillRect(tx, sy, tw, small ? 3 : 5);
+    c.fillStyle = accent;
+    c.fillRect(tx, sy, Math.round(tw * player.progress), small ? 3 : 5);
 
-    // Episode queue rows at bottom
-    const qY0 = 100;
-    show.episodes.forEach((item, idx) => {
-      const y = qY0 + idx * 18;
-      const active = idx === this.epIdx;
+    // The show's episodes
+    const rowH = small ? 11 : 18;
+    const rows = Math.max(1, Math.floor((H - artY - artS - 4) / rowH));
+    const first = Math.max(0, Math.min(player.epIdx - 1, show.episodes.length - rows));
+    show.episodes.slice(first, first + rows).forEach((item, i) => {
+      const idx = first + i;
+      const y = artY + artS + (small ? 4 : 12) + i * rowH;
+      const active = idx === player.epIdx;
+      const bh = rowH - (small ? 1 : 3);
       c.fillStyle = active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)';
-      c.fillRect(10, y, W - 20, 15);
+      c.fillRect(8, y, W - 16, bh);
       if (active) {
-        c.fillStyle = show.color;
-        c.fillRect(10, y, 3, 15);
+        c.fillStyle = accent;
+        c.fillRect(8, y, 3, bh);
       }
       c.fillStyle = active ? '#f4f1ea' : '#9aa6c8';
-      c.font = `${active ? '700' : '500'} 9px 'Inter', system-ui, sans-serif`;
-      c.fillText(`${idx + 1}. ${item.title}`, 18, y + 8, W - 64);
+      body(active ? 700 : 500, small ? 7 : 9);
+      const len = item.duration ? fmtTime(item.duration) : '';
+      c.fillText(this.fit(`${idx + 1}. ${item.title}`, W - 68), 15, y + bh / 2);
       c.textAlign = 'right';
-      c.fillText(fmtSec(item.durSec), W - 16, y + 8);
+      c.fillText(len, W - 12, y + bh / 2);
       c.textAlign = 'left';
     });
   }
