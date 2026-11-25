@@ -1,24 +1,36 @@
 ---
 title: dopepod
-tagline: A podcast player that grew from a Django web app into a Flutter mobile app.
-summary: Discover and listen to thousands of free podcasts. Started as my CS50 final project, rebuilt with Flutter and Django REST Framework.
-kind: Mobile app
-stack: [Flutter, Django REST Framework, PostgreSQL, Celery, Redis, Scrapy, Docker]
+tagline: A free podcast player that runs entirely in your browser.
+summary: A static Svelte podcast player with no account and no server. Started as my CS50 final project and rebuilt twice since.
+kind: Web app
+stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages]
 years: "2017 to now"
-cover: /img/projects/dop3pod.webp
-coverAlt: The dopepod mobile app
+cover: /img/projects/dopepod-web.webp
+coverAlt: The dopepod home page with its catalog of podcasts and category filters
 links:
-  - label: Google Play
-    href: https://play.google.com/store/apps/details?id=com.cyanidesayonara.dopepod
-  - label: Web version source
-    href: https://github.com/cyanidesayonara/dopepod
-  - label: Mobile version source
+  - label: Open dopepod
+    href: https://cyanidesayonara.github.io/dop3pod/
+  - label: Source on GitHub
     href: https://github.com/cyanidesayonara/dop3pod
+  - label: Web version (v1) source
+    href: https://github.com/cyanidesayonara/dopepod
 order: 10
 color: magenta
 ---
 
-A podcast player that has evolved from a web application into a cross-platform mobile app, giving an easy way to discover and enjoy thousands of free podcasts.
+A podcast player that began as a Django web app, became a mobile app with a full backend, and now runs as a static site with no server to look after.
+
+## Today: a static player
+
+The current version is written in Svelte and TypeScript and hosted on GitHub Pages. Browse a hand-picked catalog, play and skip, change speed, keep favorites and pick up where you left off. Everything it remembers stays in your browser.
+
+- **No backend:** a daily GitHub Action reads the 40 podcast feeds in the catalog and publishes small JSON files and cover thumbnails.
+- **Audio straight from the publishers:** nothing is copied or re-hosted.
+- **Feeds are untrusted:** the parser tolerates broken XML, accepts only https audio and reduces descriptions to plain text.
+
+![A show page with its episode list](/img/projects/dopepod-show.webp)
+
+The dopepod booths on this site, on the [2D street](/) and the [3D walk](/walk), play real episodes from the same catalog.
 
 ## Web version (v1)
 
@@ -26,10 +38,8 @@ The original dopepod started life as my CS50 final project. It used Django with 
 
 ![The original web version](/img/projects/dopepod.webp)
 
-## Mobile version (`dop3pod`)
+## Mobile version
 
-Version 3 (`dop3pod`) rebuilt the project around a Dockerized Django REST Framework backend and a Flutter client:
+The next rebuild, `dop3pod`, paired a Dockerized Django REST Framework backend with a Flutter client. Celery workers, Redis and Scrapy spiders kept the podcast directory and episode feeds updated, and the app had search, episode listings and a persistent player with a playlist. Its code lives on in the [repository's history](https://github.com/cyanidesayonara/dop3pod/tree/92ffd4c002a9dc4c05a3980c5833b6c2e61c82ef).
 
-- **Backend and indexing:** Django REST Framework backed by PostgreSQL, with Celery workers, Redis for caching and message brokering, and Scrapy spiders keeping the podcast directory and episode feeds updated.
-- **Mobile client:** Flutter app connected to the REST API with podcast search, episode listings, and a persistent audio player overlay with playlist controls.
-- **Ongoing updates:** Following Docker and dependency updates on `dop3pod` (including work on user authentication and player improvements), active development on this third-generation codebase is back underway.
+![The Flutter mobile app](/img/projects/dop3pod.webp)

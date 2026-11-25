@@ -1,3 +1,4 @@
+import type { PodLabels } from '../scripts/podcast/controls';
 import type { Locale } from './utils';
 
 export type ProjectKind = 'Game' | 'Desktop app' | 'Hardware' | 'Web app' | 'Mobile app' | 'Tool';
@@ -223,6 +224,7 @@ export interface UiDictionary {
     stops: StopSpec[];
     keys: KeySpec[];
   };
+  podPlayer: PodLabels;
   walk3d: {
     stageAria: string;
     clickToPlay: string;
@@ -280,9 +282,6 @@ export interface UiDictionary {
     podAria: string;
     podSub: string;
     podCloseAria: string;
-    podPlay: string;
-    podPrev: string;
-    podNext: string;
     noscriptTitle: string;
     noscriptBody: string;
     noscriptCtaProjects: string;
@@ -585,6 +584,28 @@ export const UI: Record<Locale, UiDictionary> = {
         { keys: ['Esc'], label: 'Leave' },
       ],
     },
+    podPlayer: {
+      play: 'Play',
+      pause: 'Pause',
+      prev: 'Previous',
+      next: 'Next',
+      seek: 'Seek',
+      shows: 'Shows',
+      openApp: 'Open in dopepod',
+      loading: 'Loading',
+      buffering: 'Loading…',
+      feedFailed: "Couldn't load the podcasts. Try again, or open dopepod.",
+      playFailed: "This episode won't play. Try another, or open dopepod.",
+      retry: 'Retry',
+      idle: 'Ready',
+      playing: 'Playing',
+      paused: 'Paused',
+      error: 'Error',
+      hint: 'Real podcasts. Open the booth to listen.',
+      banner: 'dopepod: Space play/pause, left/right skip, up/down seek, [X] close',
+      prompt: 'Open dopepod',
+      toast: 'Real podcasts, straight from their publishers. Pick a show and press play.',
+    },
     walk3d: {
       stageAria:
         'Path of Leash Resistance in 3D, in a Catalan seafront town. Click or focus to play: WASD or arrows move, Shift runs, V jumps, Space digs, Q marks, E barks, G picks up, X uses the LED wall or the stemma jukebox, Enter goes into a pavilion, C changes the camera, N skips to the next song, Tab shows the goals. Shift+Tab or Escape leaves the game.',
@@ -641,11 +662,8 @@ export const UI: Record<Locale, UiDictionary> = {
       catPounce: 'Pounce!',
       catCatches: 'Catches',
       podAria: 'dopepod booth controls',
-      podSub: 'Switch podcast shows or skip episodes.',
+      podSub: 'Real podcasts, straight from their publishers.',
       podCloseAria: 'Close dopepod',
-      podPlay: 'Play',
-      podPrev: 'Prev',
-      podNext: 'Next',
       noscriptTitle: 'The 3D seafront walk requires JavaScript & WebGL',
       noscriptBody: 'Scripts are currently disabled or blocked. You can browse every project page, post, and build guide across the site cleanly without JavaScript.',
       noscriptCtaProjects: 'Browse all projects',
@@ -964,6 +982,28 @@ export const UI: Record<Locale, UiDictionary> = {
         { keys: ['Esc'], label: 'Salir' },
       ],
     },
+    podPlayer: {
+      play: 'Reproducir',
+      pause: 'Pausa',
+      prev: 'Anterior',
+      next: 'Siguiente',
+      seek: 'Posición',
+      shows: 'Podcasts',
+      openApp: 'Abrir en dopepod',
+      loading: 'Cargando',
+      buffering: 'Cargando…',
+      feedFailed: 'No se han podido cargar los podcasts. Reinténtalo o abre dopepod.',
+      playFailed: 'Este episodio no se puede reproducir. Prueba otro o abre dopepod.',
+      retry: 'Reintentar',
+      idle: 'Listo',
+      playing: 'Sonando',
+      paused: 'En pausa',
+      error: 'Error',
+      hint: 'Podcasts reales. Abre la caseta para escuchar.',
+      banner: 'dopepod: espacio reproducir/pausa, izquierda/derecha saltar, arriba/abajo avanzar, [X] cerrar',
+      prompt: 'Abrir dopepod',
+      toast: 'Podcasts reales, directos de quien los publica. Elige uno y dale a reproducir.',
+    },
     walk3d: {
       stageAria:
         'Path of Leash Resistance en 3D, en un pueblo costero catalán. Haz clic para jugar: WASD o flechas para mover, Shift para correr, V para saltar, Espacio para cavar, Q para marcar, E para ladrar, G para recoger, X para usar el mural LED o la gramola stemma, Enter para entrar en un pabellón, C para cambiar de cámara, N para pasar de canción y Tab para ver objetivos. Shift+Tab o Escape salen del juego.',
@@ -1020,11 +1060,8 @@ export const UI: Record<Locale, UiDictionary> = {
       catPounce: 'Saltar',
       catCatches: 'Capturas',
       podAria: 'Controles de dopepod',
-      podSub: 'Cambia de podcast o salta entre episodios.',
+      podSub: 'Podcasts reales, directos de quien los publica.',
       podCloseAria: 'Cerrar dopepod',
-      podPlay: 'Reproducir',
-      podPrev: 'Anterior',
-      podNext: 'Siguiente',
       noscriptTitle: 'El paseo 3D necesita JavaScript y WebGL',
       noscriptBody: 'Los scripts están desactivados o bloqueados. Puedes explorar igualmente todos los proyectos, artículos y guías técnicas sin JavaScript.',
       noscriptCtaProjects: 'Ver proyectos',
@@ -1343,6 +1380,28 @@ export const UI: Record<Locale, UiDictionary> = {
         { keys: ['Esc'], label: 'Surt' },
       ],
     },
+    podPlayer: {
+      play: 'Reprodueix',
+      pause: 'Pausa',
+      prev: 'Anterior',
+      next: 'Següent',
+      seek: 'Posició',
+      shows: 'Pòdcasts',
+      openApp: 'Obre a dopepod',
+      loading: 'Carregant',
+      buffering: 'Carregant…',
+      feedFailed: "No s'han pogut carregar els pòdcasts. Torna-ho a provar o obre dopepod.",
+      playFailed: "Aquest episodi no es pot reproduir. Prova'n un altre o obre dopepod.",
+      retry: 'Reintenta',
+      idle: 'A punt',
+      playing: 'Sonant',
+      paused: 'En pausa',
+      error: 'Error',
+      hint: 'Pòdcasts reals. Obre la caseta per escoltar.',
+      banner: 'dopepod: espai reprodueix/pausa, esquerra/dreta salta, amunt/avall avança, [X] tanca',
+      prompt: 'Obre dopepod',
+      toast: 'Pòdcasts reals, directes de qui els publica. Tria’n un i prem reprodueix.',
+    },
     walk3d: {
       stageAria:
         'Path of Leash Resistance en 3D, en un poble costaner català. Fes clic per jugar: WASD o fletxes per moure, Shift per córrer, V per saltar, Espai per cavar, Q per marcar, E per bordar, G per recollir, X per fer servir el mural LED o la gramola stemma, Enter per entrar en un pavelló, C per canviar de càmera, N per passar de cançó i Tab per veure objectius. Shift+Tab o Escape surten del joc.',
@@ -1399,11 +1458,8 @@ export const UI: Record<Locale, UiDictionary> = {
       catPounce: 'Salta!',
       catCatches: 'Captures',
       podAria: 'Controls de dopepod',
-      podSub: 'Canvia de podcast o salta entre episodis.',
+      podSub: 'Pòdcasts reals, directes de qui els publica.',
       podCloseAria: 'Tanca dopepod',
-      podPlay: 'Reprodueix',
-      podPrev: 'Anterior',
-      podNext: 'Següent',
       noscriptTitle: 'El passeig 3D necessita JavaScript i WebGL',
       noscriptBody: 'Els scripts estan desactivats o blocats. Pots llegir igualment tots els projectes, articles i guies tècniques sense JavaScript.',
       noscriptCtaProjects: 'Mostra els projectes',
