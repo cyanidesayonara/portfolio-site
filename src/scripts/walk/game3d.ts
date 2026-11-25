@@ -1114,8 +1114,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   host.addEventListener('pointerdown', (e) => { if (e.target === renderer.domElement) host.focus({ preventScroll: true }); });
 
   // ---- Touch: virtual stick + action buttons -------------------------------------------
+  if (matchMedia('(pointer: coarse), (hover: none)').matches) root.classList.add('has-touch');
   root.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'touch') root.classList.add('has-touch');
+  });
+  // The touch toolbar's menu: closes on a tap elsewhere, or after restarting or changing the screen mode.
+  const menuBtn = q<HTMLButtonElement>('[data-tb-menu]');
+  const setMenu = (open: boolean) => menuBtn?.setAttribute('aria-expanded', String(open));
+  menuBtn?.addEventListener('click', () => setMenu(menuBtn.getAttribute('aria-expanded') !== 'true'));
+  root.querySelectorAll('[data-restart], [data-fs]').forEach((b) => b.addEventListener('click', () => setMenu(false)));
+  document.addEventListener('pointerdown', (e) => {
+    if (!(e.target as Element | null)?.closest?.('.toolbar')) setMenu(false);
   });
   const stick = q<HTMLElement>('[data-stick]');
   const knob = q<HTMLElement>('[data-knob]');

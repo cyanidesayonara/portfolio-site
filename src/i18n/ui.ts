@@ -229,6 +229,7 @@ export interface UiDictionary {
     settingsAria: string;
     soundOff: string;
     soundOn: string;
+    toolbarMenu: string;
     nextSong: string;
     weatherAria: string;
     skyDay: string;
@@ -591,6 +592,7 @@ export const UI: Record<Locale, UiDictionary> = {
       settingsAria: 'Game settings',
       soundOff: 'Sound off',
       soundOn: 'Sound on',
+      toolbarMenu: 'Menu',
       nextSong: 'Next song',
       weatherAria: 'Time and weather',
       skyDay: 'Day',
@@ -969,6 +971,7 @@ export const UI: Record<Locale, UiDictionary> = {
       settingsAria: 'Ajustes del juego',
       soundOff: 'Sonido no',
       soundOn: 'Sonido sí',
+      toolbarMenu: 'Menú',
       nextSong: 'Siguiente canción',
       weatherAria: 'Hora y clima',
       skyDay: 'Día',
@@ -1347,6 +1350,7 @@ export const UI: Record<Locale, UiDictionary> = {
       settingsAria: 'Ajustos del joc',
       soundOff: 'So no',
       soundOn: 'So sí',
+      toolbarMenu: 'Menú',
       nextSong: 'Cançó següent',
       weatherAria: 'Hora i temps',
       skyDay: 'Dia',

@@ -74,6 +74,8 @@ const fallbackLinks = [
         data-label-on={ui.soundOn}
         data-label-off={ui.soundOff}
       >{ui.soundOff}</button>
+      <button type="button" class="tb tb-menu" data-tb-menu aria-expanded="false" aria-controls={`${id}-more`}>{ui.toolbarMenu}</button>
+      <div class="tb-more" id={`${id}-more`}>
       <button type="button" class="tb" data-next-song>{ui.nextSong}</button>
       <span class="seg" role="group" aria-label={ui.weatherAria}>
         <button type="button" class="tb" data-sky="day" aria-pressed="false">{ui.skyDay}</button>
@@ -93,6 +95,7 @@ const fallbackLinks = [
         <button type="button" class="tb" data-fs="window" aria-pressed="false" title={ui.fillWindowTitle}>{ui.fillWindow}</button>
         <button type="button" class="tb" data-fs="screen" aria-pressed="false" title={ui.fullscreenTitle}>{ui.fullscreen}</button>
       </span>
+      </div>
     </div>
 
     <aside class="panel stemma-panel" data-stemma-panel aria-label={ui.stemmaAria}>
@@ -418,6 +421,8 @@ const fallbackLinks = [
     gap: 6px;
     z-index: 4;
   }
+  .tb-menu { display: none; }
+  .tb-more { display: contents; }
   .seg {
     display: inline-flex;
     border-radius: 999px;
@@ -1193,7 +1198,6 @@ const fallbackLinks = [
     .stage :global(.prompts) { bottom: 124px; }
     .stage :global(.prompts .pi kbd) { display: none; }
     .stage :global(.minimap:not(.big)) { bottom: auto; top: 142px; }
-    .toolbar { right: 12px; } /* the map is up top here */
     .focus-hint { display: none; }
   }
   .walk3d:global(.has-touch) .touch { display: flex; }
@@ -1231,14 +1235,15 @@ const fallbackLinks = [
   }
   .acts {
     display: grid;
-    grid-template-columns: repeat(2, 52px);
+    grid-template-columns: repeat(2, 60px);
     gap: 8px;
     pointer-events: auto;
   }
   .acts button {
     height: 46px;
     border: 1.5px solid rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
+    padding: 0;
+    border-radius: 23px;
     background: rgba(11, 20, 48, 0.82);
     color: #f4f1ea;
     font: 800 11px var(--font-display);
@@ -1343,7 +1348,7 @@ const fallbackLinks = [
     }
     .stage :global(.banner.show) { transform: none; }
     .toolbar { left: 8px; right: 8px; bottom: auto; top: 88px; flex-wrap: wrap; gap: 4px; }
-    .toolbar .tb { min-height: 26px; padding: 3px 8px; font-size: 10.5px; white-space: nowrap; }
+    .toolbar .tb { white-space: nowrap; }
     @media (pointer: fine) { .toolbar { top: auto; bottom: 8px; } }
     .touch { inset: auto 10px 12px 10px; }
     .stick { width: 96px; height: 96px; }
@@ -1355,8 +1360,8 @@ const fallbackLinks = [
   }
   @media (max-width: 400px) {
     .stick { width: 88px; height: 88px; }
-    .acts { grid-template-columns: repeat(2, 48px); gap: 6px; }
-    .acts button { height: 42px; font-size: 10px; }
+    .acts { grid-template-columns: repeat(2, 58px); gap: 6px; }
+    .acts button { height: 44px; font-size: 10px; }
   }
   /* Phones held sideways (and other short screens): there's no room for the map
      between the goals and the touch buttons, so shrink it and tuck it up top. */
@@ -1449,5 +1454,34 @@ const fallbackLinks = [
     .songs { margin-bottom: 0; }
     .stems { align-items: start; }
     .pod-shows { margin-top: 0; }
+  }
+  /* Touch (has-touch is set on coarse pointers or the first touch): sound stays out,
+     the other settings fold into a menu so the buttons can be finger-sized. */
+  .walk3d:global(.has-touch) .toolbar { right: auto; }
+  .walk3d:global(.has-touch) .toolbar .tb { min-height: 44px; min-width: 44px; padding: 6px 14px; font-size: 12px; }
+  .walk3d:global(.has-touch) .tb-menu { display: block; }
+  .walk3d:global(.has-touch) .tb-more { display: none; }
+  .walk3d:global(.has-touch) .tb-menu[aria-expanded='true'] { background: var(--saffron); color: var(--navy-deep); }
+  .walk3d:global(.has-touch) .tb-menu[aria-expanded='true'] + .tb-more {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 6px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: min(340px, calc(100vw - 48px));
+    padding: 8px;
+    border-radius: 14px;
+    background: rgba(20, 32, 61, 0.95);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  }
+  .walk3d:global(.has-touch) .tb-more .tb { background: rgba(255, 255, 255, 0.12); }
+  .walk3d:global(.has-touch) .tb-more .tb[aria-pressed='true'] { background: var(--saffron); }
+  .walk3d:global(.has-touch) .toolbar:has([aria-expanded='true']) { z-index: 6; }
+  .walk3d:global(.has-touch) .touch { bottom: 64px; }
+  @media (max-width: 720px) {
+    .walk3d:global(.has-touch) .touch { bottom: 12px; }
+    .walk3d:global(.has-touch) .toolbar { top: 88px; bottom: auto; }
+    .walk3d:global(.has-touch) .tb-menu[aria-expanded='true'] + .tb-more { top: calc(100% + 6px); bottom: auto; }
   }
 </style>
