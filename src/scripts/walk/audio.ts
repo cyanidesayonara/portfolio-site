@@ -94,13 +94,19 @@ export class WalkAudio {
   private lastTake = new Map<SampleGroup, string>();
   private listener = { x: 0, z: 0, fx: 0, fz: -1 };
 
-  constructor(private base = '/audio/stemma') {}
+  private base: string;
+
+  constructor(base = '/audio/stemma') {
+    this.base = base;
+  }
 
   async loadIndex() {
     if (this.songs.length) return this.songs;
     try {
       const res = await fetch(`${this.base}/songs.json`);
-      this.songs = (await res.json()).songs as SongMeta[];
+      if (!res.ok) return this.songs;
+      const data = (await res.json()) as { songs?: unknown } | null;
+      this.songs = Array.isArray(data?.songs) ? (data.songs as SongMeta[]) : [];
     } catch {
       this.songs = [];
     }
@@ -156,7 +162,7 @@ export class WalkAudio {
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       this.noise = n;
     }
-    void this.ctx.resume();
+    void this.ctx.resume().catch(() => {});
     this.on = true;
     void this.loadSamples();
     void this.loadIndex().then(() => { if (this.musicOn) void this.playSong(this.songId); });
@@ -164,7 +170,7 @@ export class WalkAudio {
 
   disable() {
     this.on = false;
-    void this.ctx?.suspend();
+    void this.ctx?.suspend().catch(() => {});
   }
 
   /** Fetch and decode every effect sample once (small mono MP3s, ~200 KB in all). */
@@ -245,30 +251,38 @@ export class WalkAudio {
     if (this.musicBus && this.ctx) this.musicBus.gain.setTargetAtTime(0.55 * v, this.ctx.currentTime, 0.3);
   }
 
-  private async fetchSong(s: SongMeta) {
+  private async fetchSong(s: SongMeta): Promise<Map<string, AudioBuffer> | null> {
     const cached = this.buffers.get(s.id);
     if (cached) return cached;
-    const c = this.ctx!;
-    const entries = await Promise.all(
-      s.stems.map(async (st) => {
-        const res = await fetch(`${this.base}/${s.id}/${st}.mp3`);
-        const buf = await c.decodeAudioData(await res.arrayBuffer());
-        return [st, buf] as const;
-      }),
-    );
-    const map = new Map(entries);
-    this.buffers.set(s.id, map);
-    return map;
+    const c = this.ctx;
+    if (!c) return null;
+    try {
+      const entries = await Promise.all(
+        s.stems.map(async (st) => {
+          const res = await fetch(`${this.base}/${s.id}/${st}.mp3`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buf = await c.decodeAudioData(await res.arrayBuffer());
+          return [st, buf] as const;
+        }),
+      );
+      const map = new Map(entries);
+      this.buffers.set(s.id, map);
+      return map;
+    } catch {
+      return null;
+    }
   }
 
-  async playSong(id: string) {
-    if (!this.ctx) return;
+  async playSong(id: string): Promise<boolean> {
+    if (!this.ctx) return false;
     const s = this.songs.find((x) => x.id === id);
-    if (!s) return;
-    this.songId = id;
+    if (!s || !s.stems.length) return false;
     const token = ++this.loadToken;
     const bufs = await this.fetchSong(s);
-    if (token !== this.loadToken || !this.ctx || !this.on) return;
+    if (!bufs || token !== this.loadToken || !this.ctx || !this.on || !this.musicOn) return false;
+    const first = bufs.get(s.stems[0]);
+    if (!first) return false;
+    this.songId = id;
     const c = this.ctx;
     const now = c.currentTime + 0.05;
     // Each stem fades in and feeds its group's shared gain (guitar and piano
@@ -288,8 +302,9 @@ export class WalkAudio {
     });
     sources.forEach((src) => src.start(now));
     this.stopCurrent(now);
-    this.playing = { id, sources, fades, startedAt: now, duration: bufs.get(s.stems[0])!.duration };
+    this.playing = { id, sources, fades, startedAt: now, duration: first.duration };
     this.onSongChange?.(s);
+    return true;
   }
 
   private stopCurrent(at: number) {
