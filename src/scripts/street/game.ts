@@ -1879,21 +1879,60 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
           }
         }
       } else if (id === 'leash') {
-        c.fillStyle = '#cfc5b3';
-        c.fillRect(w1x, wy, ww, wh);
-        const mx = snap2(w1x + 12 + ((t * 18) % (ww - 24)));
+        const night = isNight();
+        const midX = l.x + l.w / 2;
+        const nearMirror = Math.abs(dog.x - midX) < 160;
+        // Left pane: mini 3D boardwalk horizon mirror reflecting Millie, her human, and the red leash.
+        c.fillStyle = night ? '#0e1b3b' : '#65aae0';
+        c.fillRect(w1x, wy, ww, 10);
+        c.fillStyle = night ? '#12294a' : '#2f8fb0';
+        c.fillRect(w1x, wy + 10, ww, 4);
+        c.fillStyle = '#c29864';
+        c.fillRect(w1x, wy + 14, ww, wh - 14);
+        c.fillStyle = 'rgba(85, 58, 34, 0.45)';
+        for (let bx = 6; bx < ww; bx += 10) c.fillRect(w1x + bx, wy + 14, 1, wh - 14);
+        c.fillStyle = night ? '#eef2ff' : '#ffe88a';
+        c.fillRect(w1x + (night ? 10 : ww - 14), wy + 2, 4, 4);
+
+        const rxDog = nearMirror
+          ? clamp((dog.x - midX) / 140, -1, 1)
+          : Math.sin(t * 1.4) * 0.6;
+        const rxHum = nearMirror
+          ? clamp((human.x - midX) / 140, -1, 1)
+          : rxDog - 0.35;
+        const depth = nearMirror ? clamp((dog.y - WALK_TOP) / 90, 0, 1) : 0.45;
+        const dyM = wy + 14 + Math.round(depth * 6);
+        const dxM = snap2(w1x + ww / 2 + rxDog * (ww * 0.38));
+        const hxM = snap2(w1x + ww / 2 + rxHum * (ww * 0.38));
+
         c.fillStyle = '#d9403a';
-        c.fillRect(Math.max(w1x + 4, mx - 12), wy + 13, 12, 2);
-        c.fillStyle = '#1fc9b7';
-        c.fillRect(Math.max(w1x + 2, mx - 14), wy + 8, 5, 10);
-        c.fillStyle = '#ffb020';
-        c.fillRect(mx, wy + 12, 6, 4);
+        const lx0 = Math.min(hxM, dxM), lw = Math.max(2, Math.abs(dxM - hxM));
+        c.fillRect(lx0, dyM + 2, lw, 2);
+        c.fillStyle = '#b85c70';
+        c.fillRect(hxM - 2, dyM - 4, 4, 8);
+        c.fillStyle = '#18181b';
+        c.fillRect(dxM - 2, dyM + 1, 5, 3);
+        c.fillStyle = '#d9403a';
+        c.fillRect(dxM + 1, dyM + 1, 2, 2);
+        if (nearMirror && fx.some((f) => f.kind === 'ring' && Math.hypot(f.x - dog.x, f.y - dog.y) < 36)) {
+          c.fillStyle = '#ffb020';
+          c.fillRect(dxM - 4, dyM - 4, 9, 2);
+        }
+
+        // Right pane: 3D boardwalk compass & live reflection telemetry
         c.fillStyle = '#0b1430';
         c.fillRect(w2x, wy, ww, wh);
-        c.fillStyle = '#ffb020';
-        c.fillRect(w2x + 6, wy + 6, 18, 4);
+        c.fillStyle = nearMirror ? '#5eea8c' : '#ffb020';
+        c.fillRect(w2x + 4, wy + 4, 14, 4);
+        c.fillStyle = '#1fc9b7';
+        c.fillRect(w2x + 22, wy + 5, Math.max(6, Math.round(((Math.sin(t * 2.2) + 1) * 0.5) * (ww - 28))), 2);
         c.fillStyle = '#f4f1ea';
-        c.fillRect(w2x + 6, wy + 14, 42, 4);
+        const compX = snap2(w2x + ww / 2 + Math.cos(dog.heading) * 14);
+        const compY = snap2(wy + 16 + Math.sin(dog.heading) * 4);
+        c.fillRect(compX - 2, compY - 2, 4, 4);
+        c.fillStyle = 'rgba(255, 255, 255, 0.14)';
+        c.fillRect(w1x + 4, wy + 2, 4, wh - 4);
+        c.fillRect(w2x + 4, wy + 2, 4, wh - 4);
       } else {
         const col = id === 'blog' ? '#e5487a' : id === 'about' ? '#8bcb3c' : '#3d73c7';
         for (const [bi, bx] of [w1x, w2x].entries()) {

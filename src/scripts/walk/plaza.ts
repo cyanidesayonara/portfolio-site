@@ -331,6 +331,13 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   for (const [ax, bx] of [[-40, -10], [10, 40]]) {
     place(makeBunting(new THREE.Vector3(ax, Y + 5.4, 155.2), new THREE.Vector3(bx, Y + 5.4, 160.8)), 0, 0, 0);
   }
+  // Diagonal festival bunting over the main market square + stacked wooden produce crates by the portal.
+  place(makeBunting(new THREE.Vector3(-18, Y + 6.4, 108), new THREE.Vector3(-5, Y + 6.2, 134)), 0, 0, 0);
+  place(makeBunting(new THREE.Vector3(18, Y + 6.4, 108), new THREE.Vector3(5, Y + 6.2, 134)), 0, 0, 0);
+  for (const cx of [-4.4, 4.4]) {
+    builder.addBox(cx - 0.35, Y, MK.z0 - 1.35, cx + 0.35, Y + 0.45, MK.z0 - 0.75, 0x8c6442);
+    builder.addBox(cx - 0.28, Y + 0.45, MK.z0 - 1.28, cx + 0.28, Y + 0.82, MK.z0 - 0.82, 0xb08a5a);
+  }
   place(makeFingerpost([
     { title: 'Dalt de la Vila', sub: 'Església · Museu', color: '#8bcb3c', angle: Math.PI / 2 },
     { title: 'Plaça del Mercat', sub: 'Carrer Major', color: '#ffb020', angle: -Math.PI / 2 },

@@ -33,7 +33,7 @@ import {
 } from './models';
 import {
   makeLanternPost, makeSpotMast, makeTerrace, makeTamarisk, makeDatePalm, makeChimney, makeXemeneies,
-  makeArch, makeBunting, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost, makePlanterPot, makeParkedBike,
+  makeArch, makeBunting, makeLaundryLine, makePierLeg, makeBeaconMast, railFenceGeometry, makeFingerpost, makePlanterPot, makeParkedBike,
 } from './props';
 import {
   panotTextures, sandTexture, deckTexture, plasterTexture, waterNormalTexture, signTexture, rng,
@@ -334,6 +334,15 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   for (const z of [53, 71, 89]) {
     root.add(makeBunting(new THREE.Vector3(8, GROUND_Y + 5.8, z - 3), new THREE.Vector3(8, GROUND_Y + 5.8, z + 3)));
     root.add(makeBunting(new THREE.Vector3(-8, GROUND_Y + 5.8, z - 3), new THREE.Vector3(-8, GROUND_Y + 5.8, z + 3)));
+  }
+  for (const [lz, seed] of [[44, 1], [60, 2], [77, 3], [93, 4]] as const) {
+    root.add(makeLaundryLine(new THREE.Vector3(-3.3, GROUND_Y + 7.8, lz), new THREE.Vector3(3.3, GROUND_Y + 7.9, lz + 0.6), seed));
+  }
+  for (const fz of [42, 47, 61, 66, 79, 84, 96]) {
+    for (const fx of [-3.35, 3.35]) {
+      townBuilder.addBox(fx - 0.14, GROUND_Y + 4.21, fz - 0.55, fx + 0.14, GROUND_Y + 4.49, fz + 0.55, 0xb2563a);
+      townBuilder.addBox(fx - 0.11, GROUND_Y + 4.45, fz - 0.48, fx + 0.11, GROUND_Y + 4.59, fz + 0.48, 0x5a9e48);
+    }
   }
 
   yield 'Town furniture and quest props';
@@ -882,6 +891,12 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       const door = box(1.2, 2.5, 0.06, M(accent, 0.55));
       door.position.set(p.w * 0.34, 1.3, (PZ1 - PZ0) / 2 + 0.04);
       g.add(door);
+      const lintel = box(1.4, 0.12, 0.1, M(accent, 0.3, 0.25));
+      lintel.position.set(p.w * 0.34, 2.66, (PZ1 - PZ0) / 2 + 0.07);
+      g.add(lintel);
+      const mat = box(1.5, 0.015, 0.85, M(accent, 0.88));
+      mat.position.set(p.w * 0.34, 0.018, (PZ1 - PZ0) / 2 + 0.55);
+      g.add(mat);
       const sign = new THREE.Mesh(new THREE.BoxGeometry(Math.min(p.w * 0.85, 7.5), 0.85, 0.1), new THREE.MeshStandardMaterial({ map: signTexture(p.title, p.sub, p.color, { aspect: Math.min(p.w * 0.85, 7.5) / 0.85 }) }));
       sign.position.set(0, h + 0.75, (PZ1 - PZ0) / 2 + 1.6);
       g.add(sign);
@@ -902,9 +917,15 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     place(makePlanterPot(fc), fx, GROUND_Y, fz, fx);
     addCircle(fx, fz, 0.34, GROUND_Y + 0.9, 'pot', true, false);
   }
+  const addCup = (x: number, z: number) => {
+    const cup = cyl(0.04, 0.03, 0.1, M(0xf4f1ea, 0.5), 8);
+    cup.position.set(x, GROUND_Y + 0.85, z);
+    root.add(cup);
+  };
   for (const [tx, tz, col] of [[-28.6, -8.8, 0xffb020], [-13.8, -8.8, 0x1fc9b7]] as [number, number, number][]) {
     place(makeCafeSet(col), tx, GROUND_Y, tz, tx);
     addCircle(tx, tz, 0.5, GROUND_Y + 0.8, 'table', false, false);
+    addCup(tx + 0.1, tz - 0.06);
   }
   const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 14, Math.PI), M(0x2a2f3d, 0.4, 0.6));
   hoop.position.set(-17.35, GROUND_Y, -8.5);
@@ -912,11 +933,23 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(makeParkedBike(0xe5302a), -17.8, GROUND_Y, -8.5, 0.35);
   place(makeParkedBike(0x1fc9b7), -16.9, GROUND_Y, -8.5, 0.15);
   boxes.push({ x0: -18.4, x1: -16.3, z0: -9.0, z1: -8.0, top: GROUND_Y + 1.0, kind: 'bike' });
-  // About: a little terrace in front of the café.
+  // About: a little terrace + welcome A-frame board in front of the café.
   for (const tx of [24, 31]) {
     place(makeCafeSet(0x8bcb3c), tx, GROUND_Y, -9.8, r() * 3);
     addCircle(tx, -9.8, 0.5, GROUND_Y + 0.8, 'table', false, false);
+    addCup(tx - 0.08, -9.72);
   }
+  {
+    const aboard = new THREE.Group();
+    const frameM = M(0x5e4a3a, 0.85);
+    const front = box(0.56, 0.84, 0.04, M(0x1b2436, 0.85));
+    front.position.set(0, 0.45, 0.14); front.rotation.x = -0.22;
+    const back = box(0.56, 0.84, 0.04, frameM);
+    back.position.set(0, 0.45, -0.14); back.rotation.x = 0.22;
+    aboard.add(front, back);
+    place(shadowed(aboard), 24.4, GROUND_Y, PZ1 + 1.0, 0.25);
+  }
+  const leashPav = pavilions.find((p) => p.id === 'leash')!;
   // Blog: racks of magazines out front.
   place(makeKiosk(0xe5487a), 40, GROUND_Y, -10.6, 0);
   boxes.push({ x0: 38.7, x1: 41.3, z0: -11.5, z1: -9.7, top: GROUND_Y + 2.8, kind: 'kiosk' });
@@ -965,6 +998,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     root.add(m);
     stemmaBars.push(m);
   }
+  const stemmaCones: THREE.Mesh[] = [];
   for (const sx of [stem.x - 4.4, stem.x + 4.4]) {
     const sp = box(0.7, 1.15, 0.6, M(0x1b1b1f, 0.6));
     sp.position.set(sx, GROUND_Y + 0.58, PZ1 + 0.8);
@@ -972,8 +1006,20 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     const cone = cyl(0.22, 0.22, 0.04, M(0x3a3a40, 0.4, 0.3), 16);
     cone.rotation.x = Math.PI / 2;
     cone.position.set(sx, GROUND_Y + 0.7, PZ1 + 1.11);
+    cone.userData.dynamic = true;
     root.add(cone);
+    stemmaCones.push(cone);
     boxes.push({ x0: sx - 0.35, x1: sx + 0.35, z0: PZ1 + 0.5, z1: PZ1 + 1.1, top: GROUND_Y + 1.15, kind: 'speaker' });
+  }
+  {
+    const crate = box(0.54, 0.36, 0.44, M(0x8c6442, 0.85));
+    crate.position.set(stem.x - 3.3, GROUND_Y + 0.18, PZ1 + 0.85);
+    root.add(crate);
+    for (let k = 0; k < 4; k++) {
+      const sleeve = box(0.04, 0.36, 0.36, M([0x1fc9b7, 0xffb020, 0xe5487a, 0xf4f1ea][k], 0.6));
+      sleeve.position.set(stem.x - 3.45 + k * 0.1, GROUND_Y + 0.34, PZ1 + 0.85);
+      root.add(sleeve);
+    }
   }
 
   yield 'Beach';
@@ -1448,10 +1494,12 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     beacon: beacon.lamp,
     coriolis: { x: wallX, y: wallY, z: wallZ, screen },
     stemma: { x: stem.x, z: PZ1 + 1.6 },
+    leash: { x: leashPav.x, z: PZ1 + 1.2 },
     catScreen: { ...catScreenPos, mesh: catScreenMesh, viewX: eatPav.x - 1.2, viewZ: PZ1 + 1.6 },
     boothTofuAnchor: { x: eatPav.x - 1.2, z: PZ1 + 1.1 },
     dopepod: { x: podPav.x, z: PZ1 + 1.6 },
     stemmaBars,
+    stemmaCones,
     underpassLight,
     tunnel: { x0: -CUT.tunnelX, x1: CUT.tunnelX, z0: CUT.sea0, z1: CUT.rambla1, cutZ0: CUT.sea1, cutZ1: CUT.rambla0, floor: CUT.floor },
     // On the promenade between the PoLR and stemma pavilions, clear of the cycle path.
