@@ -486,3 +486,24 @@ export function paintTexture(drawFn: (g: CanvasRenderingContext2D, w: number, h:
   t.anisotropy = 8;
   return t;
 }
+
+/** Derive a grayscale bump map from a procedural canvas texture's luminance. */
+export function lumaBumpTexture(source: THREE.CanvasTexture, contrast = 1.6): THREE.CanvasTexture {
+  const src = source.image as HTMLCanvasElement;
+  const w = src.width, h = src.height;
+  const c = canvas(w, h);
+  const g = c.getContext('2d')!;
+  const srcData = src.getContext('2d')!.getImageData(0, 0, w, h).data;
+  const dst = g.createImageData(w, h);
+  const d = dst.data;
+  for (let i = 0; i < srcData.length; i += 4) {
+    const luma = srcData[i] * 0.299 + srcData[i + 1] * 0.587 + srcData[i + 2] * 0.114;
+    const v = Math.max(0, Math.min(255, Math.round((luma - 128) * contrast + 128)));
+    d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = 255;
+  }
+  g.putImageData(dst, 0, 0);
+  const t = tex(c, 1, false);
+  t.repeat.copy(source.repeat);
+  return t;
+}
