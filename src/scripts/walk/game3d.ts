@@ -12,6 +12,7 @@ import { createParticles } from './particles';
 import { createSkySystem } from './sky';
 import { createGoalSystem } from './goals';
 import { createBoothPanels } from './boothPanels';
+import { TelegraphPool, FeelState, inRing } from './telegraph';
 import { Leash, applyTug, capStretch, WhirlDetector, type Obstacle } from './leash';
 import { buildLevelSteps, runSliced, LEVEL_STEPS, PIPICA, WATER_Y, RAMBLA_Y, GROUND_Y, TRAIN_Y, TRAIN_Z, type Level } from './level';
 import { Streamer, type District } from './world';
@@ -166,6 +167,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const buildMs = performance.now() - buildT0;
   const audio = new WalkAudio();
   const hud = new Hud(host);
+  const feel = new FeelState();
+  const telegraphs = new TelegraphPool(scene);
   let mapFrame = 0;
   const minimap = new Minimap(host, level);
   // Sunbathers, anglers and terrace regulars hold still, so they get baked into the scenery.
@@ -440,6 +443,16 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     d.person.group.visible = false;
     return { ...d, id: `bd${i}`, x: level.dimoni.x, z: level.dimoni.z, heading: 0, flank: (i - 1) * 1.6 };
   });
+  const swoopGulls = Array.from({ length: 3 }, (_, i) => {
+    const b = makeBird('gull');
+    b.group.scale.setScalar(1.25);
+    b.group.visible = false;
+    scene.add(b.group);
+    return { ...b, id: `sg${i}`, x: level.fishBucket.x, y: 10, z: level.fishBucket.z, heading: 0 };
+  });
+  const gullThreat = { wave: 0, active: false, tx: 0, tz: 0, t: 0, dur: 0.85, dodged: 0, cd: 0, sx: 0, sz: 0 };
+  const correfocRing = { active: false, x: 0, z: 0, t: 0, dur: 0.85, cd: 1.0 };
+  const devilRing = { active: false, x: 0, z: 0, t: 0, dur: 0.85, cd: 1.2 };
   const drummers = [0, 1].map((i) => {
     const p = makePerson({ top: 0x8a2f2c, trousers: 0x2a1a1a, hair: 0x1a1010, hairStyle: 'short', prop: 'none' });
     const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), M(0xc9a26b, 0.6));
@@ -462,7 +475,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   // Chases (the real game's threat grid): La Neteja is slow and scares only
   // you, so your human dawdles; the correfoc is fast and scares you both.
-  type ChaseKind = 'neteja' | 'correfoc' | 'dimoni';
+  type ChaseKind = 'neteja' | 'correfoc' | 'dimoni' | 'gulls';
   let chase: null | { kind: ChaseKind; t: number; speed: number } = null;
   let chaseCooldown = 0;
   const startChase = (kind: ChaseKind) => {
@@ -477,6 +490,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       hud.shout('CREMADA!', 'loud');
       humanSay('They\'re coming for us!', 1.8, 'loud');
       hud.toast('Chase', 'The Dimoni\'s devils are out: get into the sea or get well away', '#ff4a3d');
+      devilRing.active = false; devilRing.cd = 1.0;
       beachDevils.forEach((bd, i) => {
         // They burst out from behind the fence on the far side of the fire.
         const away = Math.atan2(level.dimoni.z - dog.z, level.dimoni.x - dog.x);
@@ -485,10 +499,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         bd.person.group.visible = true;
         hud.say(bd.id, pickOne(['Foc!', 'Visca!', 'Corre!']), 1.4, 'loud');
       });
+    } else if (kind === 'gulls') {
+      hud.shout('GAVINES!', 'loud');
+      humanSay('Watch out for the gulls!', 1.8, 'loud');
+      hud.toast('Gull swoop', 'Step out of the dive rings or bark [E] as they swoop, or duck under a pavilion.', '#ff8a2a');
+      gullThreat.wave = 0; gullThreat.active = false; gullThreat.dodged = 0; gullThreat.cd = 0.2;
+      audio.gull({ x: level.fishBucket.x, z: level.fishBucket.z });
+      audio.flutter({ x: level.fishBucket.x, z: level.fishBucket.z });
     } else {
       hud.shout('CORREFOC!', 'loud');
       humanSay('Fire! Run!', 1.6, 'loud');
       hud.toast('Chase', 'Run for the underpass, both of you', '#ffb020');
+      correfocRing.active = false; correfocRing.cd = 0.9;
     }
     audio.hey();
   };
@@ -497,21 +519,45 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const kind = chase.kind;
     chase = null;
     chaseCooldown = 10;
+    if (kind === 'gulls') {
+      gullThreat.active = false;
+      swoopGulls.forEach((sg) => { sg.group.visible = false; });
+    }
+    if (kind === 'correfoc') correfocRing.active = false;
+    if (kind === 'dimoni') devilRing.active = false;
     if (won) {
-      hud.shout(kind === 'neteja' ? 'ESCAPED!' : kind === 'dimoni' ? 'COOLED OFF!' : 'SAFE!', 'good');
-      addBones(kind === 'neteja' ? 5 : kind === 'dimoni' ? 7 : 6);
-      completeGoal(kind);
+      if (kind === 'gulls') {
+        hud.shout('SCATTERED!', 'good');
+        addBones(6);
+        completeGoal('gulls');
+      } else {
+        hud.shout(kind === 'neteja' ? 'ESCAPED!' : kind === 'dimoni' ? 'COOLED OFF!' : 'SAFE!', 'good');
+        addBones(kind === 'neteja' ? 5 : kind === 'dimoni' ? 7 : 6);
+        completeGoal(kind);
+      }
+      feel.kick(0.18);
     } else if (kind === 'neteja') {
       hud.shout('SOAKED!', 'bad');
       burst(dog.x, dog.y + 0.6, dog.z, 0xbfe6ff, 30, 3, 3, 0.8, 7);
       dog.wet = 1;
       humanSay('Ugh, my shoes!', 1.8);
       audio.whine();
+      feel.kick(0.35);
+      feel.hitstop(0.08);
+    } else if (kind === 'gulls') {
+      hud.shout('PECKED!', 'bad');
+      burst(dog.x, dog.y + 0.6, dog.z, 0xf4f4f0, 22, 2.5, 2.5, 0.7, 5);
+      humanSay('Shoo!', 1.6, 'loud');
+      audio.whine();
+      feel.kick(0.4);
+      feel.hitstop(0.08);
     } else {
       hud.shout('SINGED!', 'bad');
       burst(dog.x, dog.y + 0.6, dog.z, 0x3a3a40, 24, 2, 2.5, 0.9, 4);
       humanSay('My hair!', 1.8, 'loud');
       audio.whine();
+      feel.kick(0.38);
+      feel.hitstop(0.08);
     }
   };
 
@@ -635,6 +681,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let corrections = 0;
   let swHonkCd = 0;
   let nightBarks = 0;
+  let dogBarkT = 0;
+  let dogLandT = 0;
+  let wasDogOnGround = true;
+  let prevDogHeading = startHeading;
+  let dogTurn = 0;
   const handPos = new THREE.Vector3();
   const collarPos = new THREE.Vector3();
   // The leash hand, computed from the body (the model's matrices lag a frame,
@@ -697,12 +748,25 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
 
   const doBark = () => {
+    dogBarkT = 0.24;
     if (skySys.getMode() === 'night' && ++nightBarks % 3 === 0) audio.howl();
     else audio.bark();
     life.bark();
     plaza.bark();
     hill.bark();
     strays.bark();
+    if (chase?.kind === 'gulls' && gullThreat.active && gullThreat.t / gullThreat.dur > 0.42 && Math.hypot(dog.x - gullThreat.tx, dog.z - gullThreat.tz) < 5.5) {
+      gullThreat.active = false;
+      gullThreat.cd = 0.7;
+      gullThreat.dodged++;
+      hud.shout('COUNTER-BARK!', 'good');
+      feel.hitstop(0.08);
+      feel.kick(0.25);
+      burst(gullThreat.tx, level.floor(gullThreat.tx, gullThreat.tz, 0) + 0.6, gullThreat.tz, 0xf4f4f0, 18, 2.6, 2.2, 0.7, 5);
+      audio.flutter({ x: gullThreat.tx, z: gullThreat.tz });
+      audio.gull({ x: gullThreat.tx, z: gullThreat.tz });
+      if (gullThreat.dodged >= 2) endChase(true);
+    }
     burst(dog.x + Math.cos(dog.heading) * 0.5, dog.y + 0.75, dog.z + Math.sin(dog.heading) * 0.5, 0xffb020, 5, 1.5, 1.2, 0.4, 2);
     let scared = 0;
     for (const b of birds) {
@@ -724,6 +788,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (!chase && chaseCooldown <= 0 && !offLeash) startChase('dimoni');
       else hud.shout('CREMADA!', 'loud');
     }
+    if (!chase && Math.hypot(dog.x - level.fishBucket.x, dog.z - level.fishBucket.z) < 5) startChase('gulls');
     if (!chase && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) startChase('neteja');
     if (!chase && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) startChase('correfoc');
     for (const w of walkers) {
@@ -1599,14 +1664,19 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   let runT = 0, dogNoiseT = 0, ambT = 5;
   const listenDir = new THREE.Vector3();
+  let fStep = { simScale: 1, shakeX: 0, shakeY: 0 };
   const update = (rawDt: number) => {
     streamer.update(dog.x, dog.z);
     // Goals card follows the area Millie is in.
     goalSys.setArea(areaOfDistrict(level.districtAt(dog.x, dog.z).id));
     level.churchLandmark.visible = !hillDistrict.root.visible;
-    const dt = slowmo > 0 ? rawDt * 0.3 : rawDt;
+    telegraphs.beginFrame();
+    fStep = feel.step(rawDt);
+    const dt = (slowmo > 0 ? rawDt * 0.3 : rawDt) * fStep.simScale;
     if (slowmo > 0) slowmo -= rawDt;
     time += dt;
+    dogBarkT = Math.max(0, dogBarkT - dt);
+    dogLandT = Math.max(0, dogLandT - dt);
 
     // Physics at a fixed 120 Hz for a stable rope.
     let acc = dt;
@@ -1615,6 +1685,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       physicsStep(h);
       acc -= h;
     }
+    if (!wasDogOnGround && dog.onGround && !dogSwimming) dogLandT = 0.22;
+    wasDogOnGround = dog.onGround;
+    const hDiff = Math.atan2(Math.sin(dog.heading - prevDogHeading), Math.cos(dog.heading - prevDogHeading));
+    prevDogHeading = dog.heading;
+    dogTurn += (clamp(hDiff / Math.max(0.008, dt) / 5, -1, 1) - dogTurn) * Math.min(1, dt * 10);
     const sp = Math.hypot(dog.vx, dog.vz);
     dog.speed = sp;
     dog.stillTime = sp < 0.2 ? dog.stillTime + dt : 0;
@@ -1942,6 +2017,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       chase.speed = Math.min(3.4, chase.speed + dt * 0.6);
       sw.dir = -1;
       sw.z -= chase.speed * dt;
+      telegraphs.lane(sw.x, sw.z - 1.5, sw.x, sw.z - 7.0, GROUND_Y + 0.04, 3.8, clamp(chase.t / 0.85, 0.25, 1), 0x38c9ff);
+      telegraphs.beacon(0, GROUND_Y + 0.04, 32.5, 2.4, time, 0x5eea8c);
+      const sideZ = [53, 71, 89].reduce((a, b) => (Math.abs(b - dog.z) < Math.abs(a - dog.z) ? b : a));
+      telegraphs.beacon(dog.x >= 0 ? 6.5 : -6.5, GROUND_Y + 0.04, sideZ, 2.0, time, 0x5eea8c);
       const front = sw.z - 2.3;
       const caught = [dog, human].some((p) => Math.abs(p.x - sw.x) < 2.2 && p.z > front - 0.6 && p.z < sw.z + 1);
       const safe = (p: { x: number; z: number }) => p.z < 33 || Math.abs(p.x) > 5;
@@ -2022,6 +2101,34 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       chase.t += dt;
       chase.speed = Math.min(4.6, chase.speed + dt * 1.2);
       cf.x -= chase.speed * dt;
+      telegraphs.lane(cf.x + 1, level.correfoc.z, cf.x - 10, level.correfoc.z, GROUND_Y + 0.04, 6.2, 0.85, 0xff6a1a);
+      telegraphs.beacon(0, GROUND_Y + 0.04, 20.5, 2.6, time, 0x5eea8c);
+      if (correfocRing.active) {
+        correfocRing.t += dt;
+        const fill = correfocRing.t / correfocRing.dur;
+        telegraphs.ring(correfocRing.x, RAMBLA_Y + 0.04, correfocRing.z, 2.3, fill, 0xff6a1a);
+        if (fill >= 1) {
+          correfocRing.active = false;
+          correfocRing.cd = 1.35;
+          burst(correfocRing.x, RAMBLA_Y + 0.4, correfocRing.z, 0xff8a2a, 24, 3.2, 3.0, 0.6, 5);
+          audio.firework({ x: correfocRing.x, z: correfocRing.z });
+          feel.kick(0.28);
+          if (inRing(dog.x, dog.z, correfocRing.x, correfocRing.z, 2.2)) {
+            endChase(false);
+          } else if (Math.hypot(dog.x - correfocRing.x, dog.z - correfocRing.z) < 4.8) {
+            hud.shout('DODGED! +2', 'good');
+            addBones(2);
+          }
+        }
+      } else {
+        correfocRing.cd -= dt;
+        if (correfocRing.cd <= 0 && chase?.kind === 'correfoc') {
+          correfocRing.active = true;
+          correfocRing.t = 0;
+          correfocRing.x = clamp(dog.x + dog.vx * 0.35 - 1.2, -70, 75);
+          correfocRing.z = clamp(dog.z + dog.vz * 0.35, 15.5, 32);
+        }
+      }
       const caught = devils.some((dv) => [dog, human].some((p) => Math.hypot(p.x - dv.x, p.z - dv.z) < 1.1));
       const inCut = (p: { x: number; z: number }) => Math.abs(p.x) < 3 && p.z < 21.5;
       if (caught) endChase(false);
@@ -2035,11 +2142,109 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (hunting && chase) {
       chase.t += dt;
       chase.speed = Math.min(3.6, chase.speed + dt * 0.18);
+      telegraphs.beacon(clamp(dog.x, -40, 44), WATER_Y + 0.05, -58.5, 3.2, time, 0x1fc9b7);
+      if (devilRing.active) {
+        devilRing.t += dt;
+        const fill = devilRing.t / devilRing.dur;
+        const dy = level.floor(devilRing.x, devilRing.z, 0);
+        telegraphs.ring(devilRing.x, dy + 0.05, devilRing.z, 1.65, fill, 0xff4a3d);
+        if (fill >= 1) {
+          devilRing.active = false;
+          devilRing.cd = 1.5;
+          burst(devilRing.x, dy + 0.3, devilRing.z, 0xff7a2a, 18, 2.6, 2.4, 0.5, 4);
+          feel.kick(0.22);
+          if (inRing(dog.x, dog.z, devilRing.x, devilRing.z, 1.65) || inRing(human.x, human.z, devilRing.x, devilRing.z, 1.65)) {
+            endChase(false);
+          } else if (Math.hypot(dog.x - devilRing.x, dog.z - devilRing.z) < 4.0) {
+            hud.shout('DODGED! +2', 'good');
+            addBones(2);
+          }
+        }
+      } else {
+        devilRing.cd -= dt;
+        if (devilRing.cd <= 0 && beachDevils.some((bd) => Math.hypot(bd.x - dog.x, bd.z - dog.z) < 4.8)) {
+          devilRing.active = true;
+          devilRing.t = 0;
+          devilRing.x = dog.x + dog.vx * 0.25;
+          devilRing.z = clamp(dog.z + dog.vz * 0.25, -56.5, -20.5);
+        }
+      }
       const wet = level.surface(dog.x, dog.z, dog.y) === 'water';
       const far = Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) > 34;
       const caught = beachDevils.some((bd) => [dog, human].some((p) => Math.hypot(p.x - bd.x, p.z - bd.z) < 1.0));
       if (caught) endChase(false);
       else if (wet || far || chase.t > 26) endChase(true);
+    }
+    // Gavines: swooping pier gulls telegraph dive rings and can be counter-barked mid-dive.
+    if (chase?.kind === 'gulls') {
+      chase.t += dt;
+      telegraphs.beacon(clamp(dog.x, -74, 54), GROUND_Y + 0.04, -15.5, 2.5, time, 0x5eea8c);
+      if (dog.z > -16.8 && dog.z < -11 && human.z > -18) {
+        endChase(true);
+      } else if (chase.t > 22) {
+        endChase(true);
+      } else if (gullThreat.active) {
+        gullThreat.t += dt;
+        const fill = clamp(gullThreat.t / gullThreat.dur, 0, 1);
+        const gy = level.floor(gullThreat.tx, gullThreat.tz, 0);
+        telegraphs.ring(gullThreat.tx, gy + 0.05, gullThreat.tz, 1.9, fill, 0xff5a36);
+        const lead = swoopGulls[gullThreat.wave % swoopGulls.length];
+        const diveArc = Math.sin(fill * Math.PI * 0.85);
+        const px = lerp(gullThreat.sx, gullThreat.tx, fill);
+        const pz = lerp(gullThreat.sz, gullThreat.tz, fill);
+        const py = lerp(9.5, gy + 0.45, Math.sin(fill * Math.PI * 0.5));
+        lead.group.visible = true;
+        lead.group.position.set(px, py, pz);
+        lead.group.rotation.y = -Math.atan2(gullThreat.tz - gullThreat.sz, gullThreat.tx - gullThreat.sx);
+        lead.group.rotation.z = -0.35 * (1 - fill);
+        lead.wings.forEach((w, wi) => { w.rotation.x = (wi ? -1 : 1) * Math.sin(time * 22 + diveArc) * 0.65; });
+        swoopGulls.forEach((sg, idx) => {
+          if (sg === lead) return;
+          const a = time * 1.4 + idx * 2.1;
+          sg.group.visible = true;
+          sg.group.position.set(dog.x + Math.cos(a) * 6.5, 8.5 + idx * 0.8, dog.z + Math.sin(a) * 6.5);
+          sg.group.rotation.y = -(a + Math.PI / 2);
+          sg.group.rotation.z = 0;
+          sg.wings.forEach((w, wi) => { w.rotation.x = (wi ? -1 : 1) * Math.sin(time * 10 + idx) * 0.45; });
+        });
+        if (gullThreat.t >= gullThreat.dur) {
+          gullThreat.active = false;
+          gullThreat.cd = 0.85;
+          burst(gullThreat.tx, gy + 0.3, gullThreat.tz, 0xcdb586, 14, 2.2, 2.0, 0.45, 4);
+          if (inRing(dog.x, dog.z, gullThreat.tx, gullThreat.tz, 1.85)) {
+            endChase(false);
+          } else {
+            gullThreat.dodged++;
+            if (Math.hypot(dog.x - gullThreat.tx, dog.z - gullThreat.tz) < 4.5) {
+              hud.shout('DODGED! +2', 'good');
+              addBones(2);
+            }
+            if (gullThreat.dodged >= 3) endChase(true);
+          }
+        }
+      } else {
+        gullThreat.cd -= dt;
+        swoopGulls.forEach((sg, idx) => {
+          const a = time * 1.4 + idx * 2.1;
+          sg.group.visible = true;
+          sg.group.position.set(dog.x + Math.cos(a) * 7, 9 + idx * 0.8, dog.z + Math.sin(a) * 7);
+          sg.group.rotation.y = -(a + Math.PI / 2);
+          sg.group.rotation.z = 0;
+          sg.wings.forEach((w, wi) => { w.rotation.x = (wi ? -1 : 1) * Math.sin(time * 10 + idx) * 0.45; });
+        });
+        if (gullThreat.cd <= 0 && chase?.kind === 'gulls') {
+          gullThreat.wave++;
+          gullThreat.active = true;
+          gullThreat.t = 0;
+          gullThreat.tx = clamp(dog.x + dog.vx * 0.32, -82, 82);
+          gullThreat.tz = clamp(dog.z + dog.vz * 0.32, -56, -12);
+          const flankA = (gullThreat.wave * 2.2) % (Math.PI * 2);
+          gullThreat.sx = gullThreat.tx + Math.cos(flankA) * 10;
+          gullThreat.sz = gullThreat.tz + Math.sin(flankA) * 10;
+          audio.gull({ x: gullThreat.sx, z: gullThreat.sz });
+          audio.flutter({ x: gullThreat.sx, z: gullThreat.sz });
+        }
+      }
     }
     for (const bd of beachDevils) {
       if (!bd.person.group.visible) continue;
@@ -2204,9 +2409,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     { const hl = hill.prompt(); if (hl) prompts.push(hl); }
     if (dog.carrying) prompts.push({ key: 'G', label: 'Drop' });
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) prompts.push({ key: 'E', label: 'Bark at the Dimoni' });
+    if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - level.fishBucket.x, dog.z - level.fishBucket.z) < 5) prompts.push({ key: 'E', label: 'Raid the fish bucket' });
+    if (chase?.kind === 'gulls' && gullThreat.active && gullThreat.t / gullThreat.dur > 0.35) prompts.push({ key: 'E', label: 'Counter-bark!' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) prompts.push({ key: 'E', label: 'Bark at La Neteja' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) prompts.push({ key: 'E', label: 'Bark at the devils' });
-    if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'dimoni' ? 'The devils are out! Into the sea!' : 'Correfoc! Run for the underpass!';
+    if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'dimoni' ? 'The devils are out! Into the sea!' : chase.kind === 'gulls' ? 'Gavines! Dodge the dive rings or bark [E] as they swoop!' : 'Correfoc! Run for the underpass!';
     if (inTunnel && !banner) banner = 'Carrer del Mar ↔ the beach';
     if (offLeash && !banner) banner = 'Off the leash — run!';
     hud.banner(banner, 'prompt');
@@ -2248,6 +2455,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       marks.push({ x: sw.x, z: sw.z, color: '#5ab4ff', label: 'La Neteja', kind: 'threat' });
       marks.push({ x: cf.x, z: level.correfoc.z, color: '#ff8a2a', label: 'Correfoc', kind: 'threat' });
       marks.push({ x: level.dimoni.x, z: level.dimoni.z, color: '#ff4a3d', label: 'Dimoni', kind: 'threat' });
+      marks.push({ x: level.fishBucket.x, z: level.fishBucket.z, color: '#ff8a2a', label: 'Fish bucket', kind: 'threat' });
       if (Math.abs(tr.x) < 220) marks.push({ x: tr.x, z: tr.z, color: '#e8e4dc', kind: 'train' });
       minimap.draw(dog, human, marks, camMode === 'follow' ? camYaw : 0);
     }
@@ -2255,7 +2463,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     // ---- Visuals ----
     dogM.group.position.set(dog.x, dog.y, dog.z);
     dogM.group.rotation.y = -dog.heading;
-    dogM.animate(time, { speed: sp, dig: dog.digging && !dogSwimming, peeing: dog.peeing > 0, wag: offLeash ? 1 : clamp(1 - leash.taut, 0.2, 0.8), air: !dog.onGround, swim: dogSwimming });
+    dogM.animate(time, { speed: sp, dig: dog.digging && !dogSwimming, peeing: dog.peeing > 0, wag: offLeash ? 1 : clamp(1 - leash.taut, 0.2, 0.8), air: !dog.onGround, swim: dogSwimming, turn: dogTurn, barkT: dogBarkT, landT: dogLandT, wet: dog.wet });
     const dg = dogFloor(dog.x, dog.z, dog.y);
     dogShadow.visible = !dogSwimming;
     dogShadow.position.set(dog.x, dg + 0.03, dog.z);
@@ -2272,7 +2480,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     // How hard Millie is towing them, toward where they're heading (not when they're the ones hauling).
     const towing = human.state === 'haul' ? 0 : clamp((lastTension - 2) / 14, 0, 1) * clamp(Math.cos(Math.atan2(dog.z - human.z, dog.x - human.x) - human.heading) + 0.3, 0, 1);
     humanPull += (towing - humanPull) * Math.min(1, dt * 6);
-    humanM.animate(time, { speed: hsp, pose, pull: humanPull });
+    humanM.animate(time, { speed: hsp, pose, pull: humanPull, scared: !!chase });
     humanShadow.visible = !humanSwimming;
     humanShadow.position.set(human.x, human.y + 0.03, human.z);
 
@@ -2459,6 +2667,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     camPos.lerp(camWantPos, k);
     camLook.lerp(camWantLook, k);
     camera.position.copy(camPos);
+    camera.position.x += fStep.shakeX;
+    camera.position.y += fStep.shakeY;
     if (shake > 0) {
       shake -= dt;
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
@@ -2606,6 +2816,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get sky() { return skySys.getMode(); },
       get bones() { return bones; },
       get chase() { return chase; },
+      startChase: (kind: ChaseKind) => { chaseCooldown = 0; startChase(kind); },
+      feel,
+      fishBucket: level.fishBucket,
+      gullThreat,
+      telegraphs,
+      setSky: (mode: 'day' | 'rain' | 'night') => skySys.applySky(mode),
       debug,
       podcast,
       booths: {

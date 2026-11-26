@@ -26,9 +26,15 @@ export function createSkySystem(
   const skyUniforms = {
     top: { value: new THREE.Color() },
     horizon: { value: new THREE.Color() },
+    sunDir: { value: new THREE.Vector3(30, 48, 22).normalize() },
+    sunCol: { value: new THREE.Color(0xfff0c4) },
+    cloudCol: { value: new THREE.Color(0xf8fbff) },
+    cloudAmt: { value: 0.36 },
+    sunGlow: { value: 1.0 },
+    uTime: { value: 0 },
   };
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(600, 24, 12),
+    new THREE.SphereGeometry(600, 24, 14),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -36,8 +42,27 @@ export function createSkySystem(
       uniforms: skyUniforms,
       vertexShader:
         'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader:
-        'uniform vec3 top; uniform vec3 horizon; varying vec3 vP; void main(){ float h = clamp(vP.y*1.6, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.7)), 1.0); }',
+      fragmentShader: `
+        uniform vec3 top; uniform vec3 horizon; uniform vec3 sunDir; uniform vec3 sunCol;
+        uniform vec3 cloudCol; uniform float cloudAmt; uniform float sunGlow; uniform float uTime;
+        varying vec3 vP;
+        void main(){
+          vec3 d = normalize(vP);
+          float h = clamp(d.y * 1.6, 0.0, 1.0);
+          vec3 col = mix(horizon, top, pow(h, 0.7));
+          if (sunGlow > 0.01) {
+            float sc = max(dot(d, normalize(sunDir)), 0.0);
+            col += sunCol * (pow(sc, 16.0) * 0.26 + smoothstep(0.9965, 0.9992, sc) * 1.25) * sunGlow;
+          }
+          if (d.y > 0.03) {
+            vec2 uv = d.xz / (max(d.y, 0.06) + 0.14);
+            float c1 = sin(uv.x * 1.3 + uTime * 0.018) * cos(uv.y * 1.1 - uTime * 0.012);
+            float c2 = sin(uv.x * 2.7 - uv.y * 2.1 + uTime * 0.025) * 0.5;
+            float cl = smoothstep(0.22, 0.95, (c1 + c2) * 0.5 + 0.35) * smoothstep(0.03, 0.24, d.y);
+            col = mix(col, cloudCol, cl * cloudAmt);
+          }
+          gl_FragColor = vec4(col, 1.0);
+        }`,
     }),
   );
   sky.renderOrder = -1;
@@ -86,9 +111,39 @@ export function createSkySystem(
   sun.shadow.camera.right = 34;
   sun.shadow.camera.top = 34;
   sun.shadow.camera.bottom = -34;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.03;
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.025;
   scene.add(sun, sun.target);
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envCache = new Map<SkyMode, THREE.WebGLRenderTarget>();
+  const getEnv = (mode: SkyMode) => {
+    const cached = envCache.get(mode);
+    if (cached) return cached;
+    const s = SKY[mode];
+    const es = new THREE.Scene();
+    const eGeo = new THREE.SphereGeometry(20, 16, 10);
+    const eMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        top: { value: new THREE.Color(s.skyTop) },
+        horizon: { value: new THREE.Color(s.skyHorizon) },
+        ground: { value: new THREE.Color(s.hemiGround) },
+      },
+      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'uniform vec3 top; uniform vec3 horizon; uniform vec3 ground; varying vec3 vP; void main(){ vec3 c = vP.y >= 0.0 ? mix(horizon, top, pow(vP.y, 0.65)) : mix(horizon, ground, pow(-vP.y, 0.7)); gl_FragColor = vec4(c, 1.0); }',
+    });
+    es.add(new THREE.Mesh(eGeo, eMat));
+    const discGeo = new THREE.SphereGeometry(2.2, 8, 6);
+    const discMat = new THREE.MeshBasicMaterial({ color: mode === 'night' ? 0xcad6ff : mode === 'rain' ? 0xd0d8e0 : 0xfff3cf });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.position.set(mode === 'night' ? -6 : 9, 12, mode === 'night' ? -14 : 6);
+    es.add(disc);
+    const rt = pmrem.fromScene(es, 0.04);
+    eGeo.dispose(); eMat.dispose(); discGeo.dispose(); discMat.dispose();
+    envCache.set(mode, rt);
+    return rt;
+  };
 
   const rim = new THREE.DirectionalLight(0xffe1b8, 0.72);
   scene.add(rim, rim.target);
@@ -117,6 +172,13 @@ export function createSkySystem(
     const s = SKY[mode];
     skyUniforms.top.value.setHex(s.skyTop);
     skyUniforms.horizon.value.setHex(s.skyHorizon);
+    skyUniforms.sunCol.value.setHex(mode === 'day' ? 0xfff0c4 : mode === 'night' ? 0xdbe6ff : 0xc9d4e0);
+    skyUniforms.sunGlow.value = mode === 'day' ? 1.0 : mode === 'night' ? 0.2 : 0.0;
+    skyUniforms.sunDir.value.set(mode === 'night' ? -120 : 30, mode === 'night' ? 140 : 48, mode === 'night' ? -420 : 22).normalize();
+    skyUniforms.cloudCol.value.setHex(mode === 'day' ? 0xf8fbff : mode === 'rain' ? 0x7f8a96 : 0x2c3c68);
+    skyUniforms.cloudAmt.value = mode === 'day' ? 0.36 : mode === 'rain' ? 0.55 : 0.16;
+    scene.environment = getEnv(mode).texture;
+    scene.environmentIntensity = mode === 'day' ? 0.58 : mode === 'rain' ? 0.42 : 0.36;
     scene.fog = new THREE.Fog(s.fog, s.fogNear, s.fogFar);
     sun.color.setHex(s.sunColor);
     sun.intensity = s.sunIntensity;
@@ -163,6 +225,7 @@ export function createSkySystem(
   };
 
   const updateRain = (dt: number, camLook: THREE.Vector3) => {
+    skyUniforms.uTime.value += dt;
     if (!rain.visible) return;
     rain.position.set(camLook.x, Math.max(0, camLook.y - 2), camLook.z);
     for (let i = 0; i < RAIN_COUNT; i++) {
@@ -185,6 +248,12 @@ export function createSkySystem(
     rim.target.updateMatrixWorld();
   };
 
+  const dispose = () => {
+    envCache.forEach((rt) => rt.dispose());
+    envCache.clear();
+    pmrem.dispose();
+  };
+
   return {
     sky,
     sun,
@@ -196,5 +265,6 @@ export function createSkySystem(
     bindTargets,
     updateRain,
     followTarget,
+    dispose,
   };
 }

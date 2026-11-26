@@ -28,6 +28,7 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'stemma', label: 'Change the music at stemma (X)', done: false, area: 'seafront' },
     { id: 'pier', label: 'Walk to the end of the pier', done: false, area: 'seafront' },
     { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false, area: 'seafront' },
+    { id: 'gulls', label: 'Outsmart the swooping pier gulls', done: false, area: 'seafront' },
     { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
     { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },

@@ -105,7 +105,7 @@ export interface DogModel {
   tail: THREE.Group;
   ears: THREE.Object3D[];
   collarAnchor: THREE.Object3D;
-  animate: (t: number, s: { speed: number; dig: boolean; peeing: boolean; wag: number; air: boolean; swim?: boolean }) => void;
+  animate: (t: number, s: { speed: number; dig: boolean; peeing: boolean; wag: number; air: boolean; swim?: boolean; turn?: number; barkT?: number; landT?: number; wet?: number }) => void;
 }
 
 export function makeDog(look: DogLook = MILLIE): DogModel {
@@ -231,24 +231,36 @@ export function makeDog(look: DogLook = MILLIE): DogModel {
     gait += dtA * (s.swim ? Math.max(4.5, 4 + Math.min(s.speed, 6) * 2.4) : 4 + Math.min(s.speed, 6) * 2.4);
     wagP += dtA * (6 + s.wag * 12);
     const amp = Math.min(0.75, s.speed * 0.16);
+    const damp = dtA > 0 ? Math.min(1, dtA * 16) : 1;
     // A trot (diagonal pairs) that turns into a gallop (front pair, back pair) at speed.
     const gallop = s.speed > 4.3;
     legs.forEach((leg, i) => {
-      const phase = gallop ? (i < 2 ? i * 0.35 : Math.PI + (i - 2) * 0.35) : i === 0 || i === 3 ? 0 : Math.PI;
-      leg.rotation.z = moving ? Math.sin(gait + phase) * amp * (gallop ? 1.25 : 1) : 0;
-      if (s.air) leg.rotation.z = i < 2 ? -0.6 : 0.7;
+      let targetZ = 0;
+      if (s.swim) {
+        // Doggy paddle: quick alternating strokes, chin up, tail out behind.
+        targetZ = Math.sin(gait * 1.6 + (i % 2 ? Math.PI : 0) + (i < 2 ? 0 : 0.8)) * (0.45 + Math.min(0.3, s.speed * 0.12));
+      } else if (s.air) {
+        targetZ = i < 2 ? -0.6 : 0.7;
+      } else if (moving) {
+        const phase = gallop ? (i < 2 ? i * 0.35 : Math.PI + (i - 2) * 0.35) : i === 0 || i === 3 ? 0 : Math.PI;
+        targetZ = Math.sin(gait + phase) * amp * (gallop ? 1.25 : 1);
+      }
+      leg.rotation.z += (targetZ - leg.rotation.z) * damp;
     });
-    if (s.swim) {
-      // Doggy paddle: quick alternating strokes, chin up, tail out behind.
-      legs.forEach((leg, i) => {
-        leg.rotation.z = Math.sin(gait * 1.6 + (i % 2 ? Math.PI : 0) + (i < 2 ? 0 : 0.8)) * (0.45 + Math.min(0.3, s.speed * 0.12));
-      });
-    }
     if (s.peeing) legs[3].rotation.x = -1.0;
     else legs[3].rotation.x = 0;
+    const barkAmt = Math.max(0, Math.min(1, (s.barkT ?? 0) / 0.24));
+    const landAmt = Math.max(0, Math.min(1, (s.landT ?? 0) / 0.22));
+    const turnAmt = Math.max(-1, Math.min(1, s.turn ?? 0));
+    const shiver = (s.wet ?? 0) > 0.7 && !moving && !s.swim ? Math.sin(t * 42) * 0.14 : 0;
+    const squashY = 1 - Math.sin(landAmt * Math.PI) * 0.14;
+    const squashXZ = 1 + Math.sin(landAmt * Math.PI) * 0.07;
+    const idleBreath = !moving && !s.swim && landAmt <= 0.01 ? Math.sin(t * 2.8) * 0.025 : 0;
+    body.scale.set(squashXZ, squashY + idleBreath, squashXZ);
     body.position.y = s.swim ? Math.sin(t * 2.6) * 0.025 : moving ? Math.abs(Math.sin(gait)) * 0.03 * Math.min(1, s.speed / 3) : 0;
     body.rotation.z = s.swim ? 0.16 + Math.sin(gait) * 0.03 : s.dig ? -0.22 : moving ? (gallop ? Math.sin(gait) * 0.09 : Math.sin(gait * 2) * 0.02) : 0;
-    head.rotation.z = s.swim ? 0.28 + Math.sin(t * 2.2) * 0.04 : s.dig ? -0.35 : Math.sin(t * 1.3) * 0.05;
+    body.rotation.x = (moving && !s.swim ? -turnAmt * 0.16 : 0) + shiver;
+    head.rotation.z = (s.swim ? 0.28 + Math.sin(t * 2.2) * 0.04 : s.dig ? -0.35 : Math.sin(t * 1.3) * 0.05) + barkAmt * 0.28;
     head.rotation.y = Math.sin(t * 0.7) * 0.12;
     tail.rotation.y = Math.sin(wagP) * (0.22 + s.wag * 0.28);
     tail.rotation.z = s.swim ? -0.15 : s.dig ? -0.2 : 0.1 + s.wag * 0.2;
@@ -256,7 +268,9 @@ export function makeDog(look: DogLook = MILLIE): DogModel {
       seg.rotation.y = Math.sin(wagP - i * 0.65) * (0.2 + s.wag * 0.22);
     });
     ears.forEach((e, i) => {
-      e.rotation.z = moving ? Math.sin(gait + i) * 0.12 : 0;
+      const side = i === 0 ? -1 : 1;
+      e.rotation.z = (moving ? Math.sin(gait + i) * 0.12 : 0) + barkAmt * 0.28;
+      e.rotation.x = (look.ears === 'drop' ? side * 0.35 : -side * 0.25) * (1 - barkAmt * 0.45);
     });
   };
 
@@ -294,7 +308,7 @@ export interface PersonModel {
   phoneScreen: THREE.MeshStandardMaterial | null;
   ponytail: THREE.Object3D | null;
   /** `pull` 0–1: how hard the leash drags them forward (lean back, leash arm out). */
-  animate: (t: number, s: { speed: number; pose: Pose; look?: number; pull?: number }) => void;
+  animate: (t: number, s: { speed: number; pose: Pose; look?: number; pull?: number; scared?: boolean }) => void;
 }
 
 export function makePerson(look: PersonLook): PersonModel {
@@ -523,33 +537,37 @@ export function makePerson(look: PersonLook): PersonModel {
         break;
       default: {
         // Walking or standing, phone in the right hand, leash in the left.
+        const damp = dtA > 0 ? Math.min(1, dtA * 14) : 1;
         legs.forEach((l, i) => {
           const ph = walkF + i * Math.PI;
-          l.rotation.z = moving ? Math.sin(ph) * amp * (1 - pull * 0.35) + pull * 0.1 : 0;
-          knees[i].rotation.z = moving ? -moveF * (Math.max(0, Math.cos(ph)) * (0.55 + run * 0.65) + 0.08) : 0;
+          const targetL = moving ? Math.sin(ph) * amp * (1 - pull * 0.35) + pull * 0.1 : 0;
+          const targetK = moving ? -moveF * (Math.max(0, Math.cos(ph)) * (0.55 + run * 0.65) + 0.08) : 0;
+          l.rotation.z += (targetL - l.rotation.z) * damp;
+          knees[i].rotation.z += (targetK - knees[i].rotation.z) * damp;
         });
         hips.position.y = 0.92 + Math.abs(Math.cos(walkF)) * (0.025 + run * 0.05) * Math.min(1, s.speed) - run * 0.03 - pull * 0.05;
         hips.rotation.y = moving ? Math.sin(walkF) * 0.08 * moveF : 0;
         hips.rotation.x = moving ? Math.cos(walkF) * 0.025 * moveF : 0;
+        torso.position.y = 0.08 + (!moving ? Math.sin(t * 2.1) * 0.01 : 0);
         // Running leans in; being dragged leans back against the leash.
         torso.rotation.y = moving ? -Math.sin(walkF) * 0.12 * moveF : 0;
-        torso.rotation.z = -run * 0.18 * (1 - pull) + pull * 0.32 + Math.sin(walkF * 2) * 0.02 * Math.min(1, s.speed);
+        torso.rotation.z = -run * 0.18 * (1 - pull) + pull * 0.32 + Math.sin(walkF * 2) * 0.02 * Math.min(1, s.speed) - (s.scared ? 0.14 : 0);
         hips.rotation.z = pull * 0.12;
         head.rotation.z = -pull * 0.12;
         // Leash arm: swings while walking, reaches out toward the dog when pulled.
-        arms[0].rotation.set(0, 0, 0.55 + Math.sin(walkF) * amp * 0.25 * (1 - pull) + pull * 0.85);
+        arms[0].rotation.set(0, 0, 0.55 + Math.sin(walkF) * amp * 0.25 * (1 - pull) + pull * 0.85 + (s.scared ? 0.28 : 0));
         lf.rotation.z = 0.5 * (1 - pull) + 0.1;
         if (s.pose === 'selfie') {
           arms[1].rotation.set(0.15, 0.2, 1.35);
           rf.rotation.set(0, 0, 0.55);
           head.rotation.set(0.1, 0, 0.08);
-        } else if (look.prop === 'phone' && (s.pose === 'phone' || s.pose === 'walk' || s.pose === 'stand')) {
+        } else if (look.prop === 'phone' && (s.pose === 'phone' || s.pose === 'walk' || s.pose === 'stand') && !s.scared) {
           arms[1].rotation.set(0.25, 0, 0.45);
           rf.rotation.set(0, 0, 1.6);
           head.rotation.z = s.pose === 'phone' ? -0.45 : -0.25;
         } else {
-          arms[1].rotation.set(0, 0, -Math.sin(walkF) * amp * (0.6 + run * 0.5) * (1 - pull * 0.6) - pull * 0.5);
-          rf.rotation.z = 0.25 + run * 1.1 + pull * 0.6;
+          arms[1].rotation.set(0, 0, -Math.sin(walkF) * amp * (0.6 + run * 0.5) * (1 - pull * 0.6) - pull * 0.5 + (s.scared ? 0.35 : 0));
+          rf.rotation.z = 0.25 + run * 1.1 + pull * 0.6 + (s.scared ? 0.3 : 0);
         }
       }
     }

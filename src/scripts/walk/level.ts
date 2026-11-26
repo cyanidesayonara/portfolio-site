@@ -36,7 +36,7 @@ import {
 } from './props';
 import {
   panotTextures, sandTexture, deckTexture, plasterTexture, waterNormalTexture, signTexture, rng,
-  slabTexture, flagstoneTexture, concreteTexture, wallPanelTexture, tileFloorTexture, muralTexture, paintTexture,
+  slabTexture, flagstoneTexture, concreteTexture, wallPanelTexture, tileFloorTexture, muralTexture, paintTexture, lumaBumpTexture,
 } from './textures';
 
 export interface BoxCollider { x0: number; x1: number; z0: number; z1: number; top: number; minY?: number; kind: string; face?: [number, number]; district?: string }
@@ -159,8 +159,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const lampSpots: THREE.Vector3[] = [];
   const lampGlass: THREE.MeshStandardMaterial[] = [];
   const wetMats: THREE.MeshStandardMaterial[] = [];
-  const litWindowMat = new THREE.MeshStandardMaterial({ color: 0x2c3850, roughness: 0.25, metalness: 0.2, emissive: 0xffd27a, emissiveIntensity: 0 });
-  const darkWindowMat = new THREE.MeshStandardMaterial({ color: 0x2c3850, roughness: 0.25, metalness: 0.2 });
+  const litWindowMat = new THREE.MeshStandardMaterial({ color: 0x2c3850, roughness: 0.14, metalness: 0.38, envMapIntensity: 1.25, emissive: 0xffd27a, emissiveIntensity: 0 });
+  const darkWindowMat = new THREE.MeshStandardMaterial({ color: 0x2c3850, roughness: 0.14, metalness: 0.38, envMapIntensity: 1.25 });
   const r = rng(42);
   const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
   const ironM = M(0x2a2f3d, 0.5, 0.5);
@@ -189,21 +189,23 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   yield 'Ground materials';
   // ---- Ground materials -------------------------------------------------------------
   const slab = slabTexture();
-  const slabMat = new THREE.MeshStandardMaterial({ map: slab.map, roughness: 0.9 });
+  const slabMat = new THREE.MeshStandardMaterial({ map: slab.map, bumpMap: lumaBumpTexture(slab.map, 1.8), bumpScale: 0.24, roughness: 0.9 });
   const flag = flagstoneTexture();
-  const flagMat = new THREE.MeshStandardMaterial({ map: flag.map, roughness: 0.85 });
+  const flagMat = new THREE.MeshStandardMaterial({ map: flag.map, bumpMap: lumaBumpTexture(flag.map, 2.0), bumpScale: 0.36, roughness: 0.85 });
   yield 'Textures';
   const panot = panotTextures();
   const panotMat = new THREE.MeshStandardMaterial({ map: panot.map, bumpMap: panot.bumpMap, bumpScale: 1.2, roughness: 0.92 });
   yield 'Textures';
   const conc = concreteTexture();
-  const concMat = new THREE.MeshStandardMaterial({ map: conc.map, roughness: 0.9 });
-  const sandMat = new THREE.MeshStandardMaterial({ map: sandTexture(), roughness: 1 });
+  const concMat = new THREE.MeshStandardMaterial({ map: conc.map, bumpMap: lumaBumpTexture(conc.map, 1.5), bumpScale: 0.18, roughness: 0.9 });
+  const sandMap = sandTexture();
+  const sandMat = new THREE.MeshStandardMaterial({ map: sandMap, bumpMap: lumaBumpTexture(sandMap, 1.9), bumpScale: 0.34, roughness: 1 });
   yield 'Textures';
   const deckMap = deckTexture();
-  const deckMat = new THREE.MeshStandardMaterial({ map: deckMap, roughness: 0.85, color: 0xb9ab9a });
+  const deckMat = new THREE.MeshStandardMaterial({ map: deckMap, bumpMap: lumaBumpTexture(deckMap, 2.0), bumpScale: 0.45, roughness: 0.85, color: 0xb9ab9a });
   wetMats.push(slabMat, flagMat, panotMat, concMat);
   const plaster = plasterTexture();
+  const plasterBump = lumaBumpTexture(plaster, 1.7);
   yield 'Ground';
 
   // Town: flagstones down Carrer del Mar, panots in the side streets.
@@ -254,7 +256,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const waterNormal = waterNormalTexture();
   waterNormal.repeat.set(70, 70);
   const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2f8fb0, roughness: 0.14, metalness: 0.1, normalMap: waterNormal, normalScale: new THREE.Vector2(0.6, 0.6),
+    color: 0x2f8fb0, roughness: 0.10, metalness: 0.18, envMapIntensity: 1.35, normalMap: waterNormal, normalScale: new THREE.Vector2(0.75, 0.75),
     transparent: true, opacity: 0.9,
   });
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1000), waterMat);
@@ -274,11 +276,11 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const plasterMats = new Map<number, THREE.MeshStandardMaterial>();
   const facadeMat = (c: number) => {
     let m = plasterMats.get(c);
-    if (!m) { m = new THREE.MeshStandardMaterial({ color: c, map: plaster, roughness: 0.92 }); plasterMats.set(c, m); }
+    if (!m) { m = new THREE.MeshStandardMaterial({ color: c, map: plaster, bumpMap: plasterBump, bumpScale: 0.22, roughness: 0.92 }); plasterMats.set(c, m); }
     return m;
   };
-  const shopGlassMat = new THREE.MeshStandardMaterial({ color: 0x4b647d, roughness: 0.12, metalness: 0.35, transparent: true, opacity: 0.34 });
-  const wallPlasterMat = new THREE.MeshStandardMaterial({ map: plaster, vertexColors: true, roughness: 0.92 });
+  const shopGlassMat = new THREE.MeshStandardMaterial({ color: 0x4b647d, roughness: 0.12, metalness: 0.35, envMapIntensity: 1.25, transparent: true, opacity: 0.34 });
+  const wallPlasterMat = new THREE.MeshStandardMaterial({ map: plaster, bumpMap: plasterBump, bumpScale: 0.22, vertexColors: true, roughness: 0.92 });
   const townBuilder = new DirectBuilder(TOWN_Z0);
   const townLayout = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'town')!;
   yield* buildDistrictBlocksSteps(townLayout, {
@@ -980,6 +982,28 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     place(t.group, tx, sandFloor(tz), tz);
     addCircle(tx, tz, t.radius, sandFloor(tz) + 4, 'tree', true, false);
   }
+  // Pier-side fish bucket: draws greedy gulls if Millie barks near it.
+  const fishBucketPos = { x: -44.5, z: -21.5 };
+  {
+    const fbY = sandFloor(fishBucketPos.z);
+    const fb = new THREE.Group();
+    const bucket = cyl(0.24, 0.18, 0.34, M(0x88929e, 0.35, 0.65), 12);
+    bucket.position.y = 0.17;
+    fb.add(bucket);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.02, 6, 14), M(0x6e7884, 0.3, 0.7));
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.34;
+    fb.add(rim);
+    const fishM = M(0x7ca2bd, 0.28, 0.55);
+    for (let i = 0; i < 3; i++) {
+      const fish = cyl(0.015, 0.045, 0.24, fishM, 7);
+      fish.position.set((i - 1) * 0.07, 0.36, (i % 2 ? 0.04 : -0.04));
+      fish.rotation.set(0.35 * (i % 2 ? 1 : -1), i * 0.7, 0.45 - i * 0.38);
+      fb.add(fish);
+    }
+    place(shadowed(fb), fishBucketPos.x, fbY, fishBucketPos.z);
+    addCircle(fishBucketPos.x, fishBucketPos.z, 0.3, fbY + 0.45, 'bucket', false, false);
+  }
   // Boulder clusters.
   for (const [bx, bz] of [[22, -50], [-24, -52], [54, -48]]) {
     for (let k = 0; k < 4; k++) {
@@ -1368,6 +1392,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     timings: { build: tBuilt - T0, split: tSplit - tBuilt, bake: tBaked - tSplit },
     waterMat, foamMat, sea, sunbathers, fishers, hurdles, bowls, fountains, humanBench, terraceSeats,
     dimoni: { ...dimoni, x: 24, z: -38, glow: dimoniGlow },
+    fishBucket: fishBucketPos,
     pierEnd: { x: (PIER.x0 + PIER.x1) / 2, z: PIER.end + 4 },
     beacon: beacon.lamp,
     coriolis: { x: wallX, y: wallY, z: wallZ, screen },
