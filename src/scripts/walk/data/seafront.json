@@ -1,7 +1,7 @@
 {
   "version": 1,
   "units": "meters",
-  "mapBounds": { "x0": -96, "x1": 96, "z0": -134, "z1": 256 },
+  "mapBounds": { "x0": -228, "x1": 96, "z0": -134, "z1": 256 },
   "swim": { "x0": -40, "x1": 44, "z": -90, "shoreZ": -60 },
   "pipica": { "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "gateZ0": -29.2, "gateZ1": -26.8 },
   "pier": { "x0": -50, "x1": -46, "root": -10, "rise": -30, "end": -130, "high": 1.2 },
@@ -9,12 +9,12 @@
   "tracks": [7.2, 10.8],
   "metro": { "x0": -78, "x1": -72.4, "z0": 25.2, "z1": 27.6, "depth": 3, "line": "L2", "lineColor": "#9b2d8f" },
   "zones": [
-    { "id": "sea", "x0": -96, "x1": 96, "z0": -134, "z1": -58, "mapColor": "#2d6a92" },
+    { "id": "sea", "x0": -228, "x1": 96, "z0": -134, "z1": -58, "mapColor": "#2d6a92" },
     { "id": "shallow", "x0": -96, "x1": 96, "z0": -58, "z1": -51, "mapColor": "#3f86ad" },
     { "id": "sand", "x0": -96, "x1": 96, "z0": -51, "z1": -20, "mapColor": "#dcc58f" },
     { "id": "deck", "x0": -96, "x1": 96, "z0": -20, "z1": -10, "mapColor": "#a5794e" },
-    { "id": "prom", "x0": -96, "x1": 96, "z0": -10, "z1": 4, "mapColor": "#cfc9bb" },
-    { "id": "rail", "x0": -96, "x1": 96, "z0": 4, "z1": 14, "mapColor": "#6d665a" },
+    { "id": "prom", "x0": -104, "x1": 96, "z0": -10, "z1": 4, "mapColor": "#cfc9bb" },
+    { "id": "rail", "x0": -228, "x1": 96, "z0": 4, "z1": 14, "mapColor": "#6d665a" },
     { "id": "rambla", "x0": -96, "x1": 96, "z0": 14, "z1": 34, "mapColor": "#e0d6c4" },
     { "id": "townFill", "x0": -96, "x1": 96, "z0": 34, "z1": 103, "mapColor": "#62584c" },
     { "id": "townStreet", "x0": -34, "x1": 34, "z0": 34, "z1": 103, "mapColor": "#bdb19e" },
@@ -37,13 +37,23 @@
     { "id": "pipica3", "x0": -25, "x1": -13, "z0": 197, "z1": 208, "mapColor": "#9bc46a" },
     { "id": "hillStairsTop", "x0": -4.5, "x1": 4.5, "z0": 204, "z1": 218, "mapColor": "#d6cab4" },
     { "id": "hillRampTop", "x0": -12, "x1": -6.5, "z0": 204, "z1": 218, "mapColor": "#c8b99e" },
-    { "id": "hillSquare", "x0": -24, "x1": 24, "z0": 218, "z1": 244, "mapColor": "#d8cdb6" }
+    { "id": "hillSquare", "x0": -24, "x1": 24, "z0": 218, "z1": 244, "mapColor": "#d8cdb6" },
+    { "id": "marinaBasin", "x0": -224, "x1": -94, "z0": -120, "z1": -18, "mapColor": "#245c82" },
+    { "id": "marinaQuay", "x0": -214, "x1": -104, "z0": -18, "z1": 4, "mapColor": "#cfc9bb" },
+    { "id": "marinaCanal", "x0": -178, "x1": -162, "z0": -18, "z1": 4, "mapColor": "#2d6a92" },
+    { "id": "marinaCanalBridge", "x0": -178, "x1": -162, "z0": -10, "z1": -2, "mapColor": "#a5794e" },
+    { "id": "marinaWestQuay", "x0": -214, "x1": -180, "z0": -26, "z1": -18, "mapColor": "#c7bfb0" },
+    { "id": "marinaPontoonA", "x0": -126, "x1": -122, "z0": -58, "z1": -18, "mapColor": "#a5794e" },
+    { "id": "marinaPontoonB", "x0": -152, "x1": -148, "z0": -58, "z1": -18, "mapColor": "#a5794e" },
+    { "id": "marinaBreakwater", "x0": -214, "x1": -206, "z0": -104, "z1": -26, "mapColor": "#b8b1a2" },
+    { "id": "marinaBreakwaterArm", "x0": -214, "x1": -158, "z0": -104, "z1": -96, "mapColor": "#b8b1a2" },
+    { "id": "pipica4", "x0": -158, "x1": -144, "z0": -14, "z1": -4, "mapColor": "#9bc46a" }
   ],
   "districts": [
     {
       "id": "seafront",
       "label": "The seafront",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": -100000, "z1": 4 },
+      "bounds": { "x0": -104, "x1": 165, "z0": -145, "z1": 4 },
       "streets": [
         { "id": "promenade", "name": "Passeig Marítim", "width": 14, "surface": "paving", "points": [[-92, -3], [92, -3]] },
         { "id": "boardwalk", "name": "Boardwalk", "width": 10, "surface": "deck", "points": [[-92, -15], [92, -15]] },
@@ -71,7 +81,7 @@
     {
       "id": "rambla",
       "label": "The Rambla",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": 4, "z1": 33.5 },
+      "bounds": { "x0": -155, "x1": 155, "z0": 4, "z1": 33.5 },
       "streets": [
         { "id": "rambla", "name": "La Rambla", "width": 20, "surface": "paving", "points": [[-92, 24], [92, 24]] },
         { "id": "underpass", "name": "Underpass", "width": 4, "surface": "paving", "points": [[0, -4], [0, 22]] }
@@ -92,7 +102,7 @@
     {
       "id": "town",
       "label": "Carrer del Mar",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": 33.5, "z1": 101 },
+      "bounds": { "x0": -145, "x1": 145, "z0": 33.5, "z1": 101 },
       "streets": [
         { "id": "carrer-del-mar", "name": "Carrer del Mar", "width": 7, "surface": "paving", "points": [[0, 34], [0, 100]] },
         { "id": "side-a", "name": "Side street A", "width": 6, "surface": "paving", "points": [[-34, 53], [34, 53]] },
@@ -135,7 +145,7 @@
     {
       "id": "plaza",
       "label": "Plaça del Mercat",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": 101, "z1": 173 },
+      "bounds": { "x0": -70, "x1": 70, "z0": 101, "z1": 173 },
       "streets": [
         { "id": "plaza", "name": "Plaça del Mercat", "width": 40, "surface": "paving", "points": [[0, 101], [0, 139]] },
         { "id": "carrer-major", "name": "Carrer Major", "width": 6, "surface": "paving", "points": [[-62, 158], [62, 158]] },
@@ -170,7 +180,7 @@
     {
       "id": "hill",
       "label": "Dalt de la Vila",
-      "bounds": { "x0": -100000, "x1": 100000, "z0": 173, "z1": 100000 },
+      "bounds": { "x0": -48, "x1": 48, "z0": 173, "z1": 256 },
       "streets": [
         { "id": "hill-climb", "name": "Baixada del Turó", "width": 8, "surface": "paving", "points": [[0, 173], [0, 196]] },
         { "id": "hill-stairs-e", "name": "Escales del Museu", "width": 4, "surface": "paving", "points": [[14, 178], [14, 196]] },
@@ -202,8 +212,32 @@
         { "id": "mirador", "kind": "place", "label": "Mirador", "x": 14, "z": 219.5, "color": "#1fc9b7" },
         { "id": "home", "kind": "stop", "label": "Home", "x": -23.4, "z": 227.5, "color": "#8bcb3c" }
       ]
+    },
+    {
+      "id": "marina",
+      "label": "El Port",
+      "bounds": { "x0": -226, "x1": -104, "z0": -120, "z1": 4 },
+      "streets": [
+        { "id": "north-quay", "name": "Moll Nord", "width": 22, "surface": "paving", "points": [[-214, -7], [-104, -7]] },
+        { "id": "west-quay", "name": "Moll de Ponent", "width": 34, "surface": "paving", "points": [[-197, -26], [-197, 4]] },
+        { "id": "breakwater", "name": "Espigó", "width": 8, "surface": "paving", "points": [[-210, -26], [-210, -100], [-160, -100]] }
+      ],
+      "blocks": [],
+      "pavilions": [],
+      "landmarks": [
+        { "id": "capitania", "label": "Capitania", "x0": -140, "x1": -118, "z0": -6, "z1": 3.5, "height": 6.5, "color": "#f0ece2", "roofColor": "#284c75" },
+        { "id": "lighthouse", "label": "Far del Port", "x0": -164.5, "x1": -159.5, "z0": -102.5, "z1": -97.5, "height": 11, "color": "#e5e1d8", "roofColor": "#c93b32" },
+        { "id": "crane", "label": "Grua", "x0": -212, "x1": -208, "z0": -25, "z1": -21, "height": 9, "color": "#e8b42c", "roofColor": "#2a5aa8" }
+      ],
+      "pois": [
+        { "id": "port", "kind": "place", "label": "Port", "x": -129, "z": -10, "color": "#3d73c7" },
+        { "id": "pipica4", "kind": "pipica", "label": "Pipicà", "x": -151, "z": -9, "color": "#8bcb3c" },
+        { "id": "lighthouse", "kind": "landmark", "label": "Far del Port", "x": -162, "z": -100, "color": "#5eea8c" },
+        { "id": "west-quay", "kind": "place", "label": "Moll de Ponent", "x": -197, "z": -12, "color": "#ffb020" }
+      ]
     }
   ],
   "pipica2": { "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "gateZ0": 129.6, "gateZ1": 132.0 },
-  "pipica3": { "x0": -25, "x1": -13, "z0": 197, "z1": 208, "gateZ0": 200.5, "gateZ1": 203.0 }
+  "pipica3": { "x0": -25, "x1": -13, "z0": 197, "z1": 208, "gateZ0": 200.5, "gateZ1": 203.0 },
+  "pipica4": { "x0": -158, "x1": -144, "z0": -14, "z1": -4, "gateZ0": -10.2, "gateZ1": -7.8 }
 }

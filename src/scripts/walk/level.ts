@@ -21,6 +21,7 @@ import { DirectBuilder } from './meshbuilder';
 import { makeCitySkyline, makeInlandHills } from './horizon';
 import { PLAZA, inPlazaPipica, makePlazaDistrict } from './plaza';
 import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } from './hill';
+import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './marina';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { groundAroundMetro, makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
@@ -223,22 +224,23 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   root.add(ground(-140, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, 140, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
-  root.add(ground(-140, 140, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
-  root.add(ground(-140, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(-104, 140, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(-104, -92, -18, -10, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(-104, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
   root.add(ground(CUT.x, 140, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
-  const promCurb = box(280, 0.05, 0.26, M(0xd8c3a5, 0.85));
-  promCurb.position.set(0, GROUND_Y + 0.025, -10.02);
+  const promCurb = box(232, 0.05, 0.26, M(0xd8c3a5, 0.85));
+  promCurb.position.set(24, GROUND_Y + 0.025, -10.02);
   promCurb.receiveShadow = true;
   root.add(promCurb);
-  const deck = ground(-140, 140, -20, -10, GROUND_Y + 0.01, deckMat, 3);
+  const deck = ground(-92, 140, -20, -10, GROUND_Y + 0.01, deckMat, 3);
   root.add(deck);
-  // Beach, under the sea too.
-  root.add(ground(-160, 160, -120, -20, 0, sandMat, 6, 1, 50, (_x, z) => sandFloor(z)));
-  const wet = ground(-160, 160, -62, -54, 0, new THREE.MeshStandardMaterial({ color: 0x8a6c44, roughness: 0.5, transparent: true, opacity: 0.4 }), 4, 1, 8, (_x, z) => sandFloor(z) + 0.012);
+  // Beach, under the sea too (stops at the western rock groin x -94 so it clears the marina basin).
+  root.add(ground(-94, 160, -120, -20, 0, sandMat, 6, 1, 50, (_x, z) => sandFloor(z)));
+  const wet = ground(-94, 160, -62, -54, 0, new THREE.MeshStandardMaterial({ color: 0x8a6c44, roughness: 0.5, transparent: true, opacity: 0.4 }), 4, 1, 8, (_x, z) => sandFloor(z) + 0.012);
   root.add(wet);
   // The step down from the boardwalk to the sand: a low white concrete wall.
-  const stepWall = box(280, 0.56, 0.4, M(0xeeebe4, 0.8));
-  stepWall.position.set(0, GROUND_Y - 0.26, -20.1);
+  const stepWall = box(232, 0.56, 0.4, M(0xeeebe4, 0.8));
+  stepWall.position.set(24, GROUND_Y - 0.26, -20.1);
   root.add(stepWall);
   for (const rx of RAMPS) {
     const shape = new THREE.Shape();
@@ -264,10 +266,16 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   sea.position.set(0, WATER_Y, -540);
   sea.userData.always = true;
   root.add(sea);
+  // Harbor basin water north of z -40 (kept separate from `sea` so there is no coplanar z-fighting).
+  const harborWater = new THREE.Mesh(new THREE.PlaneGeometry(138, 22.52), waterMat);
+  harborWater.rotation.x = -Math.PI / 2;
+  harborWater.position.set(-163, WATER_Y, -28.76);
+  harborWater.userData.always = true;
+  root.add(harborWater);
   const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
-  const foam = new THREE.Mesh(new THREE.PlaneGeometry(320, 1.4), foamMat);
+  const foam = new THREE.Mesh(new THREE.PlaneGeometry(254, 1.4), foamMat);
   foam.rotation.x = -Math.PI / 2;
-  foam.position.set(0, WATER_Y + 0.03, -57.4);
+  foam.position.set(33, WATER_Y + 0.03, -57.4);
   foam.userData.always = true;
   root.add(foam);
 
@@ -404,8 +412,28 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(makeExcavator(), -38, GROUND_Y, 89, 1.2);
   obresLine(-92, 14.6, -92, 33.4);
   obresLine(92, 14.6, 92, 33.4);
-  obresLine(-92, -19.6, -92, 3.6);
+  // Seafront promenade opens west at x -92 into El Port; edge rails keep Millie on the transition quay.
   obresLine(92, -19.6, 92, 3.6);
+  {
+    const wallM = M(0xb9b2a4, 0.85);
+    const railM = M(0x383e4a, 0.5, 0.5);
+    const qWall = box(12, 2.2, 0.5, wallM);
+    qWall.position.set(-98, GROUND_Y - 1.1, -18.1);
+    root.add(qWall);
+    const qRail = box(12, 0.9, 0.14, railM);
+    qRail.position.set(-98, GROUND_Y + 0.45, -18.1);
+    root.add(qRail);
+    boxes.push({ x0: -104, x1: -92, z0: -18.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
+    const bwRail = box(0.16, 0.9, 2.4, railM);
+    bwRail.position.set(-92.0, GROUND_Y + 0.45, -19.1);
+    root.add(bwRail);
+    boxes.push({ x0: -92.2, x1: -91.8, z0: -20.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
+    place(makeFingerpost([
+      { title: 'Port · Espigó', sub: 'Boats · Far', color: '#3d73c7', angle: Math.PI },
+      { title: 'Platja', sub: 'Passeig · Pier', color: '#ffb020', angle: 0 },
+    ]), -94, GROUND_Y, -8);
+    addCircle(-94, -8, 0.14, GROUND_Y + 3.2, 'pole', true, true);
+  }
   place(makeExcavator(), 97, GROUND_Y, 22, -1.4);
   place(makeSkip(0xdb5c24), -97, GROUND_Y, 24, Math.PI / 2);
   // Rock breakwaters close the beach.
@@ -1321,6 +1349,22 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(hill.root);
   bowls.push({ ...HILL.bowl });
   fountains.push({ ...HILL.drink });
+  // The Marina & Breakwater (marina.ts): streams in west beyond the seafront promenade.
+  const marinaGlass = makeLanternPost().glass;
+  lampGlass.push(marinaGlass);
+  for (const [x, z] of MARINA.lamps) lampSpots.push(new THREE.Vector3(x, (z < -27 ? BREAKWATER_Y : GROUND_Y) + 4.4, z));
+  const marina = makeMarinaDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('marina')!, ground, newInstancer: () => new Instancer(), r,
+    mats: {
+      conc: concMat, concTile: conc.tileMeters, panot: panotMat, panotTile: panot.tileMeters,
+      deck: deckMat, sand: sandMat, water: waterMat,
+      litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM, lampGlass: marinaGlass,
+    },
+  });
+  districts.push(marina);
+  root.add(marina.root);
+  bowls.push({ ...MARINA.bowl });
+  fountains.push({ ...MARINA.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
@@ -1335,14 +1379,15 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  /** Which pipicà (x, z) is in: 0 beach, 1 Plaça del Mercat, 2 Dalt de la Vila, -1 neither. */
-  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : inHillPipica(x, z) ? 2 : -1);
+  /** Which pipicà (x, z) is in: 0 beach, 1 Plaça del Mercat, 2 Dalt de la Vila, 3 Marina, -1 neither. */
+  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : inHillPipica(x, z) ? 2 : inMarinaPipica(x, z) ? 3 : -1);
   const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
   /** Where Millie's human waits while she's off the leash in each pipicà. */
   const pipicaBenches: { x: number; z: number; heading?: number }[] = [
     humanBench,
     PLAZA.pipicaBench,
     { ...HILL.pipicaBench, heading: Math.PI },
+    { ...MARINA.pipicaBench, heading: Math.PI },
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
     // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
@@ -1355,6 +1400,11 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (p.z >= HILL.z0) {
       p.z = Math.min(p.z, HILL.maxZ);
       p.x = Math.max(HILL.minX, Math.min(HILL.maxX, p.x));
+      return;
+    }
+    if (p.z < 4 && p.x < -91.5) {
+      p.x = Math.max(-222, p.x);
+      p.z = Math.max(-108, Math.min(3.6, p.z));
       return;
     }
     p.x = Math.max(-91.5, Math.min(91.5, p.x));
@@ -1382,6 +1432,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     [[-48, -12], [-48, -60], [-48, -126]],
     ...PLAZA.pedPaths,
     ...HILL.pedPaths,
+    ...MARINA.pedPaths,
   ];
 
   return {
