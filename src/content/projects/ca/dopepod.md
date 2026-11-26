@@ -3,7 +3,7 @@ title: dopepod
 tagline: Un reproductor de pòdcasts gratuït que funciona del tot al teu navegador.
 summary: Un reproductor de pòdcasts estàtic en Svelte, sense compte ni servidor. Va començar com el meu projecte final de CS50 i l'he refet dues vegades.
 kind: Web app
-stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages]
+stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages, Podcast Index]
 years: "2017 fins avui"
 cover: /img/projects/dopepod-web.webp
 coverAlt: La pàgina d'inici de dopepod amb el catàleg de pòdcasts i filtres per categoria
@@ -22,9 +22,10 @@ Un reproductor de pòdcasts que va néixer com a aplicació web en Django, va es
 
 ## Avui: un reproductor estàtic
 
-La versió actual està escrita en Svelte i TypeScript i allotjada a GitHub Pages. Explora un catàleg triat a mà, reprodueix i salta, canvia la velocitat, desa preferits i continua on ho vas deixar. Tot el que recorda es queda al teu navegador.
+La versió actual està escrita en Svelte i TypeScript i allotjada a GitHub Pages. Explora un catàleg triat a mà en quatre idiomes, cerca en un directori d'uns 27.000 pòdcasts més, posa episodis a la cua, canvia la velocitat, programa un temporitzador, desa preferits i continua on ho vas deixar. Tot el que recorda es queda al teu navegador.
 
-- **Sense backend:** una GitHub Action diària llegeix els 40 feeds de pòdcasts del catàleg i publica petits fitxers JSON i miniatures de les portades.
+- **Sense backend:** una GitHub Action diària llegeix els feeds del catàleg i publica petits fitxers JSON i miniatures de les portades.
+- **Un directori i llistes de Podcast Index:** un cop al mes la mateixa Action construeix el directori a partir del bolcat públic de Podcast Index, i cada dia descarrega les llistes de novetats en alça per categoria i idioma. La seva clau d'API es queda a l'Action; el web només rep les llistes ja fetes.
 - **L'àudio arriba directe de qui el publica:** no es copia ni es torna a allotjar res.
 - **Els feeds no són de fiar:** l'analitzador tolera XML defectuós, només accepta àudio per https i redueix les descripcions a text pla.
 

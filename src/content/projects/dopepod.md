@@ -3,7 +3,7 @@ title: dopepod
 tagline: A free podcast player that runs entirely in your browser.
 summary: A static Svelte podcast player with no account and no server. Started as my CS50 final project and rebuilt twice since.
 kind: Web app
-stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages]
+stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages, Podcast Index]
 years: "2017 to now"
 cover: /img/projects/dopepod-web.webp
 coverAlt: The dopepod home page with its catalog of podcasts and category filters
@@ -22,9 +22,10 @@ A podcast player that began as a Django web app, became a mobile app with a full
 
 ## Today: a static player
 
-The current version is written in Svelte and TypeScript and hosted on GitHub Pages. Browse a hand-picked catalog, play and skip, change speed, keep favorites and pick up where you left off. Everything it remembers stays in your browser.
+The current version is written in Svelte and TypeScript and hosted on GitHub Pages. Browse a hand-picked catalog in four languages, search a directory of about 27,000 more shows, queue episodes, change speed, set a sleep timer, keep favorites and pick up where you left off. Everything it remembers stays in your browser.
 
-- **No backend:** a daily GitHub Action reads the 40 podcast feeds in the catalog and publishes small JSON files and cover thumbnails.
+- **No backend:** a daily GitHub Action reads the catalog's feeds and publishes small JSON files and cover thumbnails.
+- **A directory and charts from Podcast Index:** once a month the same Action builds the searchable directory from Podcast Index's public data dump, and once a day it fetches the New and rising charts by category and language. Its API key stays in the Action; the site only receives the finished lists.
 - **Audio straight from the publishers:** nothing is copied or re-hosted.
 - **Feeds are untrusted:** the parser tolerates broken XML, accepts only https audio and reduces descriptions to plain text.
 

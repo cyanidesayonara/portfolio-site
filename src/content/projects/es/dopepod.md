@@ -3,7 +3,7 @@ title: dopepod
 tagline: Un reproductor de podcasts gratuito que funciona por completo en tu navegador.
 summary: Un reproductor de podcasts estático en Svelte, sin cuenta ni servidor. Empezó como mi proyecto final de CS50 y lo he rehecho dos veces.
 kind: Web app
-stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages]
+stack: [Svelte, TypeScript, GitHub Actions, GitHub Pages, Podcast Index]
 years: "2017 hasta hoy"
 cover: /img/projects/dopepod-web.webp
 coverAlt: La página de inicio de dopepod con su catálogo de podcasts y filtros por categoría
@@ -22,9 +22,10 @@ Un reproductor de podcasts que nació como aplicación web en Django, pasó a se
 
 ## Hoy: un reproductor estático
 
-La versión actual está escrita en Svelte y TypeScript y alojada en GitHub Pages. Explora un catálogo elegido a mano, reproduce y salta, cambia la velocidad, guarda favoritos y sigue donde lo dejaste. Todo lo que recuerda se queda en tu navegador.
+La versión actual está escrita en Svelte y TypeScript y alojada en GitHub Pages. Explora un catálogo elegido a mano en cuatro idiomas, busca en un directorio de unos 27.000 podcasts más, pon episodios en cola, cambia la velocidad, programa un temporizador, guarda favoritos y sigue donde lo dejaste. Todo lo que recuerda se queda en tu navegador.
 
-- **Sin backend:** una GitHub Action diaria lee los 40 feeds de podcasts del catálogo y publica pequeños archivos JSON y miniaturas de las portadas.
+- **Sin backend:** una GitHub Action diaria lee los feeds del catálogo y publica pequeños archivos JSON y miniaturas de las portadas.
+- **Un directorio y listas de Podcast Index:** una vez al mes la misma Action construye el directorio a partir del volcado público de Podcast Index, y cada día descarga las listas de novedades en auge por categoría e idioma. Su clave de API se queda en la Action; la web solo recibe las listas ya hechas.
 - **El audio llega directo de quien lo publica:** no se copia ni se vuelve a alojar nada.
 - **Los feeds no son de fiar:** el analizador tolera XML defectuoso, solo acepta audio por https y reduce las descripciones a texto plano.
 
