@@ -27,7 +27,7 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'coriolis', label: 'Play the Coriolis LED wall (X)', done: false, area: 'seafront' },
     { id: 'stemma', label: 'Change the music at stemma (X)', done: false, area: 'seafront' },
     { id: 'pier', label: 'Walk to the end of the pier', done: false, area: 'seafront' },
-    { id: 'dimoni', label: 'Light the Dimoni, then outrun its devils', done: false, area: 'seafront' },
+    { id: 'dimoni', label: 'Douse El Dimoni Gegant on the beach', done: false, area: 'seafront' },
     { id: 'gulls', label: 'Outsmart the swooping pier gulls', done: false, area: 'seafront' },
     { id: 'marina_quests', label: 'Help out at the marina', done: false, count: 0, target: 3, area: 'marina' },
     { id: 'marina_lighthouse', label: 'Reach the breakwater lighthouse', done: false, area: 'marina' },
@@ -37,7 +37,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
     { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
+    { id: 'tabalers', label: 'Brave the Rambla tabalers drum squad', done: false, area: 'town' },
     { id: 'plaza', label: 'Help out on Plaça del Mercat', done: false, count: 0, target: 3, area: 'plaza' },
+    { id: 'plaza_castellers', label: 'Topple the Plaça Castellers tower', done: false, area: 'plaza' },
     { id: 'butcher', label: 'Get away with the butcher’s botifarra', done: false, area: 'plaza' },
     { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2, area: 'hill' },
     { id: 'cats', label: 'Send 3 old-town cats running', done: false, count: 0, target: 3, area: 'hill' },
@@ -101,12 +103,14 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     }
     if (saved.done === undefined) {
       if (goal('town').done) ['ball', 'tofu', 'crate', 'bakery', 'selfie'].forEach((k) => doneKeys.add(`town:${k}`));
+      if (goal('tabalers').done) doneKeys.add('town:tabalers');
       if (goal('marina_quests').done) ['buoy', 'gulls', 'playmate'].forEach((k) => doneKeys.add(`marina:${k}`));
       if (goal('marina_lighthouse').done) doneKeys.add('marina:lighthouse');
       if (goal('marina_boats').done) ['pontoonA', 'pontoonB'].forEach((k) => doneKeys.add(`marina:${k}`));
       if (goal('marina_wake').done) doneKeys.add('marina:wake');
       if (goal('marina_mico').done) doneKeys.add('marina:mico');
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
+      if (goal('plaza_castellers').done) doneKeys.add('plaza:castellers');
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));
       if (goal('hill_top').done) doneKeys.add('hill:home');
       if (goal('finds').done) [0, 1, 2].forEach((i) => doneKeys.add(`find:${i}`));

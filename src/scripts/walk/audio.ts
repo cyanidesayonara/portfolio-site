@@ -470,6 +470,18 @@ export class WalkAudio {
     if (this.sample('honk', { at, vol: 0.6, ref: 14 })) return;
     this.tone(370, 0.3, 'square', 0.06); this.tone(466, 0.3, 'square', 0.05);
   }
+  /** Festive street drumline hit (bass thump + crisp snare rattle), distance-attenuated. */
+  drum(at?: { x: number; z: number }) {
+    if (!this.ctx || !this.on) return;
+    let att = 1;
+    if (at) {
+      const d = Math.hypot(at.x - this.listener.x, at.z - this.listener.z);
+      if (d > 34) return;
+      att = 1 / (1 + Math.pow(d / 9, 1.5));
+    }
+    this.tone(118, 0.14, 'triangle', 0.24 * att, 54);
+    this.hiss(0.08, 1600, 1.8, 0.14 * att, 'bandpass');
+  }
   /** The commuter train's horn: carries a long way. */
   trainHorn(at?: { x: number; z: number }) {
     if (this.sample('trainHorn', { at, vol: 0.75, ref: 30 })) return;
