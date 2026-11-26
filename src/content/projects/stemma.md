@@ -32,6 +32,12 @@ Import a song, separate it into stems (vocals, drums, bass, guitar, piano, other
 
 ![Recording takes over the stems](/img/projects/stemma-takes.webp)
 
+## Library, setlists and queue
+
+- Tags and a practice status per song (learning, practicing or ready), and each song keeps its own loop, speed and pitch.
+- Ordered setlists for a lesson or a gig, and a play queue apart from the library.
+- Select several songs to queue, tag, add to a setlist, export or remove them together, or import several files at once.
+
 ## Separation
 
 - **HTDemucs v4** four- and six-stem separation (CPU) and **MDX-Net** two-stem separation on the GPU via DirectML with automatic CPU fallback, plus Wiener filtering and soft gating to reduce bleed.

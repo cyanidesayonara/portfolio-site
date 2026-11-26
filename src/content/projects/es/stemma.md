@@ -32,6 +32,12 @@ Importa una canción, sepárala en pistas (voz, batería, bajo, guitarra, piano,
 
 ![Grabando tomas sobre las pistas](/img/projects/stemma-takes.webp)
 
+## Biblioteca, setlists y cola
+
+- Etiquetas y un estado de práctica por canción (aprendiendo, practicando o lista), y cada canción guarda su propio bucle, velocidad y tono.
+- Setlists ordenadas para una clase o un concierto, y una cola de reproducción aparte de la biblioteca.
+- Selecciona varias canciones para ponerlas en cola, etiquetarlas, añadirlas a una setlist, exportarlas o quitarlas a la vez, o importa varios archivos de golpe.
+
 ## Separación
 
 - **HTDemucs v4** para separación en cuatro y seis pistas (CPU) y **MDX-Net** en dos pistas por GPU mediante DirectML con respaldo automático a CPU, más filtrado de Wiener y puerta suave para reducir residuos entre pistas.

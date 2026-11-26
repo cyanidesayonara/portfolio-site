@@ -633,8 +633,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // Fingerposts at both ends of the underpass: the way to the projects, the beach and town.
   const W_ = Math.PI, E_ = 0, SEA = -Math.PI / 2, LAND = Math.PI / 2;
   place(makeFingerpost([
-    { title: 'Projects', sub: 'dopepod · Cat · Leash · stemma', color: '#ffb020', angle: W_ },
-    { title: 'Projects', sub: 'Coriolis · About · Blog', color: '#1fc9b7', angle: E_ },
+    { title: 'Projects', sub: 'stemma · Leash · Cat · dopepod', color: '#ffb020', angle: W_ },
+    { title: 'Projects', sub: 'Coriolis · About · Blog · How', color: '#1fc9b7', angle: E_ },
     { title: 'Platja', sub: 'Beach · old pier', color: '#3d73c7', angle: SEA - 0.75 },
   ]), -4.3, GROUND_Y, -3.4);
   addCircle(-4.3, -3.4, 0.12, GROUND_Y + 3.5, 'pole', true, true);

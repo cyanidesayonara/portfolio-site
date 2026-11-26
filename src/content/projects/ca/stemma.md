@@ -32,6 +32,12 @@ Importa una cançó, separa-la en pistes (veu, bateria, baix, guitarra, piano, a
 
 ![Enregistrant preses damunt les pistes](/img/projects/stemma-takes.webp)
 
+## Biblioteca, setlists i cua
+
+- Etiquetes i un estat de pràctica per cançó (aprenent, practicant o a punt), i cada cançó desa el seu propi bucle, velocitat i to.
+- Setlists ordenades per a una classe o un concert, i una cua de reproducció a part de la biblioteca.
+- Selecciona diverses cançons per posar-les a la cua, etiquetar-les, afegir-les a una setlist, exportar-les o treure-les alhora, o importa diversos fitxers de cop.
+
 ## Separació
 
 - **HTDemucs v4** de quatre i sis pistes (CPU) i **MDX-Net** de dues pistes per GPU amb DirectML amb retorn automàtic a CPU, més filtratge de Wiener i porta suau per reduir restes entre pistes.
