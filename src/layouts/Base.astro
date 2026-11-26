@@ -69,6 +69,14 @@ const xDefaultHref = noHreflang ? null : new URL(switchLocalePath(Astro.url.path
         const t = localStorage.getItem('theme');
         if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
       } catch {}
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          if (!regs.length) return;
+          Promise.all(regs.map((r) => r.unregister())).then(() => {
+            if ('caches' in window) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
+          });
+        }).catch(() => {});
+      }
     </script>
   </head>
   <body>
