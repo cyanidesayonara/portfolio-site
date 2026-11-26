@@ -18,6 +18,7 @@ class FakeAudioContext {
   currentTime = 0;
   destination = {};
   sources: FakeSource[] = [];
+  oscillators = 0;
   shouldRejectDecode = false;
   shouldRejectResume = false;
   shouldRejectSuspend = false;
@@ -27,6 +28,7 @@ class FakeAudioContext {
       value: 1,
       setValueAtTime() {},
       linearRampToValueAtTime() {},
+      exponentialRampToValueAtTime() {},
       setTargetAtTime() {},
       cancelScheduledValues() {},
     };
@@ -42,6 +44,15 @@ class FakeAudioContext {
 
   createBiquadFilter() {
     return { type: 'lowpass', frequency: this.makeParam(), Q: this.makeParam(), connect() {} };
+  }
+
+  createStereoPanner() {
+    return { pan: this.makeParam(), connect() {} };
+  }
+
+  createOscillator() {
+    this.oscillators++;
+    return { type: 'sine', frequency: this.makeParam(), connect() {}, start() {}, stop() {} };
   }
 
   createAnalyser() {
@@ -267,8 +278,9 @@ describe('WalkAudio offline and error handling', () => {
   });
 
   it('enable and disable with offline fetch produce zero unhandledRejection events', async () => {
-    const song = makeSong('makes-shift-salvation');
     const audio = new WalkAudio('/audio/stemma');
+    assert.equal(audio.songId, 'myxtery');
+    const song = makeSong(audio.songId);
     const rejections: unknown[] = [];
     const onUnhandled = (reason: unknown) => rejections.push(reason);
     process.on('unhandledRejection', onUnhandled);
@@ -293,5 +305,53 @@ describe('WalkAudio offline and error handling', () => {
     } finally {
       process.off('unhandledRejection', onUnhandled);
     }
+  });
+
+  it('SFX methods use loaded samples when present and fall back quietly when unloaded', async () => {
+    const audio = new WalkAudio('/audio/stemma');
+    audio.musicOn = false;
+
+    // 1. Unloaded SFX: falls back quietly without throwing.
+    globalThis.fetch = async () => new Response('Missing', { status: 404 });
+    audio.enable();
+    await flushMicrotasks();
+
+    audio.dig();
+    audio.pee();
+    audio.flutter({ x: 1, z: 2 });
+    audio.firework({ x: 3, z: 4 });
+    audio.honk({ x: 5, z: 6 });
+    audio.howl();
+    audio.whine();
+    assert.ok(fakeCtx.oscillators > 0);
+    assert.ok(fakeCtx.sources.length > 0);
+
+    // 2. Loaded SFX: fresh instance loads all sample takes and plays them without synth fallback.
+    installFakeWindow();
+    const audioLoaded = new WalkAudio('/audio/stemma');
+    audioLoaded.musicOn = false;
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.startsWith('/audio/sfx/')) {
+        return new Response(new Uint8Array(8), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    audioLoaded.enable();
+    await flushMicrotasks();
+
+    const beforeSources = fakeCtx.sources.length;
+    audioLoaded.dig();
+    audioLoaded.pee();
+    audioLoaded.flutter({ x: 1, z: 2 });
+    audioLoaded.firework({ x: 3, z: 4 });
+    audioLoaded.honk({ x: 1, z: 1 });
+    audioLoaded.howl(undefined, 0.5);
+    audioLoaded.whine();
+
+    assert.equal(fakeCtx.oscillators, 0);
+    assert.equal(fakeCtx.sources.length - beforeSources, 7);
+    assert.ok(fakeCtx.sources.slice(beforeSources).every((s) => s.started));
   });
 });

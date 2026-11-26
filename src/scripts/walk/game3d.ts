@@ -472,6 +472,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       hud.shout('LA NETEJA!', 'bad');
       hud.say('sweeper', 'Fora, gos!', 1.6, 'loud');
       hud.toast('Chase', 'Drag your human to the Rambla or into a side street', '#ff6b5a');
+      audio.honk({ x: sw.x, z: sw.z });
     } else if (kind === 'dimoni') {
       hud.shout('CREMADA!', 'loud');
       humanSay('They\'re coming for us!', 1.8, 'loud');
@@ -505,10 +506,12 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       burst(dog.x, dog.y + 0.6, dog.z, 0xbfe6ff, 30, 3, 3, 0.8, 7);
       dog.wet = 1;
       humanSay('Ugh, my shoes!', 1.8);
+      audio.whine();
     } else {
       hud.shout('SINGED!', 'bad');
       burst(dog.x, dog.y + 0.6, dog.z, 0x3a3a40, 24, 2, 2.5, 0.9, 4);
       humanSay('My hair!', 1.8, 'loud');
+      audio.whine();
     }
   };
 
@@ -630,6 +633,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   // Leash corrections: warn once before the first, explain the first few.
   let patienceWarned = false;
   let corrections = 0;
+  let swHonkCd = 0;
+  let nightBarks = 0;
   const handPos = new THREE.Vector3();
   const collarPos = new THREE.Vector3();
   // The leash hand, computed from the body (the model's matrices lag a frame,
@@ -667,7 +672,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   const doMark = () => {
     if (dog.peeing > 0 || !dog.onGround || dogSwimming) return;
-    if (pee < 0.2) { hud.banner('Out of pee — drink at a fountain', 'news'); return; }
+    if (pee < 0.2) { audio.whine(); hud.banner('Out of pee — drink at a fountain', 'news'); return; }
     pee = Math.max(0, pee - 0.25);
     dog.peeing = 0.8;
     audio.pee();
@@ -692,7 +697,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
 
   const doBark = () => {
-    audio.bark();
+    if (skySys.getMode() === 'night' && ++nightBarks % 3 === 0) audio.howl();
+    else audio.bark();
     life.bark();
     plaza.bark();
     hill.bark();
@@ -708,13 +714,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       }
     }
     if (scared) {
-      audio.flutter();
+      audio.flutter({ x: dog.x, z: dog.z });
       { const g = birds.find((b) => b.kind === 'gull' && b.fly > 5.9); if (g) audio.gull({ x: g.x, z: g.z }); }
       completeGoal('birds');
     }
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) {
       fireworksT = 14;
-      audio.firework();
+      audio.firework({ x: level.dimoni.x, z: level.dimoni.z });
       if (!chase && chaseCooldown <= 0 && !offLeash) startChase('dimoni');
       else hud.shout('CREMADA!', 'loud');
     }
@@ -1334,6 +1340,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
             leash.rest *= 0.65;
             humanSay('That’s enough pulling!', 1.8, 'loud');
             hud.shout('YANKED BACK', 'bad');
+            audio.whine();
             // Explain it the first few times; after that the shout is enough.
             if (corrections++ < 2) {
               hud.toast('Leash correction', 'You pulled too hard for too long, so your human yanked the leash short. Walk without pulling for a while and they calm down.', '#e5487a', 6);
@@ -1929,6 +1936,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     }
     // La Neteja.
     if (chaseCooldown > 0) chaseCooldown -= dt;
+    if (swHonkCd > 0) swHonkCd -= dt;
     if (chase?.kind === 'neteja') {
       chase.t += dt;
       chase.speed = Math.min(3.4, chase.speed + dt * 0.6);
@@ -1944,7 +1952,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       sw.z += sw.dir * sw.speed * dt;
       if (sw.z > Q.sweeper.z1) sw.dir = -1;
       if (sw.z < Q.sweeper.z0) sw.dir = 1;
-      if (Math.hypot(sw.x - dog.x, sw.z + sw.dir * 2.2 - dog.z) < 1.4) sw.z -= sw.dir * sw.speed * dt; // waits for her
+      if (Math.hypot(sw.x - dog.x, sw.z + sw.dir * 2.2 - dog.z) < 1.4) {
+        sw.z -= sw.dir * sw.speed * dt; // waits for her
+        if (swHonkCd <= 0) { audio.honk({ x: sw.x, z: sw.z }); swHonkCd = 5; }
+      }
     }
     sweeper.group.position.set(sw.x, RAMBLA_Y, sw.z);
     dynBoxes.length = 0;
@@ -1979,12 +1990,20 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         } else if (dist < 70) tr.speed = Math.max(0.6, Math.min(16, Math.sqrt(4.4 * dist)));
       } else if (tr.stopped && tr.dwell > 0) {
         tr.dwell -= dt;
-        if (tr.dwell <= 0) { audio.trainHorn({ x: tr.x, z: tr.z }); tr.stop = false; }
+        if (tr.dwell <= 0) {
+          audio.trainHorn({ x: tr.x, z: tr.z });
+          if (Math.hypot(tr.x - dog.x, tr.z - dog.z) < 60) audio.howl(undefined, 0.85);
+          tr.stop = false;
+        }
       } else {
         tr.speed = Math.min(16, tr.speed + dt * (tr.stopped ? 1.6 : 4));
       }
       tr.x += tr.dir * tr.speed * dt;
-      if (!tr.horned && !tr.stop && Math.abs(tr.x - dog.x) < 110) { audio.trainHorn({ x: tr.x, z: tr.z }); tr.horned = true; }
+      if (!tr.horned && !tr.stop && Math.abs(tr.x - dog.x) < 110) {
+        audio.trainHorn({ x: tr.x, z: tr.z });
+        if (Math.hypot(tr.x - dog.x, tr.z - dog.z) < 60) audio.howl(undefined, 0.85);
+        tr.horned = true;
+      }
       if (!tr.rumbled && Math.abs(tr.x - dog.x) < 50 && tr.speed > 4) { audio.rumble(4); tr.rumbled = true; }
       if (Math.abs(tr.x) > 290) tr.wait = rand(22, 38);
     }
@@ -2133,8 +2152,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       }
       if (Math.random() < dt * 6) burst(level.dimoni.x + rand(-1, 1), 5 + rand(0, 3), level.dimoni.z + rand(-1, 1), 0x3a3a40, 1, 0.4, 1.4, 1.6, -0.3);
       if (Math.random() < dt * 2.2) {
-        fireworks.push({ x: level.dimoni.x + rand(-8, 8), y: 0, z: level.dimoni.z + rand(-6, 2), t: 0, color: pickOne([0xff4a3d, 0xffb020, 0x5eea8c, 0x1fc9b7, 0xe5487a, 0xffffff]) });
-        audio.firework();
+        const fx = level.dimoni.x + rand(-8, 8), fz = level.dimoni.z + rand(-6, 2);
+        fireworks.push({ x: fx, y: 0, z: fz, t: 0, color: pickOne([0xff4a3d, 0xffb020, 0x5eea8c, 0x1fc9b7, 0xe5487a, 0xffffff]) });
+        audio.firework({ x: fx, z: fz });
       }
     } else {
       level.dimoni.glow.intensity = skySys.getMode() === 'night' ? 2 : 0;
