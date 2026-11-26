@@ -1,15 +1,19 @@
 /*
   The Marina & Breakwater at runtime: moored boats gently bobbing on the harbor
   swell, a flashing green beacon atop Far del Port, a sailor looking for his
-  lifebuoy, a fisherman beset by crate gulls, and Bimba the playmate in pipicà 4.
+  lifebuoy, a fisherman beset by crate gulls, Bimba the playmate in pipica 4,
+  Boss #1 (El Mico de Bronze) at West Quay, and the Harbor Boat Wake Surge chase.
 */
 import * as THREE from 'three';
 import { makePerson, makeBird, makeDog, M, box, cyl, sphere, rod, shadowed } from './models';
 import { collapseRig } from './bake';
 import { MARINA, inMarinaPipica, PONTOON_Y, BREAKWATER_Y } from './marina';
-import { MARINA_GROUND_Y, MARINA_WATER_Y } from './marinaGeom';
+import { MARINA_GROUND_Y, MARINA_WATER_Y, PONTOON_A, PONTOON_B } from './marinaGeom';
+import { createMicoBoss } from './micoBoss';
+import { WakeChaseState } from './wakeLogic';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';
+import type { FeelState, TelegraphPool } from './telegraph';
 
 export type MarinaItem = 'buoy';
 export const isMarinaItem = (c: string | null): c is MarinaItem => c === 'buoy';
@@ -20,7 +24,10 @@ export interface MarinaCtx {
   scene: THREE.Scene;
   hud: Hud;
   audio: WalkAudio;
+  telegraphs: TelegraphPool;
+  feel: FeelState;
   dog: { x: number; y: number; z: number; vx: number; vz: number; heading: number; carrying: string | null };
+  human: { x: number; y: number; z: number; vx: number; vz: number };
   humanSay: (text: string, ttl?: number, tone?: 'paper' | 'win' | 'loud') => void;
   addBones: (n: number, why?: string) => void;
   completeGoal: (id: string) => void;
@@ -28,6 +35,9 @@ export interface MarinaCtx {
   onDone?: (key: string) => void;
   burst: (x: number, y: number, z: number, color: number, n?: number, spd?: number, up?: number, life?: number, g?: number) => void;
   offLeash: () => boolean;
+  canStartThreat?: () => boolean;
+  onWet?: () => void;
+  onHitDog?: (vx: number, vz: number, vy?: number) => void;
 }
 
 const Y = MARINA_GROUND_Y;
@@ -90,8 +100,40 @@ function makeMooredBoat(accent: number, kind: 'sail' | 'fisher') {
   return g;
 }
 
+function makeWakeBoat() {
+  const g = new THREE.Group();
+  const hull = box(5.4, 0.85, 2.1, M(0xf4f1ea, 0.4));
+  hull.position.y = 0.42;
+  const trim = box(5.46, 0.2, 2.14, M(0x2a5aa8, 0.45));
+  trim.position.y = 0.66;
+  const cabin = box(1.9, 0.65, 1.5, M(0x1f2b3f, 0.25, 0.3));
+  cabin.position.set(-0.2, 1.1, 0);
+  g.add(hull, trim, cabin);
+  g.visible = false;
+  shadowed(g);
+  collapseRig(g);
+  return g;
+}
+
+function makeWakeWave() {
+  const g = new THREE.Group();
+  const crest = new THREE.Mesh(
+    new THREE.BoxGeometry(5.2, 1.25, 1.4),
+    new THREE.MeshBasicMaterial({ color: 0x62dbff, transparent: true, opacity: 0.62, depthWrite: false }),
+  );
+  crest.position.y = 0.6;
+  const foam = new THREE.Mesh(
+    new THREE.BoxGeometry(5.4, 0.35, 1.55),
+    new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.84, depthWrite: false }),
+  );
+  foam.position.y = 1.22;
+  g.add(crest, foam);
+  g.visible = false;
+  return g;
+}
+
 export function createMarinaLife(ctx: MarinaCtx) {
-  const { scene, hud, audio, dog } = ctx;
+  const { scene, hud, audio, dog, human } = ctx;
   const all: THREE.Object3D[] = [];
   const add = <T extends THREE.Object3D>(o: T) => { scene.add(o); all.push(o); return o; };
   const person = (look: Parameters<typeof makePerson>[0], x: number, y: number, z: number, heading: number) => {
@@ -110,6 +152,7 @@ export function createMarinaLife(ctx: MarinaCtx) {
   const quests = { buoy: false, gulls: false, playmate: false };
   let doneCount = 0;
   let lighthouseDone = false;
+  let wakeDone = false;
   let pontoons = { a: false, b: false };
   let boatsCount = 0;
 
@@ -190,21 +233,101 @@ export function createMarinaLife(ctx: MarinaCtx) {
     tagCd: 0,
   };
 
+  // ---- Boss #1: El Mico de Bronze (West Quay) + Wake Chase ----
+  const wake = new WakeChaseState();
+  const wakeBoat = add(makeWakeBoat());
+  const wakeWave = add(makeWakeWave());
+  const mico = createMicoBoss({
+    addObject: add,
+    hud,
+    audio,
+    telegraphs: ctx.telegraphs,
+    feel: ctx.feel,
+    dog,
+    humanSay: ctx.humanSay,
+    addBones: ctx.addBones,
+    completeGoal: ctx.completeGoal,
+    onDone: ctx.onDone,
+    burst: ctx.burst,
+    onHitDog: (vx, vz, vy) => ctx.onHitDog?.(vx, vz, vy),
+    canStart: () => (ctx.canStartThreat?.() ?? true) && !wake.active,
+  });
+
   // ---- Per-frame ----
   const update = (dt: number, time: number) => {
     for (const k in saidT) saidT[k] -= dt;
     const near = dist(dog, MARINA.center) < VIEW;
     for (const o of all) o.visible = near;
-    if (!near) return;
+    mico.update(dt, time, near);
 
-    // Boats rock gently on the marina swell, beacon flashes green.
+    if (!near) {
+      if (wake.active) wake.reset();
+      return;
+    }
+
+    // Boats rock gently on the marina swell, or roll heavily under a passing wake.
     for (const bt of boats) {
-      bt.m.position.y = MARINA_WATER_Y + Math.sin(time * 1.4 + bt.phase) * 0.06;
-      bt.m.rotation.x = Math.sin(time * 1.2 + bt.phase) * 0.025;
-      bt.m.rotation.z = Math.cos(time * 1.1 + bt.phase) * 0.03;
+      const wakeBoost = wake.active ? Math.max(0, 1 - Math.abs(bt.z - wake.waveZ) / 14) : 0;
+      bt.m.position.y = MARINA_WATER_Y + Math.sin(time * 1.4 + bt.phase) * (0.06 + wakeBoost * 0.22);
+      bt.m.rotation.x = Math.sin(time * 1.2 + bt.phase) * (0.025 + wakeBoost * 0.08);
+      bt.m.rotation.z = Math.cos(time * 1.1 + bt.phase) * (0.03 + wakeBoost * 0.12);
     }
     const pulse = Math.max(0, Math.sin(time * 3.0));
     beaconMat.emissiveIntensity = 0.6 + pulse * 1.8;
+
+    // Wake Chase trigger & advancement on Pontoons A/B.
+    if (!wake.active) {
+      const trig = wake.canTrigger(
+        dog.x, dog.z,
+        !(ctx.canStartThreat?.() ?? true) || mico.active,
+        ctx.offLeash(),
+      );
+      if (trig) {
+        wake.start(trig);
+        hud.shout('BOAT WAKE!', 'loud');
+        ctx.humanSay('Whoa, look at that wake!', 1.8, 'loud');
+        hud.toast('Harbor chase', 'Sprint back up the gangway onto the stone quay before the wake hits!', '#38c9ff', 4);
+        audio.honk({ x: wake.boatX, z: -68 });
+        audio.splash({ x: trig === 'A' ? -124 : -150, z: -62 });
+      }
+    }
+    const wakeRes = wake.step(dt, dog, human);
+    if (wakeRes === 'active' && wake.active) {
+      const p = wake.pontoon === 'B' ? PONTOON_B : PONTOON_A;
+      const cx = (p.x0 + p.x1) / 2;
+      wakeBoat.visible = true;
+      wakeBoat.position.set(wake.boatX, MARINA_WATER_Y + 0.18, -68);
+      wakeWave.visible = true;
+      wakeWave.position.set(cx, PONTOON_Y - 0.15, wake.waveZ);
+      const fill = Math.max(0.05, Math.min(1, (wake.waveZ + 62) / 44));
+      ctx.telegraphs.lane(cx, -59, cx, -19.5, PONTOON_Y + 0.08, 4.4, fill, 0x38c9ff);
+      ctx.telegraphs.beacon(cx, Y + 0.06, -17.2, 2.2, time, 0x5eea8c);
+      if (Math.random() < dt * 16) ctx.burst(cx + rand(-2, 2), PONTOON_Y + 0.4, wake.waveZ, 0xcff5ff, 2, 1.5, 2.0, 0.4, 5);
+    } else {
+      wakeBoat.visible = false;
+      wakeWave.visible = false;
+    }
+    if (wakeRes === 'escaped') {
+      hud.shout(wakeDone ? 'DRY PAWS!' : 'ESCAPED WAKE! +6', 'good');
+      audio.goal();
+      if (!wakeDone) {
+        wakeDone = true;
+        ctx.onDone?.('marina:wake');
+        ctx.addBones(6);
+        ctx.completeGoal('marina_wake');
+      }
+    } else if (wakeRes === 'hit') {
+      hud.shout('SPLASHED!', 'bad');
+      hud.flash('rgba(56, 201, 255, 0.35)');
+      ctx.onWet?.();
+      ctx.onHitDog?.(0, 5.8, 2.5);
+      ctx.burst(dog.x, dog.y + 0.5, dog.z, 0xbfe6ff, 28, 3.2, 3.2, 0.7, 6);
+      audio.splash({ x: dog.x, z: dog.z });
+      audio.whine();
+      ctx.feel.kick(0.38);
+      ctx.feel.hitstop(0.08);
+      ctx.humanSay('Drenched again!', 1.8, 'loud');
+    }
 
     sailor.animate(time, { speed: 0, pose: 'stand' });
     fisherman.animate(time + 1.5, { speed: 0, pose: 'stand' });
@@ -335,6 +458,7 @@ export function createMarinaLife(ctx: MarinaCtx) {
   };
 
   const bark = () => {
+    if (mico.bark()) return;
     if (quests.gulls) return;
     if (dist(dog, MARINA.cratePos) > 7 || !gulls.some((g) => !g.gone)) return;
     for (const g of gulls) {
@@ -352,7 +476,11 @@ export function createMarinaLife(ctx: MarinaCtx) {
     finishQuest('gulls', 'CRATES GUARDED', 4);
   };
 
+  const onWhirl = (poleX: number, poleZ: number) => mico.onWhirl(poleX, poleZ);
+
   const prompt = (): { key: string; label: string } | null => {
+    const mp = mico.prompt();
+    if (mp) return mp;
     if (!dog.carrying && !quests.buoy && !buoy.held && dist(dog, buoy) < 1.2) {
       return { key: 'G', label: 'Pick up the lifebuoy' };
     }
@@ -362,11 +490,19 @@ export function createMarinaLife(ctx: MarinaCtx) {
     return null;
   };
 
+  const banner = (): string | null => (
+    wake.active ? 'Harbor boat wake! Sprint back onto the stone quay!' : null
+  );
+
   const reset = () => {
     buoy.held = false;
     buoy.x = MARINA.buoyPos.x;
     buoy.z = MARINA.buoyPos.z;
     playmate.tagCd = 0;
+    wake.reset();
+    wakeBoat.visible = false;
+    wakeWave.visible = false;
+    mico.reset();
   };
 
   const restore = (doneKeys: ReadonlySet<string>) => {
@@ -379,6 +515,8 @@ export function createMarinaLife(ctx: MarinaCtx) {
     if (doneKeys.has('marina:pontoonA')) pontoons.a = true;
     if (doneKeys.has('marina:pontoonB')) pontoons.b = true;
     if (doneKeys.has('marina:lighthouse')) lighthouseDone = true;
+    if (doneKeys.has('marina:wake')) wakeDone = true;
+    mico.restore(doneKeys);
     doneCount = Number(quests.buoy) + Number(quests.gulls) + Number(quests.playmate);
     boatsCount = Number(pontoons.a) + Number(pontoons.b);
   };
@@ -388,16 +526,25 @@ export function createMarinaLife(ctx: MarinaCtx) {
     pickup,
     drop,
     bark,
+    onWhirl,
     prompt,
+    banner,
+    busy: () => mico.active || wake.active,
+    wakeActive: () => wake.active,
     reset,
     restore,
-    quests: () => ({ ...quests, lighthouse: lighthouseDone, pontoons: { ...pontoons } }),
+    quests: () => ({ ...quests, lighthouse: lighthouseDone, wake: wakeDone, mico: mico.state.defeatedOnce, pontoons: { ...pontoons } }),
     bubbles: () => [
       { id: 'sailor', x: MARINA.sailor.x, y: PONTOON_Y + 2.1, z: MARINA.sailor.z },
       { id: 'fisherman', x: MARINA.fisherman.x, y: Y + 2.1, z: MARINA.fisherman.z },
       { id: 'playmate', x: playmate.x, y: Y + 1.0, z: playmate.z },
+      { id: 'mico', x: mico.state.x, y: Y + 3.0, z: mico.state.z },
     ],
-    debug: { buoy, gulls, playmate, pontoons, get lighthouseDone() { return lighthouseDone; } },
+    debug: {
+      buoy, gulls, playmate, pontoons, mico, wake,
+      get lighthouseDone() { return lighthouseDone; },
+      get wakeDone() { return wakeDone; },
+    },
   };
 }
 

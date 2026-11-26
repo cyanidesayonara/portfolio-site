@@ -382,12 +382,20 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     offLeash: () => offLeash,
   });
   const hillDistrict = level.districts.find((d) => d.id === HILL.id)!;
-  // The Marina & Breakwater: moored boats, lighthouse, buoy & crate-gull quests (marinaLife.ts).
+  // The Marina & Breakwater: moored boats, lighthouse, buoy, crate gulls, El Mico boss & wake chase.
   const marina = createMarinaLife({
-    scene, hud, audio, dog, addBones, completeGoal, bumpGoal, burst,
+    scene, hud, audio, telegraphs, feel, dog, human, addBones, completeGoal, bumpGoal, burst,
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
+    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !offLeash,
+    onWet: () => { dog.wet = 1; },
+    onHitDog: (vx, vz, vy = 2.0) => {
+      dog.vx += vx;
+      dog.vz += vz;
+      dog.vy = Math.max(dog.vy, vy);
+      dog.onGround = false;
+    },
   });
   // Old-town stray cats on the hill (strays.ts).
   const strays = createStrays({
@@ -497,7 +505,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let chase: null | { kind: ChaseKind; t: number; speed: number } = null;
   let chaseCooldown = 0;
   const startChase = (kind: ChaseKind) => {
-    if (chase || chaseCooldown > 0 || offLeash || plaza.chasing()) return;
+    if (chase || chaseCooldown > 0 || offLeash || plaza.chasing() || marina.busy()) return;
     chase = { kind, t: 0, speed: kind === 'neteja' ? 1.6 : kind === 'dimoni' ? 2.0 : 2.5 };
     if (kind === 'neteja') {
       hud.shout('LA NETEJA!', 'bad');
@@ -1383,8 +1391,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         // Scared too: they keep right up with Millie.
         wantX = dx / d; wantZ = dz / d; speed = 3.1;
       }
-      if (plaza.chasing() && d > 1.6) {
-        // Mortified: they hurry after Millie (and the butcher).
+      if ((plaza.chasing() || marina.wakeActive()) && d > 1.6) {
+        // Hurry along behind Millie when chased in the plaza or outrunning a boat wake.
         wantX = dx / d; wantZ = dz / d; speed = 3.4;
       }
       if (chase?.kind === 'correfoc') {
@@ -1467,6 +1475,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     humanSay('Wheee!', 1.4, 'loud');
     hud.shout('POLE SWING', 'loud');
     addCombo('POLE SWING', 10);
+    marina.onWhirl(pole.x, pole.z);
   };
   let whooshAcc = 0;
   const updateWhirl = (dt: number, tension: number) => {
@@ -2456,6 +2465,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) prompts.push({ key: 'E', label: 'Bark at La Neteja' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) prompts.push({ key: 'E', label: 'Bark at the devils' });
     if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'dimoni' ? 'The devils are out! Into the sea!' : chase.kind === 'gulls' ? 'Gavines! Dodge the dive rings or bark [E] as they swoop!' : 'Correfoc! Run for the underpass!';
+    else { const mb = marina.banner(); if (mb) banner = mb; }
     if (inTunnel && !banner) banner = 'Carrer del Mar ↔ the beach';
     if (offLeash && !banner) banner = 'Off the leash — run!';
     hud.banner(banner, 'prompt');
@@ -2482,7 +2492,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         { x: -129, z: -10, color: '#3d73c7', label: 'Port', kind: 'place' },
         { x: -151, z: -9, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
         { x: MARINA.lighthouse.x, z: MARINA.lighthouse.z, color: '#5eea8c', label: 'Far del Port', kind: 'place' },
-        { x: -197, z: -12, color: '#ffb020', label: 'Moll de Ponent', kind: 'place' },
+        { x: -197, z: -12, color: '#ffb020', label: 'El Mico', kind: 'threat' },
       );
       if (!quest.ball) marks.push({ x: Q.kid.x, z: Q.kid.z - 1, color: '#ffc93c', label: 'Lost ball', kind: 'quest' });
       if (!quest.tofu) marks.push({ x: tofu.x, z: tofu.z, color: '#ffc93c', label: 'Tofu', kind: 'quest' });
@@ -2863,6 +2873,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get dogSwimming() { return dogSwimming; },
       get humanSwimming() { return humanSwimming; },
       plaza, hill, marina, strays,
+      get mico() { return marina.debug.mico; },
+      get wake() { return marina.debug.wake; },
       get area() { return goalSys.getArea(); },
       get whirl() { return whirl; },
       get camMode() { return camMode; },
