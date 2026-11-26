@@ -293,6 +293,10 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
     b.scale.setScalar(1.25);
     place(b, bx, Y, bz);
     addCircle(bx, bz, 0.18, Y + 1.1, 'bollard', true, true);
+    builder.addBox(bx + 0.32, Y, bz - 0.24, bx + 0.76, Y + 0.22, bz + 0.2, 0xc99c62);
+  }
+  for (const px of [-139.2, -125]) {
+    builder.addBox(px + 0.14, Y + 1.25, -5.85, px + 0.22, Y + 1.75, -5.35, 0xf26c22);
   }
   // Boat-lift crane (Grua) matching the stand-in landmark at x -212..-208, z -25..-21.
   const craneYel = 0xe8b42c, craneBlue = 0x2a5aa8, steelDark = 0x383e4a;

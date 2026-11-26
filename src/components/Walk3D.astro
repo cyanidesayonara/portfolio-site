@@ -10,6 +10,7 @@
 */
 import { localePath, type Locale } from '../i18n/utils';
 import { getUi } from '../i18n/ui';
+import { getLocalizedPosts } from '../i18n/content';
 
 interface Props {
   lazy?: boolean;
@@ -19,6 +20,7 @@ interface Props {
 const { lazy = false, id = 'walk', locale = 'en' } = Astro.props;
 const ui = getUi(locale).walk3d;
 const podLabels = JSON.stringify(getUi(locale).podPlayer);
+const blogTitles = (await getLocalizedPosts(locale)).slice(0, 5).map((p) => p.entry.data.title);
 const CORE_KEYS = ui.keys.filter((k) => ['W', 'Space', 'E'].includes(k.keys[0]));
 const EXTRA_KEYS = ui.keys.filter((k) => !['W', 'Space', 'E'].includes(k.keys[0]));
 const localePrefix = locale === 'en' ? '' : `/${locale}`;
@@ -33,7 +35,7 @@ const fallbackLinks = [
 ];
 ---
 
-<figure class="walk3d" data-walk-3d data-locale-prefix={localePrefix} data-lazy={lazy ? '' : undefined} id={id}>
+<figure class="walk3d" data-walk-3d data-locale-prefix={localePrefix} data-blog-titles={JSON.stringify(blogTitles)} data-lazy={lazy ? '' : undefined} id={id}>
   <div class="walk-fallback">
     <img
       class="wf-img"
@@ -1031,29 +1033,36 @@ const fallbackLinks = [
     right: 12px;
     bottom: 56px;
     width: min(400px, calc(100% - 24px));
-    padding: 12px 14px 14px;
+    padding: 13px 15px 15px;
     border-radius: 14px;
-    background: rgba(20, 32, 61, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(16, 26, 52, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     color: #f4f1ea;
-    box-shadow: inset 0 4px 0 var(--turquoise), 0 4px 10px rgba(0, 0, 0, 0.35);
+    box-shadow: inset 0 4px 0 var(--turquoise), 0 10px 26px rgba(5, 10, 24, 0.48);
     z-index: 5;
-    transform: translateY(12px);
+    transform: translateY(14px) scale(0.98);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s, transform 0.2s;
+    transition: opacity 0.22s cubic-bezier(0.2, 0.85, 0.25, 1), transform 0.22s cubic-bezier(0.2, 0.85, 0.25, 1);
   }
   .panel:global(.open) { opacity: 1; transform: none; pointer-events: auto; }
-  .coriolis-panel { box-shadow: inset 0 4px 0 var(--led), 0 4px 10px rgba(0, 0, 0, 0.35); width: min(300px, calc(100% - 24px)); }
-  .cat-panel { box-shadow: inset 0 4px 0 #f0c44d, 0 4px 10px rgba(0, 0, 0, 0.35); width: min(380px, calc(100% - 24px)); }
-  .pod-panel { box-shadow: inset 0 4px 0 #d94ca6, 0 4px 10px rgba(0, 0, 0, 0.35); width: min(390px, calc(100% - 24px)); }
+  .coriolis-panel { box-shadow: inset 0 4px 0 var(--led), 0 10px 26px rgba(5, 10, 24, 0.48); width: min(300px, calc(100% - 24px)); }
+  .cat-panel { box-shadow: inset 0 4px 0 #f0c44d, 0 10px 26px rgba(5, 10, 24, 0.48); width: min(380px, calc(100% - 24px)); }
+  .pod-panel { box-shadow: inset 0 4px 0 #d94ca6, 0 10px 26px rgba(5, 10, 24, 0.48); width: min(390px, calc(100% - 24px)); }
   .walk3d:global(.panel-open) .touch,
   .walk3d:global(.panel-open) .toolbar,
   .walk3d:global(.panel-open) .stage :global(.prompts),
   .walk3d:global(.panel-open) .stage :global(.minimap:not(.big)) {
     display: none;
   }
-  .panel header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-  .panel header b { display: block; font: 800 18px var(--font-display); }
+  .panel header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .panel header b { display: flex; align-items: center; gap: 7px; font: 800 18px var(--font-display); }
+  .panel header b::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--turquoise); box-shadow: 0 0 8px var(--turquoise); }
+  .coriolis-panel header b::before { background: var(--led); box-shadow: 0 0 8px var(--led); }
+  .cat-panel header b::before { background: #f0c44d; box-shadow: 0 0 8px #f0c44d; }
+  .pod-panel header b::before { background: #d94ca6; box-shadow: 0 0 8px #d94ca6; }
   .panel header span { font-size: 13px; color: #c9cfdf; }
   .panel .x {
     flex: none;
@@ -1061,11 +1070,13 @@ const fallbackLinks = [
     height: 32px;
     border: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.12);
     color: inherit;
     font-size: 20px;
     cursor: pointer;
+    transition: background-color 0.14s, transform 0.14s;
   }
+  .panel .x:hover { background: rgba(255, 255, 255, 0.22); transform: scale(1.06); }
   .songs {
     display: grid;
     gap: 4px;

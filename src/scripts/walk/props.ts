@@ -520,3 +520,27 @@ export function makeParkedBike(frameColor = 0xe5302a) {
   shadowed(g);
   return g;
 }
+
+/** Mediterranean laundry line with colorful garments hanging across an upper street gap. */
+export function makeLaundryLine(a: THREE.Vector3, b: THREE.Vector3, seed = 1) {
+  const g = new THREE.Group();
+  const r = rng(seed);
+  const len = a.distanceTo(b);
+  const n = Math.max(4, Math.floor(len / 0.85));
+  const ang = Math.atan2(b.z - a.z, b.x - a.x);
+  const cols = [0xf4f1ea, 0x3d73c7, 0xe5487a, 0xffb020, 0x1fc9b7, 0x8bcb3c, 0xd9705a];
+  g.add(rod(a, b, 0.01, M(0x4a4a52, 0.7), 4));
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n;
+    const p = a.clone().lerp(b, t);
+    p.y -= Math.sin(t * Math.PI) * 0.42;
+    const gw = 0.34 + r() * 0.22;
+    const gh = 0.46 + r() * 0.26;
+    const cloth = box(gw, gh, 0.03, M(cols[(i + seed) % cols.length], 0.88));
+    cloth.position.set(p.x, p.y - gh / 2, p.z);
+    cloth.rotation.y = -ang + (r() - 0.5) * 0.14;
+    cloth.rotation.x = (r() - 0.5) * 0.1;
+    g.add(cloth);
+  }
+  return g;
+}

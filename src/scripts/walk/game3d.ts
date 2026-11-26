@@ -123,11 +123,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const podLabels = readPodLabels(root.querySelector('[data-pod-panel]'));
   const podSim = new DopepodSim({ player: podcast, labels: podLabels });
   const polrMeta = projectMeta.projects['path-of-leash-resistance'];
+  let blogTitles: string[] | undefined;
+  try {
+    const rawTitles = root.dataset.blogTitles ? JSON.parse(root.dataset.blogTitles) : undefined;
+    if (Array.isArray(rawTitles)) blogTitles = rawTitles.filter((x): x is string => typeof x === 'string');
+  } catch {}
   const boothScreens = createBoardwalkBoothScreens({
     catSim,
     podSim,
     commits: polrMeta?.commits ?? 2242,
     mainWalks: polrMeta?.mainWalks ?? 51,
+    blogTitles,
   });
 
   // Build in slices behind a loading bar (or commuter train cutscene), then bake what's
@@ -238,6 +244,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let slowmo = 0;
   let shake = 0;
   let fireworksT = 0;
+  let stemmaBarkPulse = 0;
+  let leashMirrorOn = false;
   const markedSpots = new Set<object>();
 
   // Progress is saved in this browser (progress.ts); ?walktest starts clean
@@ -759,6 +767,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   const doBark = () => {
     dogBarkT = 0.24;
+    if (Math.hypot(dog.x - level.stemma.x, dog.z - level.stemma.z) < 10) stemmaBarkPulse = 1;
     if (skySys.getMode() === 'night' && ++nightBarks % 3 === 0) audio.howl();
     else audio.bark();
     life.bark();
@@ -1736,13 +1745,30 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (d > 34) podcast.stop();
       else podcast.setVolume(Math.max(0, Math.min(1, 1 - (d - 4) / 28)) ** 1.5);
     }
-    // Live idling UIs across all boardwalk pavilions.
+    // Live idling UIs and 2D mirror across the boardwalk pavilions.
+    stemmaBarkPulse = Math.max(0, stemmaBarkPulse - dt * 2.2);
     const activeBoothId = panels.catFocus || Math.hypot(dog.x - level.catScreen.viewX, dog.z - level.catScreen.viewZ) < 16
       ? 'eat-prey-nap'
       : panels.podOpen
         ? 'dopepod'
         : null;
-    boothScreens.update(dt, audio.playhead(), audio.muted, audio.on && audio.musicOn, activeBoothId);
+    const ldx = dog.x - level.leash.x;
+    const ldz = dog.z - level.leash.z;
+    leashMirrorOn = Math.abs(ldx) < 10 && Math.abs(ldz) < 9.5;
+    boothScreens.update(dt, audio.playhead(), audio.muted, audio.on && audio.musicOn, activeBoothId, {
+      active: leashMirrorOn,
+      dx: ldx,
+      dz: ldz,
+      dogHeading: dog.heading,
+      dogSpeed: sp,
+      hx: human.x - level.leash.x,
+      hz: human.z - level.leash.z,
+      humanState: human.state,
+      taut: leash.taut,
+      barkT: dogBarkT,
+      offLeash,
+      sky: skySys.getMode(),
+    }, stemmaBarkPulse);
 
     // Pee, streaks, drinking.
     if (dog.peeing > 0) dog.peeing -= dt;
@@ -2533,12 +2559,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       }
     }
 
-    // Stemma window bars and panel.
+    // Stemma window bars, exterior speaker cones, and panel.
     level.stemmaBars.forEach((b, i) => {
       const lv = audio.level(STEM_GROUPS[i]);
-      b.scale.y = lerp(b.scale.y, 0.15 + lv * 2.4, Math.min(1, dt * 14));
+      b.scale.y = lerp(b.scale.y, 0.15 + lv * 2.4 + stemmaBarkPulse * 0.35, Math.min(1, dt * 14));
       b.position.y = RAMBLA_Y + 0.25 + b.scale.y * 0.5;
     });
+    const bassPump = Math.max(audio.level('drums') * 0.08, stemmaBarkPulse * 0.07);
+    level.stemmaCones.forEach((c) => { c.position.z = (level.stemma.z - 0.49) + bassPump; });
     panels.drawLanes();
 
     // Night lights near the camera.
@@ -2854,6 +2882,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         get stemmaOpen() { return panels.stemmaOpen; },
         get catFocus() { return panels.catFocus; },
         get podOpen() { return panels.podOpen; },
+        get leashMirrorActive() { return leashMirrorOn; },
         get boothTofu() { return { ...boothTofu }; },
         cat: catSim,
         pod: podSim,

@@ -178,12 +178,12 @@ export function createSkySystem(
     skyUniforms.cloudCol.value.setHex(mode === 'day' ? 0xf8fbff : mode === 'rain' ? 0x7f8a96 : 0x2c3c68);
     skyUniforms.cloudAmt.value = mode === 'day' ? 0.36 : mode === 'rain' ? 0.55 : 0.16;
     scene.environment = getEnv(mode).texture;
-    scene.environmentIntensity = mode === 'day' ? 0.58 : mode === 'rain' ? 0.42 : 0.36;
+    scene.environmentIntensity = mode === 'day' ? 0.72 : mode === 'rain' ? 0.52 : 0.46;
     scene.fog = new THREE.Fog(s.fog, s.fogNear, s.fogFar);
     sun.color.setHex(s.sunColor);
     sun.intensity = s.sunIntensity;
-    rim.color.setHex(mode === 'night' ? 0x8bb6ff : mode === 'rain' ? 0xc2d0de : 0xffe1b8);
-    rim.intensity = mode === 'day' ? 0.72 : mode === 'rain' ? 0.35 : 0.45;
+    rim.color.setHex(mode === 'night' ? 0x8bb6ff : mode === 'rain' ? 0xc2d0de : 0xffe7c2);
+    rim.intensity = mode === 'day' ? 0.85 : mode === 'rain' ? 0.42 : 0.55;
     hemi.color.setHex(s.hemiSky);
     hemi.groundColor.setHex(s.hemiGround);
     hemi.intensity = s.hemiIntensity;
