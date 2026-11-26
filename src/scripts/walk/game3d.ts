@@ -27,6 +27,8 @@ import { createLife } from './life';
 import { createPlazaLife, type PlazaItem } from './plazaLife';
 import { createHillLife } from './hillLife';
 import { HILL } from './hill';
+import { createMarinaLife, type MarinaItem } from './marinaLife';
+import { MARINA } from './marina';
 import { bakeStatic, collapseRig } from './bake';
 import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
@@ -197,7 +199,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   const dog = {
     x: startDog.x, y: RAMBLA_Y, z: startDog.z, vx: 0, vz: 0, vy: 0, heading: startHeading,
-    onGround: true, planted: false, digging: false, peeing: 0, wet: 0, carrying: null as null | 'ball' | 'questBall' | PlazaItem, zoom: 1,
+    onGround: true, planted: false, digging: false, peeing: 0, wet: 0, carrying: null as null | 'ball' | 'questBall' | PlazaItem | MarinaItem, zoom: 1,
     speed: 0, airStart: 0, stillTime: 0,
   };
   const human = {
@@ -372,6 +374,13 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     offLeash: () => offLeash,
   });
   const hillDistrict = level.districts.find((d) => d.id === HILL.id)!;
+  // The Marina & Breakwater: moored boats, lighthouse, buoy & crate-gull quests (marinaLife.ts).
+  const marina = createMarinaLife({
+    scene, hud, audio, dog, addBones, completeGoal, bumpGoal, burst,
+    onDone: markDone,
+    humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
+    offLeash: () => offLeash,
+  });
   // Old-town stray cats on the hill (strays.ts).
   const strays = createStrays({
     scene, audio, dog,
@@ -404,6 +413,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     });
     plaza.restore(doneKeys);
     hill.restore(doneKeys);
+    marina.restore(doneKeys);
     strays.restore(doneKeys);
   }
   // Cyclists on the Rambla bike lane.
@@ -754,6 +764,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     life.bark();
     plaza.bark();
     hill.bark();
+    marina.bark();
     strays.bark();
     if (chase?.kind === 'gulls' && gullThreat.active && gullThreat.t / gullThreat.dur > 0.42 && Math.hypot(dog.x - gullThreat.tx, dog.z - gullThreat.tz) < 5.5) {
       gullThreat.active = false;
@@ -804,6 +815,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       // Drop.
       const fx = dog.x + Math.cos(dog.heading) * 0.55, fz = dog.z + Math.sin(dog.heading) * 0.55;
       if (plaza.drop(fx, fz)) return;
+      if (marina.drop(fx, fz)) return;
       if (dog.carrying === 'questBall') {
         questBall.held = false;
         questBall.x = fx; questBall.z = fz;
@@ -829,6 +841,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       return;
     }
     if (plaza.pickup()) return;
+    if (marina.pickup()) return;
     if (!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) { ball.held = true; dog.carrying = 'ball'; audio.pickup(); return; }
     if (!questBall.held && !questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9) {
       questBall.held = true; dog.carrying = 'questBall'; audio.pickup();
@@ -1036,6 +1049,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     camSnap = true;
     plaza.reset();
     hill.reset();
+    marina.reset();
     hud.banner('Back where we started', 'news');
   };
   let departing = false;
@@ -1265,8 +1279,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const humanLevelBlocked = () => {
     // Human on the sand while the dog is up on the Rambla (or the reverse): head for a ramp.
     const onPier = (p: { x: number; z: number }) => p.x > -50.5 && p.x < -45.5 && p.z < -10;
-    const hb = human.z < -20.3 && !onPier(human), db = dog.z < -20.3 && !onPier(dog);
-    return hb !== db;
+    const onBeach = (p: { x: number; z: number }) => p.x > -94 && p.z < -20.3 && !onPier(p);
+    return onBeach(human) !== onBeach(dog);
   };
 
   const updateHuman = (dt: number, tension: number) => {
@@ -1954,6 +1968,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     life.update(dt, time, skySys.getMode());
     plaza.update(dt, time);
     hill.update(dt, time);
+    marina.update(dt, time);
     strays.update(dt, time);
     for (const w of walkers) {
       if (w.saidT > 0) w.saidT -= dt;
@@ -2407,6 +2422,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!dog.carrying && ((!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) || (!questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9))) prompts.push({ key: 'G', label: 'Pick up' });
     { const pl = plaza.prompt(); if (pl) prompts.push({ key: 'G', label: pl }); }
     { const hl = hill.prompt(); if (hl) prompts.push(hl); }
+    { const ml = marina.prompt(); if (ml) prompts.push(ml); }
     if (dog.carrying) prompts.push({ key: 'G', label: 'Drop' });
     if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) prompts.push({ key: 'E', label: 'Bark at the Dimoni' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - level.fishBucket.x, dog.z - level.fishBucket.z) < 5) prompts.push({ key: 'E', label: 'Raid the fish bucket' });
@@ -2437,6 +2453,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         { x: 0, z: 232, color: '#f4f1ea', label: 'Església', kind: 'place' },
         { x: 14, z: 219.5, color: '#1fc9b7', label: 'Mirador', kind: 'place' },
         { x: HILL.home.x, z: HILL.home.z, color: '#8bcb3c', label: 'Home', kind: 'stop' },
+        { x: -129, z: -10, color: '#3d73c7', label: 'Port', kind: 'place' },
+        { x: -151, z: -9, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
+        { x: MARINA.lighthouse.x, z: MARINA.lighthouse.z, color: '#5eea8c', label: 'Far del Port', kind: 'place' },
+        { x: -197, z: -12, color: '#ffb020', label: 'Moll de Ponent', kind: 'place' },
       );
       if (!quest.ball) marks.push({ x: Q.kid.x, z: Q.kid.z - 1, color: '#ffc93c', label: 'Lost ball', kind: 'quest' });
       if (!quest.tofu) marks.push({ x: tofu.x, z: tofu.z, color: '#ffc93c', label: 'Tofu', kind: 'quest' });
@@ -2451,6 +2471,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         if (!hq.bell) marks.push({ x: HILL.portal.x, z: HILL.portal.z, color: '#ffc93c', label: 'Church bell', kind: 'quest' });
         if (!hq.mirador) marks.push({ x: 14, z: 219.5, color: '#ffc93c', label: 'Mirador', kind: 'quest' });
         if (!hq.home) marks.push({ x: HILL.home.x, z: HILL.home.z, color: '#ffc93c', label: 'Home', kind: 'quest' }); }
+      { const mq = marina.quests();
+        if (!mq.buoy) marks.push({ x: MARINA.buoyPos.x, z: MARINA.buoyPos.z, color: '#ffc93c', label: 'Lifebuoy', kind: 'quest' });
+        if (!mq.gulls) marks.push({ x: MARINA.cratePos.x, z: MARINA.cratePos.z, color: '#ffc93c', label: 'Crate gulls', kind: 'quest' });
+        if (!mq.playmate) marks.push({ x: -151, z: -9, color: '#ffc93c', label: 'Harbor tag', kind: 'quest' }); }
       marks.push({ x: plaza.debug.butcher.x, z: plaza.debug.butcher.z, color: '#ff6b5a', label: 'Butcher', kind: 'threat' });
       marks.push({ x: sw.x, z: sw.z, color: '#5ab4ff', label: 'La Neteja', kind: 'threat' });
       marks.push({ x: cf.x, z: level.correfoc.z, color: '#ff8a2a', label: 'Correfoc', kind: 'threat' });
@@ -2570,6 +2594,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of life.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
+    for (const b of marina.bubbles()) place(b.id, b.x, b.y, b.z);
 
     skySys.followTarget(camLook);
   };
@@ -2809,7 +2834,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get offLeash() { return offLeash; },
       get dogSwimming() { return dogSwimming; },
       get humanSwimming() { return humanSwimming; },
-      plaza, hill, strays,
+      plaza, hill, marina, strays,
       get area() { return goalSys.getArea(); },
       get whirl() { return whirl; },
       get camMode() { return camMode; },
