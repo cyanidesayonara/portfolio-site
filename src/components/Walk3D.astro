@@ -929,6 +929,63 @@ const fallbackLinks = [
   .stage :global(.toast b) { font: 800 14px var(--font-display); color: var(--ac); }
   .stage :global(.toast span) { font: 500 13px var(--font-body); }
 
+  .stage :global(.bossbar) {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    transform: translateX(-50%);
+    width: min(360px, calc(100% - 260px));
+    padding: 8px 12px 9px;
+    border-radius: 12px;
+    background: rgba(11, 20, 48, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    display: grid;
+    gap: 5px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .stage :global(.bossbar[hidden]) { display: none; }
+  .stage :global(.bossbar .bh) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .stage :global(.bossbar .bname) {
+    font: 800 12px var(--font-display);
+    letter-spacing: 0.05em;
+    color: #f4f1ea;
+  }
+  .stage :global(.bossbar .bphase) {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--bac, #ffb020);
+    font: 800 10px var(--font-display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .stage :global(.bossbar .btrack) {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+  }
+  .stage :global(.bossbar .btrack i) {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--bac, #ffb020);
+    transition: width 0.18s ease;
+  }
+  .stage :global(.bossbar .bsub) {
+    font: 600 11px var(--font-body);
+    color: #d6dde8;
+    min-height: 14px;
+  }
+
   .stage :global(.combo) {
     position: absolute;
     left: 50%;
@@ -1333,6 +1390,7 @@ const fallbackLinks = [
     .stage { height: clamp(460px, 76vh, 680px); }
     .stage :global(.vitals) { transform: scale(0.68); transform-origin: top left; left: 8px; top: 8px; }
     .stage :global(.goals) { width: 128px; padding: 7px 10px; }
+    .stage :global(.bossbar) { top: 78px; width: min(300px, calc(100% - 24px)); padding: 6px 10px 7px; }
     .stage :global(.goals .gh) { font-size: 11px; }
     .stage :global(.goals .gh kbd) { display: none; }
     .stage :global(.goals.open) { width: calc(100% - 16px); z-index: 2; }

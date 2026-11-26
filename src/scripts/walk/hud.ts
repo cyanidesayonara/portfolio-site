@@ -49,6 +49,7 @@ export class Hud {
   onResetProgress?: () => void;
   private lastBanner = '';
   private lastPrompt = '';
+  private lastBoss = '';
 
   constructor(stage: HTMLElement) {
     const root = document.createElement('div');
@@ -62,6 +63,11 @@ export class Hud {
         <div class="row"><span class="ic pee">${ICONS.drop}</span><span class="lbl">PEE</span><span class="bar"><i data-h="pee"></i></span></div>
         <div class="row"><span class="ic mk">${ICONS.drop}</span><span class="lbl">MARKED</span><span class="drops" data-h="marks">${ICONS.drop.repeat(5)}</span><span class="chip" data-h="streak" hidden></span></div>
         <div class="row"><span class="ic zm">${ICONS.bolt}</span><span class="lbl">ZOOMIES</span><span class="bar"><i class="zoom" data-h="zoom"></i></span></div>
+      </div>
+      <div class="bossbar" data-h="boss" hidden>
+        <div class="bh"><span class="bname" data-h="bname"></span><span class="bphase" data-h="bphase"></span></div>
+        <div class="btrack"><i data-h="bfill"></i></div>
+        <div class="bsub" data-h="bsub"></div>
       </div>
       <button type="button" class="hud-card goals" data-h="goals" aria-expanded="false">
         <span class="gh"><span data-h="gtitle">GOALS 0/0</span><kbd class="kc pill">TAB</kbd></span>
@@ -219,6 +225,28 @@ export class Hud {
     this.lastPrompt = html;
     this.els.prompts.innerHTML = html;
     this.els.prompts.classList.toggle('show', items.length > 0);
+  }
+
+  /** Show or hide the shared top-center boss health bar during boss encounters. */
+  setBoss(state: null | { name: string; hp: number; maxHp: number; phase?: string; hint?: string; accent?: string }) {
+    const key = state
+      ? `${state.name}|${state.hp}|${state.maxHp}|${state.phase ?? ''}|${state.hint ?? ''}|${state.accent ?? ''}`
+      : 'off';
+    if (key === this.lastBoss) return;
+    this.lastBoss = key;
+    const el = this.els.boss;
+    if (!state) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.style.setProperty('--bac', state.accent ?? '#ffb020');
+    this.els.bname.textContent = state.name;
+    this.els.bphase.textContent = state.phase ?? '';
+    this.els.bphase.hidden = !state.phase;
+    this.els.bsub.textContent = state.hint ?? '';
+    const pct = Math.max(0, Math.min(1, state.hp / Math.max(1, state.maxHp))) * 100;
+    this.els.bfill.style.width = `${pct.toFixed(1)}%`;
   }
 
   say(id: string, text: string, ttl = 2, tone: 'paper' | 'win' | 'loud' = 'paper') {

@@ -32,6 +32,8 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'marina_quests', label: 'Help out at the marina', done: false, count: 0, target: 3, area: 'marina' },
     { id: 'marina_lighthouse', label: 'Reach the breakwater lighthouse', done: false, area: 'marina' },
     { id: 'marina_boats', label: 'Stroll both marina pontoons', done: false, count: 0, target: 2, area: 'marina' },
+    { id: 'marina_wake', label: 'Outrun the harbor boat wake on a pontoon', done: false, area: 'marina' },
+    { id: 'marina_mico', label: 'Outsmart El Mico de Bronze at Moll de Ponent', done: false, area: 'marina' },
     { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
     { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
@@ -102,6 +104,8 @@ export function createGoalSystem(opts: GoalSystemOpts) {
       if (goal('marina_quests').done) ['buoy', 'gulls', 'playmate'].forEach((k) => doneKeys.add(`marina:${k}`));
       if (goal('marina_lighthouse').done) doneKeys.add('marina:lighthouse');
       if (goal('marina_boats').done) ['pontoonA', 'pontoonB'].forEach((k) => doneKeys.add(`marina:${k}`));
+      if (goal('marina_wake').done) doneKeys.add('marina:wake');
+      if (goal('marina_mico').done) doneKeys.add('marina:mico');
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));
       if (goal('hill_top').done) doneKeys.add('hill:home');
