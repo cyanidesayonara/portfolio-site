@@ -130,7 +130,7 @@ export function createPlazaLife(ctx: PlazaCtx) {
       any = true;
     }
     if (any) {
-      audio.flutter();
+      audio.flutter(terraceCenter);
       ctx.completeGoal('birds');
     }
   };

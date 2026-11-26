@@ -123,7 +123,7 @@ export function createHillLife(ctx: HillCtx) {
       any = true;
     }
     if (any) {
-      audio.flutter();
+      audio.flutter({ x: 0.5, z: 228.8 });
       ctx.completeGoal('birds');
     }
   };

@@ -27,6 +27,10 @@ const SAMPLES = {
   trainHorn: ['train-horn'],
   bell: ['bell-1', 'bell-2'],
   meow: ['meow'],
+  dig: ['dig-1', 'dig-2', 'dig-3'],
+  pee: ['pee'],
+  flutter: ['flutter-1', 'flutter-2'],
+  firework: ['firework-1', 'firework-2', 'firework-3'],
 } satisfies Record<string, string[]>;
 export type SampleGroup = keyof typeof SAMPLES;
 
@@ -84,7 +88,7 @@ export class WalkAudio {
   private noise: AudioBuffer | null = null;
   private levelData = new Uint8Array(256);
   songs: SongMeta[] = [];
-  songId = 'makes-shift-salvation';
+  songId = 'myxtery';
   muted: Record<StemGroup, boolean> = { vocals: false, drums: false, bass: false, other: false };
   on = false;
   musicOn = true;
@@ -413,13 +417,19 @@ export class WalkAudio {
   /** A few quick breaths after a run. */
   pant() { for (let i = 0; i < 3; i++) this.sample('pant', { vol: 0.42 - i * 0.06, delay: i * 0.36, rate: 1.1 }); }
   whine() { this.sample('whine', { vol: 0.55 }); }
-  howl(at?: { x: number; z: number }) { this.sample('howl', { at, vol: 0.8 }); }
+  howl(at?: { x: number; z: number }, delay?: number) { this.sample('howl', { at, vol: 0.8, delay }); }
   /** A palas ball off a wooden bat. */
   pock() { this.tone(900, 0.05, 'triangle', 0.08, 600); this.hiss(0.03, 2500, 2, 0.05, 'bandpass'); }
   jump() { this.tone(300, 0.16, 'square', 0.08, 620); }
   land() { this.hiss(0.08, 300, 1, 0.12, 'lowpass'); }
-  pee() { this.hiss(0.7, 2600, 1.2, 0.06, 'bandpass', 1800); }
-  dig() { for (let i = 0; i < 3; i++) this.hiss(0.08, 500, 1, 0.14, 'lowpass', undefined, i * 0.12); }
+  pee() {
+    if (this.sample('pee', { vol: 0.55 })) return;
+    this.hiss(0.7, 2600, 1.2, 0.06, 'bandpass', 1800);
+  }
+  dig() {
+    if (this.sample('dig', { vol: 0.8 })) return;
+    for (let i = 0; i < 3; i++) this.hiss(0.08, 500, 1, 0.14, 'lowpass', undefined, i * 0.12);
+  }
   pickup() { [660, 880, 1320].forEach((f, i) => this.tone(f, 0.12, 'triangle', 0.14, undefined, i * 0.06)); }
   goal() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.13, undefined, i * 0.07)); }
   click() { this.tone(1800, 0.03, 'square', 0.05); }
@@ -432,7 +442,10 @@ export class WalkAudio {
     }
     this.tone(500, 0.25, 'sine', 0.1, 260);
   }
-  flutter() { for (let i = 0; i < 6; i++) this.hiss(0.06, 1400 + Math.random() * 600, 3, 0.08, 'bandpass', undefined, i * 0.05); }
+  flutter(at?: { x: number; z: number }) {
+    if (this.sample('flutter', { at, vol: 0.7, ref: 8 })) return;
+    for (let i = 0; i < 6; i++) this.hiss(0.06, 1400 + Math.random() * 600, 3, 0.08, 'bandpass', undefined, i * 0.05);
+  }
   gull(at?: { x: number; z: number }) {
     if (this.sample('gull', { at, vol: 0.6, ref: 12 })) { this.sample('gull', { at, vol: 0.5, ref: 12, delay: 0.3 }); return; }
     this.tone(1500, 0.28, 'sawtooth', 0.05, 900); this.tone(1600, 0.22, 'sawtooth', 0.04, 1000, 0.32);
@@ -467,7 +480,8 @@ export class WalkAudio {
   }
   chime() { this.tone(659, 0.5, 'sine', 0.12); this.tone(523, 0.7, 'sine', 0.12, undefined, 0.45); }
   rumble(dur = 3) { this.hiss(dur, 120, 0.7, 0.22, 'lowpass', 80); }
-  firework() {
+  firework(at?: { x: number; z: number }) {
+    if (this.sample('firework', { at, vol: 0.85, ref: 24 })) return;
     this.tone(900, 0.6, 'sine', 0.05, 2400);
     this.hiss(0.7, 300, 0.5, 0.3, 'lowpass', 90, 0.6);
     for (let i = 0; i < 8; i++) this.hiss(0.05, 3000, 2, 0.06, 'highpass', undefined, 0.7 + i * 0.06 + Math.random() * 0.05);
