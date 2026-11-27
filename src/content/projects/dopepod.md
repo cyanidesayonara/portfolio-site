@@ -22,10 +22,10 @@ A podcast player that began as a Django web app, became a mobile app with a full
 
 ## Today: a static player
 
-The current version is written in Svelte and TypeScript and hosted on GitHub Pages. Browse a hand-picked catalog in four languages, search a directory of about 27,000 more shows, queue episodes, change speed, set a sleep timer, keep favorites and pick up where you left off. Everything it remembers stays in your browser.
+The current version is written in Svelte and TypeScript and hosted on GitHub Pages. Browse a hand-picked catalog and a searchable directory of about 27,000 more shows in one list, with grid or list layout, favorites that work for directory shows too, and Continue listening that picks up where you left off. Change speed, set a sleep timer, and keep everything in your browser.
 
 - **No backend:** a daily GitHub Action reads the catalog's feeds and publishes small JSON files and cover thumbnails.
-- **A directory and charts from Podcast Index:** once a month the same Action builds the searchable directory from Podcast Index's public data dump, and once a day it fetches the New and rising charts by category and language. Its API key stays in the Action; the site only receives the finished lists.
+- **A directory and charts from Podcast Index:** once a week the same Action rebuilds the searchable directory from Podcast Index's public data dump, and once a day it fetches the New and rising charts by category and language. Its API key stays in the Action; the site never sees it.
 - **Audio straight from the publishers:** nothing is copied or re-hosted.
 - **Feeds are untrusted:** the parser tolerates broken XML, accepts only https audio and reduces descriptions to plain text.
 

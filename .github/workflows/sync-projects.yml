@@ -2,6 +2,8 @@ name: Sync active projects
 
 on:
   schedule:
+    # Weekly catch-all if a release hook misses; prefer repository_dispatch from
+    # each project's release workflow for same-day updates.
     - cron: '0 8 * * 1'
   workflow_dispatch:
   repository_dispatch:

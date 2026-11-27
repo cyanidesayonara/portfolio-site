@@ -19,21 +19,24 @@ npm run sync:apply
 
 ### Automated weekly & release-triggered sync
 
-[.github/workflows/sync-projects.yml](file:///C:/Users/SanttuNyk%C3%A4nen/projects/portfolio-site/.github/workflows/sync-projects.yml) runs `node tools/sync-projects.mjs --github --apply` every Monday at 08:00 UTC, on manual `workflow_dispatch`, or whenever a project repository fires a `repository_dispatch` event of type `project-updated`. When metadata or assets change, it verifies `npm run build` and opens or updates a PR against `main` on branch `chore/sync-projects`.
+[.github/workflows/sync-projects.yml](.github/workflows/sync-projects.yml) runs `node tools/sync-projects.mjs --github --apply` every Monday at 08:00 UTC, on manual `workflow_dispatch`, or whenever a project repository fires a `repository_dispatch` event of type `project-updated`. When metadata or assets change, it verifies `npm run build` and opens or updates a PR against `main` on branch `chore/sync-projects`.
 
-To trigger an immediate portfolio refresh from another project's release workflow, send a `repository_dispatch` webhook (with a fine-grained PAT or token with `contents: write` stored as `PORTFOLIO_SYNC_TOKEN`):
+**Release hooks (required for "update the portfolio whenever a project ships"):** each active project's release or publish workflow should notify this repo. Store a fine-grained PAT (contents + pull requests on `portfolio-site`, or a classic PAT with `repo`) as `PORTFOLIO_SYNC_TOKEN` in that project's secrets:
 
 ```yaml
 - name: Notify portfolio-site
+  if: success()
   uses: peter-evans/repository-dispatch@v3
   with:
     token: ${{ secrets.PORTFOLIO_SYNC_TOKEN }}
     repository: cyanidesayonara/portfolio-site
     event-type: project-updated
-    client-payload: '{"project": "${{ github.event.repository.name }}"}'
+    client-payload: '{"project": "${{ github.event.repository.name }}", "tag": "${{ github.ref_name }}"}'
 ```
 
-*(Descriptive prose updates — such as new features, boss names, or release highlights across English, Spanish, and Catalan markdown files — still benefit from a quick human/agent pass whenever a major milestone lands.)*
+Wired today on tag/release paths for `path-of-leash-resistance` and `stemma`, and on push-to-`master` deploys for `dop3pod` (not on the daily catalog cron, so episode refreshes do not open empty sync PRs). Each notify step is `continue-on-error: true` until `PORTFOLIO_SYNC_TOKEN` is set in that repository's secrets; once the secret exists, a successful release opens or updates `chore/sync-projects` on this repo the same day.
+
+**What still needs a human or agent pass:** descriptive prose in `src/content/projects/*.md` (and any Spanish/Catalan mirrors) whenever a release changes player-facing features, walk counts, bosses, or store messaging. The sync job updates tags, dates, and PoLR metrics automatically; it does not rewrite marketing copy. After a meaningful release, either merge the `chore/sync-projects` PR and follow with a short prose PR, or fold both into one.
 
 ## 2. Crosslinking app-specific blog posts onto standalone project sites
 

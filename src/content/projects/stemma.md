@@ -40,7 +40,8 @@ Import a song, separate it into stems (vocals, drums, bass, guitar, piano, other
 
 ## Separation
 
-- **HTDemucs v4** four- and six-stem separation (CPU) and **MDX-Net** two-stem separation on the GPU via DirectML with automatic CPU fallback, plus Wiener filtering and soft gating to reduce bleed.
+- **HTDemucs v4** four- and six-stem separation and **MDX-Net** two-stem separation, all on the GPU via DirectML when Windows supports it, with automatic CPU fallback. Wiener filtering and soft gating reduce bleed between stems.
+- From v3.3.0, a five-minute song separates into four or six stems in about a minute on a supported graphics card; two-stem mode is quicker still.
 - ONNX Runtime inference, with no PyTorch. Models download on first use and are checksum-verified.
 - Imports run in the background, from a file, by drag and drop, or from a YouTube URL (with a bundled QuickJS-ng runtime for `yt-dlp`).
 
