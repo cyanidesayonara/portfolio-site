@@ -171,6 +171,11 @@ export class StreetSound {
     if (t < 0) return;
     this.hiss(t, 0.8, 0.05, 3200, 'bandpass', this.sfx!);
   }
+  dig() {
+    const t = this.now();
+    if (t < 0) return;
+    for (let i = 0; i < 3; i++) this.hiss(t + i * 0.1, 0.08, 0.1, 500, 'lowpass', this.sfx!);
+  }
   bell() {
     const t = this.now();
     if (t < 0) return;

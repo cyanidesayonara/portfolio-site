@@ -1205,6 +1205,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   q('[data-restart]')?.addEventListener('click', resetWalk);
   const PROMPT_CODE: Record<string, string> = { X: 'KeyX', Enter: 'Enter', G: 'KeyG', E: 'KeyE', Space: 'Space' };
   let digPulse = 0;
+  let digSfxCd = 0;
   hud.onPrompt = (k) => {
     engage();
     const code = PROMPT_CODE[k];
@@ -1900,6 +1901,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
     // Digging on the beach.
     if (dog.digging && dog.onGround) {
+      digSfxCd -= dt;
+      if (digSfxCd <= 0 && level.surface(dog.x, dog.z, dog.y) === 'sand') {
+        audio.dig();
+        digSfxCd = 0.32 + Math.random() * 0.18;
+      }
       for (let i = 0; i < level.mounds.length; i++) {
         const m = level.mounds[i];
         if (!m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.3) {
@@ -1909,6 +1915,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
           findsGot++;
           markDone(`find:${i}`);
           audio.dig(); audio.pickup();
+          digSfxCd = 0.5;
           burst(m.x, level.floor(m.x, m.z, 0) + 0.1, m.z, 0xcdb586, 18, 2.2, 3);
           hud.toast('Dug up', m.name, '#ffb020');
           addBones(3);
@@ -1916,6 +1923,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         }
       }
       if (Math.random() < dt * 10 && level.surface(dog.x, dog.z, dog.y) === 'sand') burst(dog.x - Math.cos(dog.heading) * 0.3, dog.y + 0.1, dog.z - Math.sin(dog.heading) * 0.3, 0xcdb586, 2, 1.2, 1.5, 0.4);
+    } else {
+      digSfxCd = 0;
     }
     for (const m of level.mounds) if (m.dug) m.loot.rotation.y += dt * 2;
 

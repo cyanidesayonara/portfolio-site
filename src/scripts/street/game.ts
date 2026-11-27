@@ -88,7 +88,7 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   });
   let leash = ROPE_BASE;
   let heyT = 0;
-  let pee = 0.6, zoom = 1, barkCd = 0, marked = 0;
+  let pee = 0.6, zoom = 1, barkCd = 0, digSfxCd = 0, marked = 0;
   const goals = { mark: false, pigeons: false, dog: false, bones: false, bakery: false, booth: false, free: false };
   let offLeash = false, offT = 0, clippedInPark = false;
   let nature = 35, natureCalls = false;
@@ -642,6 +642,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     } else if (dog.dig && Math.random() < dt * 16) {
       spawnFx('dust', dog.x - Math.cos(dog.heading) * 9 + (Math.random() - 0.5) * 6, dog.y + 2, -Math.cos(dog.heading) * 20, -10 - Math.random() * 8, 0.32);
     }
+    if (dog.dig) {
+      digSfxCd -= dt;
+      if (digSfxCd <= 0) { sound.dig(); digSfxCd = 0.34 + Math.random() * 0.16; }
+    } else digSfxCd = 0;
     pushOut(dog, DOG_R);
     nearBone = null;
     for (const b of bones) if (!b.got && Math.hypot(b.x - dog.x, b.y - dog.y) < DOG_R + 16) nearBone = b;
