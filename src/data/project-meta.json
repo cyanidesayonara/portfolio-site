@@ -4,10 +4,10 @@
       "repo": "cyanidesayonara/path-of-leash-resistance",
       "defaultBranch": "main",
       "latestTag": "v1.78",
-      "latestCommitSha": "f893799",
+      "latestCommitSha": "c0528f3",
       "latestCommitDate": "2026-11-27",
-      "commits": 2295,
-      "mergedPrs": 660,
+      "commits": 2298,
+      "mergedPrs": 661,
       "walksTotal": 56,
       "mainWalks": 55,
       "bossCount": 5,
@@ -17,7 +17,7 @@
       "repo": "cyanidesayonara/stemma",
       "defaultBranch": "main",
       "latestTag": "v3.3.0",
-      "latestCommitSha": "cd03b2a",
+      "latestCommitSha": "5799219",
       "latestCommitDate": "2026-11-27"
     },
     "coriolis": {
@@ -38,7 +38,7 @@
       "repo": "cyanidesayonara/dop3pod",
       "defaultBranch": "master",
       "latestTag": null,
-      "latestCommitSha": "83bb940",
+      "latestCommitSha": "f5745a2",
       "latestCommitDate": "2026-11-27"
     }
   }
