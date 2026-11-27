@@ -34,6 +34,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'marina_boats', label: 'Stroll both marina pontoons', done: false, count: 0, target: 2, area: 'marina' },
     { id: 'marina_wake', label: 'Outrun the harbor boat wake on a pontoon', done: false, area: 'marina' },
     { id: 'marina_mico', label: 'Outsmart El Mico de Bronze at Moll de Ponent', done: false, area: 'marina' },
+    { id: 'gorg_quests', label: 'Help out around Canal i Galeria', done: false, count: 0, target: 3, area: 'gorg' },
+    { id: 'gorg_bridges', label: 'Cross both bridges over the canal', done: false, count: 0, target: 2, area: 'gorg' },
+    { id: 'gorg_carts', label: 'Dodge the runaway shopping carts at Galeria', done: false, area: 'gorg' },
     { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
     { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
@@ -111,6 +114,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
       if (goal('marina_boats').done) ['pontoonA', 'pontoonB'].forEach((k) => doneKeys.add(`marina:${k}`));
       if (goal('marina_wake').done) doneKeys.add('marina:wake');
       if (goal('marina_mico').done) doneKeys.add('marina:mico');
+      if (goal('gorg_quests').done) ['bag', 'hoop', 'tram'].forEach((k) => doneKeys.add(`gorg:${k}`));
+      if (goal('gorg_bridges').done) ['bridgeS', 'bridgeN'].forEach((k) => doneKeys.add(`gorg:${k}`));
+      if (goal('gorg_carts').done) doneKeys.add('gorg:carts');
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
       if (goal('plaza_castellers').done) doneKeys.add('plaza:castellers');
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));

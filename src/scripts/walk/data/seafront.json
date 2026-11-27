@@ -47,7 +47,14 @@
     { "id": "marinaPontoonB", "x0": -152, "x1": -148, "z0": -58, "z1": -18, "mapColor": "#a5794e" },
     { "id": "marinaBreakwater", "x0": -214, "x1": -206, "z0": -104, "z1": -26, "mapColor": "#b8b1a2" },
     { "id": "marinaBreakwaterArm", "x0": -214, "x1": -158, "z0": -104, "z1": -96, "mapColor": "#b8b1a2" },
-    { "id": "pipica4", "x0": -158, "x1": -144, "z0": -14, "z1": -4, "mapColor": "#9bc46a" }
+    { "id": "pipica4", "x0": -158, "x1": -144, "z0": -14, "z1": -4, "mapColor": "#9bc46a" },
+    { "id": "gorgGround", "x0": -222, "x1": -104, "z0": 14, "z1": 102, "mapColor": "#d6cec0" },
+    { "id": "gorgCanal", "x0": -178, "x1": -162, "z0": 14, "z1": 96, "mapColor": "#2d6a92" },
+    { "id": "gorgBridgeS", "x0": -178, "x1": -162, "z0": 20, "z1": 28, "mapColor": "#a5794e" },
+    { "id": "gorgBridgeN", "x0": -178, "x1": -162, "z0": 62, "z1": 70, "mapColor": "#a5794e" },
+    { "id": "gorgTram", "x0": -220, "x1": -104, "z0": 35.5, "z1": 38.5, "mapColor": "#638a55" },
+    { "id": "gorgCourt", "x0": -146, "x1": -124, "z0": 54, "z1": 74, "mapColor": "#3a73a8" },
+    { "id": "pipica5", "x0": -156, "x1": -142, "z0": 21, "z1": 31, "mapColor": "#9bc46a" }
   ],
   "districts": [
     {
@@ -81,7 +88,7 @@
     {
       "id": "rambla",
       "label": "The Rambla",
-      "bounds": { "x0": -155, "x1": 155, "z0": 4, "z1": 33.5 },
+      "bounds": { "x0": -104, "x1": 155, "z0": 4, "z1": 33.5 },
       "streets": [
         { "id": "rambla", "name": "La Rambla", "width": 20, "surface": "paving", "points": [[-92, 24], [92, 24]] },
         { "id": "underpass", "name": "Underpass", "width": 4, "surface": "paving", "points": [[0, -4], [0, 22]] }
@@ -102,7 +109,7 @@
     {
       "id": "town",
       "label": "Carrer del Mar",
-      "bounds": { "x0": -145, "x1": 145, "z0": 33.5, "z1": 101 },
+      "bounds": { "x0": -104, "x1": 145, "z0": 33.5, "z1": 101 },
       "streets": [
         { "id": "carrer-del-mar", "name": "Carrer del Mar", "width": 7, "surface": "paving", "points": [[0, 34], [0, 100]] },
         { "id": "side-a", "name": "Side street A", "width": 6, "surface": "paving", "points": [[-34, 53], [34, 53]] },
@@ -128,7 +135,7 @@
         { "x0": 20, "x1": 41, "z0": 92, "z1": 101, "floors": 5, "color": "#d9b48a", "roofColor": "#c2997a", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": true },
         { "x0": 41, "x1": 70, "z0": 34, "z1": 60, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z", "-x"], "groundFloor": true },
         { "x0": 70, "x1": 100, "z0": 34, "z1": 60, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
-        { "x0": -140, "x1": -95, "z0": 34, "z1": 60, "floors": 4, "color": "#e8d4a8", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -104, "x1": -95, "z0": 34, "z1": 60, "floors": 4, "color": "#e8d4a8", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
         { "x0": 100, "x1": 140, "z0": 34, "z1": 60, "floors": 4, "color": "#efe4cc", "roofColor": "#c2997a", "shutterColor": "#7a8a6a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
         { "x0": -95, "x1": -90, "z0": 34, "z1": 60, "floors": 3, "color": "#d9b48a", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "industrial", "faces": ["-z"], "groundFloor": false },
         { "x0": -42, "x1": -41, "z0": 34, "z1": 60, "floors": 3, "color": "#d9b48a", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "industrial", "faces": [], "groundFloor": false }
@@ -235,9 +242,34 @@
         { "id": "lighthouse", "kind": "landmark", "label": "Far del Port", "x": -162, "z": -100, "color": "#5eea8c" },
         { "id": "west-quay", "kind": "place", "label": "Moll de Ponent", "x": -197, "z": -12, "color": "#ffb020" }
       ]
+    },
+    {
+      "id": "gorg",
+      "label": "Canal i Galeria",
+      "bounds": { "x0": -226, "x1": -104, "z0": 14, "z1": 108 },
+      "streets": [
+        { "id": "canal-promenade", "name": "Passeig del Canal", "width": 10, "surface": "paving", "points": [[-183, 14], [-183, 96]] },
+        { "id": "tram-avenue", "name": "Avinguda del Tramvia", "width": 8, "surface": "paving", "points": [[-218, 37], [-104, 37]] },
+        { "id": "galeria-esplanade", "name": "Galeria del Canal", "width": 10, "surface": "paving", "points": [[-183, 44], [-183, 86]] }
+      ],
+      "blocks": [],
+      "pavilions": [],
+      "landmarks": [
+        { "id": "galeria", "label": "Galeria del Canal", "x0": -218, "x1": -188, "z0": 44, "z1": 86, "height": 11, "color": "#efe6d5", "roofColor": "#2b6e78" },
+        { "id": "pavello", "label": "Pavelló", "x0": -154, "x1": -120, "z0": 78, "z1": 98, "height": 12, "color": "#dce2e8", "roofColor": "#3d73c7" },
+        { "id": "tramstop", "label": "Parada Canal", "x0": -154, "x1": -142, "z0": 32.5, "z1": 35.2, "height": 3.4, "color": "#e8eef2", "roofColor": "#1fc9b7" }
+      ],
+      "pois": [
+        { "id": "canal", "kind": "place", "label": "Canal", "x": -170, "z": 24, "color": "#1fc9b7" },
+        { "id": "galeria", "kind": "landmark", "label": "Galeria", "x": -196, "z": 64, "color": "#ffb020" },
+        { "id": "pavello", "kind": "landmark", "label": "Pavelló", "x": -137, "z": 88, "color": "#3d73c7" },
+        { "id": "tram", "kind": "place", "label": "Tramvia", "x": -148, "z": 34, "color": "#5eea8c" },
+        { "id": "pipica5", "kind": "pipica", "label": "Pipicà", "x": -149, "z": 26, "color": "#8bcb3c" }
+      ]
     }
   ],
   "pipica2": { "x0": 7, "x1": 19.5, "z0": 125, "z1": 138.5, "gateZ0": 129.6, "gateZ1": 132.0 },
   "pipica3": { "x0": -25, "x1": -13, "z0": 197, "z1": 208, "gateZ0": 200.5, "gateZ1": 203.0 },
-  "pipica4": { "x0": -158, "x1": -144, "z0": -14, "z1": -4, "gateZ0": -10.2, "gateZ1": -7.8 }
+  "pipica4": { "x0": -158, "x1": -144, "z0": -14, "z1": -4, "gateZ0": -10.2, "gateZ1": -7.8 },
+  "pipica5": { "x0": -156, "x1": -142, "z0": 21, "z1": 31, "gateZ0": 24.8, "gateZ1": 27.2 }
 }
