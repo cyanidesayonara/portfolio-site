@@ -19,7 +19,7 @@ export interface TrafficStepEvents {
   passed: number;
 }
 
-/** Ambient trench traffic — visual only; no dog hits. */
+/** Ambient trench traffic — no dog hits; life layer may honk when vehicles loop. */
 export class TrafficState {
   vehicles: TrafficVehicle[] = [];
 

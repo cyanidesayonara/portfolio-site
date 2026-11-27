@@ -145,6 +145,7 @@ export function createRondaLife(ctx: RondaCtx) {
   const quests = { deck: false, bridge: false, fetch: false };
   let doneCount = 0;
   let crossedBridge = false;
+  let trafficHonkCd = 2.5;
 
   const finishQuest = (k: keyof typeof quests, msg: string, reward: number) => {
     if (quests[k]) return;
@@ -250,13 +251,19 @@ export function createRondaLife(ctx: RondaCtx) {
     });
     fetcher.animate(time + 2, { speed: 0, pose: 'stand' });
 
-    // Ambient trench traffic (visual only).
-    traffic.step(dt);
+    // Ambient trench traffic; occasional horn when a car loops past under the overpass.
+    const { passed } = traffic.step(dt);
     for (let i = 0; i < traffic.vehicles.length; i++) {
       const v = traffic.vehicles[i];
       const m = trafficMeshes[i];
       m.position.set(v.x, RONDA_TRENCH_Y + 0.05, v.z);
       m.rotation.y = v.dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+    }
+    trafficHonkCd -= dt;
+    if (trafficHonkCd <= 0 && passed > 0 && dog.z > 118 && dog.z < 142 && Math.random() < 0.4) {
+      const v = traffic.vehicles[Math.floor(Math.random() * traffic.vehicles.length)];
+      audio.honk({ x: v.x, z: v.z });
+      trafficHonkCd = 5 + Math.random() * 7;
     }
 
     // Bridge crossing goal.
@@ -521,6 +528,7 @@ export function createRondaLife(ctx: RondaCtx) {
       timid.group.rotation.y = -Math.PI / 2;
     }
     traffic.reset();
+    trafficHonkCd = 2.5;
     scooterRush.reset();
     for (const sm of scooterMeshes) sm.visible = false;
   };

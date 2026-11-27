@@ -1,11 +1,11 @@
 /*
-  Music and sound for the street, synthesized with Web Audio like Path of
-  Leash Resistance's own soundtrack: no audio files to download.
+  Music and sound for the street. Music is still synthesized (Andalusian
+  cadence loop). Effects reuse the same CC0 clips as the 3D walk
+  (public/audio/sfx; see CREDITS.md there), with synthesized fallbacks until
+  they load.
 
   Sound is off until the visitor turns it on (and browsers only allow an
-  AudioContext after a gesture anyway). The music is a light loop over the
-  Andalusian cadence (Am, G, F, E): plucked arpeggios, a walking bass and
-  soft hats.
+  AudioContext after a gesture anyway).
 */
 
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
@@ -27,12 +27,26 @@ const TUNE: (number | null)[][] = [
 const BPM = 104;
 const EIGHTH = 60 / BPM / 2;
 
+const STREET_SAMPLES = {
+  bark: ['bark-1', 'bark-2', 'bark-3', 'bark-4', 'bark-5'],
+  pee: ['pee'],
+  flutter: ['flutter-1', 'flutter-2'],
+  honk: ['honk-1', 'honk-2'],
+  bell: ['bell-1', 'bell-2'],
+  lap: ['lap-1', 'lap-2', 'lap-3', 'lap-4'],
+  dig: ['dig-1', 'dig-2', 'dig-3'],
+} as const;
+type StreetSampleGroup = keyof typeof STREET_SAMPLES;
+
 export class StreetSound {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private music: GainNode | null = null;
   private sfx: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  private samples = new Map<string, AudioBuffer>();
+  private samplesLoading = false;
+  private lastTake = new Map<StreetSampleGroup, string>();
   private timer = 0;
   private next = 0;
   private step = 0;
@@ -58,10 +72,49 @@ export class StreetSound {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   }
 
+  private async loadSamples(sfxBase = '/audio/sfx') {
+    if (this.samplesLoading || !this.ctx) return;
+    this.samplesLoading = true;
+    const c = this.ctx;
+    const names = new Set<string>(Object.values(STREET_SAMPLES).flat());
+    await Promise.all([...names].map(async (n) => {
+      try {
+        const res = await fetch(`${sfxBase}/${n}.mp3`);
+        if (!res.ok) return;
+        this.samples.set(n, await c.decodeAudioData(await res.arrayBuffer()));
+      } catch { /* keep synthesized fallback */ }
+    }));
+  }
+
+  /** Play a recorded take; returns false when the clip is not loaded yet. */
+  private sample(group: StreetSampleGroup, vol = 1, rate = 1, delay = 0): boolean {
+    const ctx = this.ctx;
+    if (!ctx || !this.on || !this.sfx) return false;
+    const takes = STREET_SAMPLES[group].filter((n) => this.samples.has(n));
+    if (!takes.length) return false;
+    const last = this.lastTake.get(group);
+    const pool = takes.length > 1 ? takes.filter((n) => n !== last) : takes;
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    this.lastTake.set(group, name);
+    const t = ctx.currentTime + delay;
+    const src = ctx.createBufferSource();
+    src.buffer = this.samples.get(name)!;
+    src.playbackRate.value = rate * (0.96 + Math.random() * 0.08);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol), t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.08, src.buffer.duration / src.playbackRate.value));
+    src.connect(g);
+    g.connect(this.sfx);
+    src.start(t);
+    return true;
+  }
+
   enable() {
     this.setup();
     this.on = true;
     void this.ctx!.resume();
+    void this.loadSamples();
     this.next = this.ctx!.currentTime + 0.1;
     this.step = 0;
     clearInterval(this.timer);
@@ -160,6 +213,7 @@ export class StreetSound {
 
   // ---- Effects --------------------------------------------------------------------------
   bark() {
+    if (this.sample('bark', 0.95)) return;
     const t = this.now();
     if (t < 0) return;
     this.tone(620, t, 0.11, 'sawtooth', 0.35, this.sfx!, 1800, 260);
@@ -167,11 +221,19 @@ export class StreetSound {
     this.tone(560, t + 0.13, 0.09, 'sawtooth', 0.25, this.sfx!, 1600, 280);
   }
   pee() {
+    if (this.sample('pee', 0.55)) return;
     const t = this.now();
     if (t < 0) return;
     this.hiss(t, 0.8, 0.05, 3200, 'bandpass', this.sfx!);
   }
+  dig() {
+    if (this.sample('dig', 0.8)) return;
+    const t = this.now();
+    if (t < 0) return;
+    for (let i = 0; i < 3; i++) this.hiss(t + i * 0.1, 0.08, 0.1, 500, 'lowpass', this.sfx!);
+  }
   bell() {
+    if (this.sample('bell', 0.6)) return;
     const t = this.now();
     if (t < 0) return;
     for (const dt of [0, 0.17]) {
@@ -180,6 +242,7 @@ export class StreetSound {
     }
   }
   honk() {
+    if (this.sample('honk', 0.6)) return;
     const t = this.now();
     if (t < 0) return;
     this.tone(370, t, 0.32, 'square', 0.09, this.sfx!, 1200);
@@ -216,11 +279,17 @@ export class StreetSound {
     this.tone(240, t, 0.18, 'square', 0.1, this.sfx!, 1400, 170);
   }
   slurp() {
+    if (this.sample('lap', 0.8)) {
+      this.sample('lap', 0.7, 1, 0.32);
+      this.sample('lap', 0.75, 1, 0.62);
+      return;
+    }
     const t = this.now();
     if (t < 0) return;
     for (let i = 0; i < 3; i++) this.tone(420 + i * 60, t + i * 0.09, 0.07, 'sine', 0.1, this.sfx!, 0, 700 + i * 80);
   }
   flutter() {
+    if (this.sample('flutter', 0.7)) return;
     const t = this.now();
     if (t < 0) return;
     for (let i = 0; i < 6; i++) this.hiss(t + i * 0.045, 0.04, 0.05, 2500, 'bandpass', this.sfx!);
