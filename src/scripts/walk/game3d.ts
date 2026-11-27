@@ -31,6 +31,8 @@ import { createMarinaLife, type MarinaItem } from './marinaLife';
 import { MARINA } from './marina';
 import { createGorgLife, type GorgItem } from './gorgLife';
 import { GORG } from './gorg';
+import { createRondaLife, type RondaItem } from './rondaLife';
+import { RONDA } from './ronda';
 import { createDimoniBoss } from './dimoniBoss';
 import { createTabalers } from './tabalers';
 import { bakeStatic, collapseRig } from './bake';
@@ -209,7 +211,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   const dog = {
     x: startDog.x, y: RAMBLA_Y, z: startDog.z, vx: 0, vz: 0, vy: 0, heading: startHeading,
-    onGround: true, planted: false, digging: false, peeing: 0, wet: 0, carrying: null as null | 'ball' | 'questBall' | PlazaItem | MarinaItem | GorgItem, zoom: 1,
+    onGround: true, planted: false, digging: false, peeing: 0, wet: 0, carrying: null as null | 'ball' | 'questBall' | PlazaItem | MarinaItem | GorgItem | RondaItem, zoom: 1,
     speed: 0, airStart: 0, stillTime: 0,
   };
   const human = {
@@ -370,6 +372,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   });
   let marina!: ReturnType<typeof createMarinaLife>;
   let gorg!: ReturnType<typeof createGorgLife>;
+  let ronda!: ReturnType<typeof createRondaLife>;
   let dimoniBoss!: ReturnType<typeof createDimoniBoss>;
   // Plaça del Mercat: its people, quests, Castellers tower, and the butcher (plazaLife.ts).
   const plaza = createPlazaLife({
@@ -387,7 +390,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
-    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !marina.busy() && !gorg.busy() && !dimoniBoss.active && !offLeash,
+    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !marina.busy() && !gorg.busy() && !ronda.busy() && !dimoniBoss.active && !offLeash,
     onHitDog: (vx, vz, vy = 2.0) => {
       dog.vx += vx;
       dog.vz += vz;
@@ -402,7 +405,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
-    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !dimoniBoss.active && !hill.busy() && !gorg.busy() && !offLeash,
+    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !dimoniBoss.active && !hill.busy() && !gorg.busy() && !ronda.busy() && !offLeash,
     onWet: () => { dog.wet = 1; },
     onHitDog: (vx, vz, vy = 2.0) => {
       dog.vx += vx;
@@ -417,7 +420,21 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
-    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !dimoniBoss.active && !hill.busy() && !marina.busy() && !offLeash,
+    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !dimoniBoss.active && !hill.busy() && !marina.busy() && !ronda.busy() && !offLeash,
+    onHitDog: (vx, vz, vy = 2.0) => {
+      dog.vx += vx;
+      dog.vz += vz;
+      dog.vy = Math.max(dog.vy, vy);
+      dog.onGround = false;
+    },
+  });
+  // Ronda i Parc: sunken highway trench, overpass, skate park, pipica 6 & delivery scooters.
+  ronda = createRondaLife({
+    scene, hud, audio, telegraphs, feel, dog, addBones, completeGoal, bumpGoal, burst,
+    onDone: markDone,
+    humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
+    offLeash: () => offLeash,
+    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !dimoniBoss.active && !hill.busy() && !marina.busy() && !gorg.busy() && !offLeash,
     onHitDog: (vx, vz, vy = 2.0) => {
       dog.vx += vx;
       dog.vz += vz;
@@ -459,6 +476,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hill.restore(doneKeys);
     marina.restore(doneKeys);
     gorg.restore(doneKeys);
+    ronda.restore(doneKeys);
     strays.restore(doneKeys);
   }
   // Cyclists on the Rambla bike lane.
@@ -523,7 +541,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     },
     onVictory: () => { fireworksT = 12; },
     fireworksT: () => fireworksT,
-    canStart: () => !chase && chaseCooldown <= 0 && !offLeash && !plaza.chasing() && !marina.busy() && !hill.busy() && !gorg.busy(),
+    canStart: () => !chase && chaseCooldown <= 0 && !offLeash && !plaza.chasing() && !marina.busy() && !hill.busy() && !gorg.busy() && !ronda.busy(),
   });
   const tabalers = createTabalers({
     scene,
@@ -544,7 +562,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       dog.vy = Math.max(dog.vy, vy);
       dog.onGround = false;
     },
-    busy: () => !!chase || offLeash || dimoniBoss.active || marina.busy() || hill.busy() || gorg.busy(),
+    busy: () => !!chase || offLeash || dimoniBoss.active || marina.busy() || hill.busy() || gorg.busy() || ronda.busy(),
   });
   if (doneKeys.size) {
     dimoniBoss.restore(doneKeys);
@@ -585,7 +603,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let chase: null | { kind: ChaseKind; t: number; speed: number } = null;
   let chaseCooldown = 0;
   const startChase = (kind: ChaseKind) => {
-    if (chase || chaseCooldown > 0 || offLeash || plaza.chasing() || marina.busy() || hill.busy() || gorg.busy() || dimoniBoss.active) return;
+    if (chase || chaseCooldown > 0 || offLeash || plaza.chasing() || marina.busy() || hill.busy() || gorg.busy() || ronda.busy() || dimoniBoss.active) return;
     chase = { kind, t: 0, speed: kind === 'neteja' ? 1.6 : 2.5 };
     if (kind === 'neteja') {
       hud.shout('LA NETEJA!', 'bad');
@@ -849,6 +867,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hill.bark();
     marina.bark();
     gorg.bark();
+    ronda.bark();
     strays.bark();
     if (chase?.kind === 'gulls' && gullThreat.active && gullThreat.t / gullThreat.dur > 0.42 && Math.hypot(dog.x - gullThreat.tx, dog.z - gullThreat.tz) < 5.5) {
       gullThreat.active = false;
@@ -897,6 +916,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (plaza.drop(fx, fz)) return;
       if (marina.drop(fx, fz)) return;
       if (gorg.drop(fx, fz)) return;
+      if (ronda.drop(fx, fz)) return;
       if (dog.carrying === 'questBall') {
         questBall.held = false;
         questBall.x = fx; questBall.z = fz;
@@ -924,6 +944,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (plaza.pickup()) return;
     if (marina.pickup()) return;
     if (gorg.pickup()) return;
+    if (ronda.pickup()) return;
     if (!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) { ball.held = true; dog.carrying = 'ball'; audio.pickup(); return; }
     if (!questBall.held && !questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9) {
       questBall.held = true; dog.carrying = 'questBall'; audio.pickup();
@@ -1133,6 +1154,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hill.reset();
     marina.reset();
     gorg.reset();
+    ronda.reset();
     dimoniBoss.reset();
     tabalers.reset();
     hud.banner('Back where we started', 'news');
@@ -1459,7 +1481,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         // Scared too: they keep right up with Millie.
         wantX = dx / d; wantZ = dz / d; speed = 3.2;
       }
-      if ((plaza.chasing() || marina.wakeActive() || hill.senglarsActive() || hill.mosaicActive() || gorg.cartsActive()) && d > 1.6) {
+      if ((plaza.chasing() || marina.wakeActive() || hill.senglarsActive() || hill.mosaicActive() || gorg.cartsActive() || ronda.scootersActive()) && d > 1.6) {
         // Hurry along behind Millie during active district threats & chases.
         wantX = dx / d; wantZ = dz / d; speed = 3.4;
       }
@@ -2074,6 +2096,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hill.update(dt, time);
     marina.update(dt, time);
     gorg.update(dt, time);
+    ronda.update(dt, time);
     strays.update(dt, time);
     tabalers.update(dt, time);
     dimoniBoss.update(dt, time);
@@ -2496,6 +2519,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     { const ml = marina.prompt(); if (ml) prompts.push(ml); }
     { const gp = gorg.prompt(); if (gp) prompts.push({ key: 'G', label: gp }); }
     { const gbp = gorg.barkPrompt(); if (gbp) prompts.push({ key: 'E', label: gbp }); }
+    { const rp = ronda.prompt(); if (rp) prompts.push({ key: 'G', label: rp }); }
+    { const rbp = ronda.barkPrompt(); if (rbp) prompts.push({ key: 'E', label: rbp }); }
     if (dog.carrying) prompts.push({ key: 'G', label: 'Drop' });
     { const dp = dimoniBoss.prompt(); if (dp) prompts.push(dp); }
     { const tp = tabalers.prompt(); if (tp) prompts.push(tp); }
@@ -2505,7 +2530,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) prompts.push({ key: 'E', label: 'Bark at the devils' });
     if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'gulls' ? 'Gavines! Dodge the dive rings or bark [E] as they swoop!' : 'Correfoc! Run for the underpass!';
     else if (dimoniBoss.active) banner = 'El Dimoni Gegant — soak in the waves, then bark [E] near the bonfire!';
-    else { const tb = marina.banner() ?? hill.banner() ?? gorg.banner(); if (tb) banner = tb; }
+    else { const tb = marina.banner() ?? hill.banner() ?? gorg.banner() ?? ronda.banner(); if (tb) banner = tb; }
     if (inTunnel && !banner) banner = 'Carrer del Mar ↔ the beach';
     if (offLeash && !banner) banner = 'Off the leash — run!';
     hud.banner(banner, 'prompt');
@@ -2565,6 +2590,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         if (!gq.bag) marks.push({ x: GORG.bagPos.x, z: GORG.bagPos.z, color: '#ffc93c', label: 'Bag', kind: 'quest' });
         if (!gq.hoop) marks.push({ x: GORG.ballPos.x, z: GORG.ballPos.z, color: '#ffc93c', label: 'Streetball', kind: 'quest' });
         if (!gq.tram) marks.push({ x: GORG.commuter.x, z: GORG.commuter.z, color: '#ffc93c', label: 'Tramvia', kind: 'quest' }); }
+      { const rq = ronda.quests();
+        if (!rq.deck) marks.push({ x: RONDA.deckPos.x, z: RONDA.deckPos.z, color: '#ffc93c', label: 'Skateboard', kind: 'quest' });
+        if (!rq.bridge) marks.push({ x: RONDA.timid.x, z: RONDA.timid.z, color: '#ffc93c', label: 'Overpass', kind: 'quest' });
+        if (!rq.fetch) marks.push({ x: RONDA.ballPos.x, z: RONDA.ballPos.z, color: '#ffc93c', label: 'Park fetch', kind: 'quest' }); }
       marks.push({ x: plaza.debug.butcher.x, z: plaza.debug.butcher.z, color: '#ff6b5a', label: 'Butcher', kind: 'threat' });
       marks.push({ x: sw.x, z: sw.z, color: '#5ab4ff', label: 'La Neteja', kind: 'threat' });
       marks.push({ x: cf.x, z: level.correfoc.z, color: '#ff8a2a', label: 'Correfoc', kind: 'threat' });
@@ -2690,6 +2719,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of marina.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of gorg.bubbles()) place(b.id, b.x, b.y, b.z);
+    for (const b of ronda.bubbles()) place(b.id, b.x, b.y, b.z);
 
     skySys.followTarget(camLook);
   };
@@ -2929,7 +2959,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       get offLeash() { return offLeash; },
       get dogSwimming() { return dogSwimming; },
       get humanSwimming() { return humanSwimming; },
-      plaza, hill, marina, gorg, strays,
+      plaza, hill, marina, gorg, ronda, strays,
       get mico() { return marina.debug.mico; },
       get wake() { return marina.debug.wake; },
       get mosaic() { return hill.debug.mosaic; },

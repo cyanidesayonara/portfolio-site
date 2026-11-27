@@ -349,11 +349,14 @@ function* buildGorgSteps(env: GorgEnv, d: District): Generator<void, void, void>
   ]), -156, Y, 30.8);
   addCircle(-156, 30.8, 0.14, Y + 3.4, 'pole', true, true);
 
-  // Outer borders: west wall (-220), north fence (100.5), east town edge (-104 north of Rambla).
+  // Outer borders: west wall (-220), north fence (100.5) with a gap toward Ronda, east town edge.
   for (let z = 16; z <= 98; z += 4) place(makeHeras(4.0), -220, Y, z, Math.PI / 2);
   addBox({ x0: -220.2, x1: -219.8, z0: 14, z1: 100.5, top: 9, kind: 'fence' });
-  for (let x = -218; x <= -106; x += 4) place(makeHeras(4.0), x, Y, 100.5, 0);
-  addBox({ x0: -220, x1: -104, z0: 100.3, z1: 100.7, top: 9, kind: 'fence' });
+  // Leave an open approach corridor around x = -165 for Phase 8 Ronda.
+  for (let x = -218; x <= -178; x += 4) place(makeHeras(4.0), x, Y, 100.5, 0);
+  for (let x = -150; x <= -106; x += 4) place(makeHeras(4.0), x, Y, 100.5, 0);
+  addBox({ x0: -220, x1: -178, z0: 100.3, z1: 100.7, top: 9, kind: 'fence' });
+  addBox({ x0: -152, x1: -104, z0: 100.3, z1: 100.7, top: 9, kind: 'fence' });
   for (let z = 62; z <= 98; z += 4) place(makeHeras(4.0), -104, Y, z, Math.PI / 2);
   addBox({ x0: -104.2, x1: -103.8, z0: 38.8, z1: 100.5, top: 9, kind: 'fence' });
 

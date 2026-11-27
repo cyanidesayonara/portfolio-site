@@ -24,6 +24,7 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
   - **Metro:** `/walk?via=metro` arrives at the head of the metro stairs; on the 2D street, `?via=metro&streettest` arrives across the road and `__street.teleport(1750, 375)` puts Millie at its stairs (Enter boards at once in test mode).
   - **Phase 5:** `area` (current goals area) and `strays` (`debug.cats`, `debug.scared`). `?walktest` starts with no saved progress and never saves; add `&walksave` to test saving.
   - **`hill`:** the Dalt de la Vila runtime (`hillLife.ts`): `quests()`, `bubbles()`, and `debug` (`bellRingT`, `miradorT`, `homeDone`, `pigeons`, `parkDog`).
+  - **`marina` / `gorg` / `ronda`:** district runtimes with `quests()`, `busy()`, pickup/drop/bark hooks, and chase debug. Boss/chase hooks: `mico`, `wake`, `dimoni`, `castellers`, `tabalers`, `mosaic`, `senglars`.
   - **Street camera keys:** the default camera looks out to sea, so `W` heads toward the sea (-Z) and `S` inland (+Z); `A` is -X, `D` is +X.
   - **`addTestDistrict()`:** a streamable district far off the map (x 400–460) for exercising build, bake and unload through `streamer.update(x, z)`.
 - **Stress test:** previous sessions used a snippet that drives Millie with random keys from many spots and checks for NaNs, leaving the bounds and safety "hops" (`debug.hops`). It isn't saved in the repo; rebuild it from the `__walk` API above. For routes, a small steering helper works well: each 5 frames, hold `KeyW`/`KeyS`/`KeyA`/`KeyD` toward the next waypoint, `tick(5)`, and log `dog.x/z/y`.
@@ -57,6 +58,16 @@ For the next agent picking up the 3D "Path of Leash Resistance" walk on Santtu's
 | `hud.ts`, `audio.ts`, `theme.ts`, `textures.ts` | HUD DOM, Web Audio (stemma jukebox stems; recorded CC0 effects from `public/audio/sfx` with positional panning, distance falloff and synth fallback; `N` skips songs), day/rain/night presets, procedural canvas textures. |
 | `transit.ts` | Animated R1 commuter-train loading cutscene and sliding-door reveal connecting the 2D street `Estació` stop to 3D `Estació` and back (`?via=train`), plus the metro's own ride (an L2-style car through the tunnel into an underground platform) and its walk-down-the-stairs departure (`?via=metro`). |
 | `metro.ts` | The metro entrance at the west end of the Rambla, placed from `metro` in `data/seafront.json`: an open stairwell cut into the Rambla's slabs (`groundAroundMetro()`), stairs down to a lit landing, railings and glass, a lintel and a totem. Signs only say "Metro" and "L2"; the real station stays unnamed. A railing collider keeps Millie at the head, where the `metro` stop links to the 2D street's metro entrance (across the road from its `Estació`). |
+| `marinaGeom.ts`, `marina.ts`, `marinaLife.ts` | Phase 6: El Port / Marina as a streamable western harbor (`makeMarinaDistrict()`): stone quays, canal footbridge to Moll de Ponent, pontoons, breakwater lighthouse (Far del Port), fourth pipicà. Runtime: buoy / gull / playmate quests, El Mico de Bronze boss (`micoLogic.ts`, `micoBoss.ts`), Harbor Boat Wake Surge chase (`wakeLogic.ts`). |
+| `gorgGeom.ts`, `gorg.ts`, `gorgLogic.ts`, `gorgLife.ts` | Phase 7: Canal i Galeria / Gorg west of the Rambla (`x: -104 .. -220`, `z: 14 .. 102`): turquoise canal & twin bridges, Mediterranean tramway (Parada Canal), Galeria del Canal arcade, Pista streetball + Pavelló, fifth pipicà (Nala), bag/hoop/tram quests, Runaway Shopping Carts chase (`CartRushState`). |
+| `rondaGeom.ts`, `ronda.ts`, `rondaLogic.ts`, `rondaLife.ts` | Phase 8: Ronda i Parc north of Gorg (`x: -226 .. -104`, `z: 108 .. 196`): sunken highway trench with ambient traffic, Pont de vianants overpass, urban park + skate ramp, sixth pipicà, deck/bridge/fetch quests, runaway delivery scooters chase (`ScooterRushState`). |
+| `telegraph.ts`, `hud.ts` (boss bar) | Shared telegraph pool / feel state for boss and chase telegraphs. `Hud.setBoss` shows a boss bar; call sites guard `setBoss(null)` with a `wasBossBarOn` flag so dormant bosses never clear another boss's bar. |
+| `dimoniLogic.ts`, `dimoniBoss.ts` | Boss #2: El Dimoni Gegant on the beach. |
+| `castellersLogic.ts`, `castellers.ts` | Interactive Plaça Castellers tower on Plaça del Mercat. |
+| `tabalersLogic.ts`, `tabalers.ts` | Marching Rambla Tabalers drum squad (`audio.drum`). |
+| `mosaicLogic.ts`, `mosaicBoss.ts` | Boss #3: Roman Mosaic Guardian outside Museu on Dalt de la Vila. |
+| `senglarsLogic.ts`, `senglars.ts` | Chase #2: Senglars wild boars down the cobbled hill. |
+| `booths.ts` | Boardwalk pavilion live screens (Coriolis, Eat Prey Nap, dopepod, stemma) plus Leash booth 2D/3D mirror and booth Tofu. |
 
 `src/scripts/viewport.ts` sizes both games' window-filling fullscreen mode from `visualViewport`. `src/components/Walk3D.astro` holds the markup, toolbar, panels and all HUD CSS, and lazy-loads `game3d`. `src/pages/walk.astro` is the page. The home page (`src/pages/index.astro`) still uses the 2D `StreetMap.astro`.
 
@@ -78,6 +89,9 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 | 3 | done (`fcc520f`) | Plaça del Mercat north of Carrer del Mar: a square with a fountain, a market hall, a second pipicà, Carrer Major (shopping street), three quests (newspaper, terrace, fetch) and the botifarra chase. Generic Catalan look for now; refine from reference photos later. Two goals added (14 in all). |
 | 4 | done (merged in PR #4) | Terrain (`HeightGrid`, sloped streets, two stone stairways, upper ramp) and Dalt de la Vila (`hill.ts`, `hillLife.ts`): `Museu`, third pipicà, `Església` & always-visible `Campanar` landmark, Mirador overlook, generic wooden Home door, two new goals (16 in all). Verified in `?walktest` (routes, quests, pipicà, stress test, unloading); see the measured costs below. |
 | 5 | done (merged in PR #7) | Goals grouped by area (`progress.ts` `AREAS`: seafront, Rambla and Carrer del Mar, Plaça del Mercat, Dalt de la Vila, anywhere); the goals card shows the area Millie is in, the others summed up, and finishing an area pays +5 bones. Progress (goals, partial counts, bones) is saved in `localStorage` (`walk3d-progress-v1`) with a reset button beside the open goals card. More life: stray cats on the hill (`strays.ts`, a new `cats` goal, 17 goals in all) and pigeons circling the bell tower. |
+| 6 | done (merged in PR #20) | Streamable Marina & Breakwater (`marinaGeom.ts`, `marina.ts`, `marinaLife.ts`): quays, pontoons, Far del Port, fourth pipicà, three marina quests. Follow-ups: boardwalk Leash booth mirror & lighting (PR #22); Boss #1 El Mico de Bronze + Chase #1 Harbor Boat Wake Surge (PR #23); Boss #2 El Dimoni Gegant, Plaça Castellers, Rambla Tabalers (PR #24); Boss #3 Roman Mosaic Guardian + Chase #2 Senglars (PR #25). |
+| 7 | done (merged in PR #26) | Streamable Canal i Galeria / Gorg west of the Rambla: turquoise canal & twin bridges, tramway, Galeria arcade, Pista + Pavelló, fifth pipicà (Nala), three quests, Runaway Shopping Carts chase. |
+| 8 | in progress (`feat/walk-phase8-ronda`) | Streamable Ronda i Parc north of Gorg: sunken highway trench with ambient cars/buses, Pont de vianants overpass, urban park + skate ramp, sixth pipicà, three quests (skateboard, timid walker, park fetch), runaway delivery scooters chase. |
 
 **Measured costs (headless SwiftShader `?walktest`):**
 - **Build:** ~1.5 s total build time (`LEVEL_STEPS = 53`), longest single step ~54 ms (`Districts`). Streaming slices stay ~0.2 ms at rest and ~1.5 ms max step when streaming `addTestDistrict()`.
@@ -94,7 +108,7 @@ Squeezing distances (roughly a quarter scale) and skipping side streets is fine.
 3. **Plaça del Mercat and Dalt de la Vila reference pass:** reference photos for the real squares and streets, and maybe a market interior.
 4. **Sounds still synthesized:** digging, peeing, wing flutter, fireworks. The car horn clips exist (`honk-*`) but nothing honks in 3D yet. `howl` and `whine` are loaded but unused. A Freesound login would find CC0 versions quickly.
 5. **Share the audio findings with the real Path of Leash Resistance game:** sources and processing are in `public/audio/sfx/CREDITS.md`.
-6. **Next phases:** more of the town (toward the harbor, the shopping center and the inland highway, per the expansion plan), each district with its own pipicà, quests and goals area in `progress.ts`.
+6. **Next phases:** optional east expansion beyond `x = 92` (residential/commercial avenue east of Estació); continuous texture, lighting, NPC animation and booth polish while keeping spawn draw calls `<= 770`. Metro relocation deeper inland once the map reaches the real station area.
 
 ## Polish backlog (from Santtu's playtesting)
 

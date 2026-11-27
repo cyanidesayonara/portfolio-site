@@ -110,6 +110,7 @@ export interface TownLayout {
   pipica3: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pipica4: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pipica5?: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
+  pipica6?: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pier: { x0: number; x1: number; root: number; rise: number; end: number; high: number };
   ramps: number[];
   tracks: number[];

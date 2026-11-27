@@ -37,6 +37,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'gorg_quests', label: 'Help out around Canal i Galeria', done: false, count: 0, target: 3, area: 'gorg' },
     { id: 'gorg_bridges', label: 'Cross both bridges over the canal', done: false, count: 0, target: 2, area: 'gorg' },
     { id: 'gorg_carts', label: 'Dodge the runaway shopping carts at Galeria', done: false, area: 'gorg' },
+    { id: 'ronda_quests', label: 'Help out around Ronda i Parc', done: false, count: 0, target: 3, area: 'ronda' },
+    { id: 'ronda_bridge', label: 'Cross the Pont de vianants overpass', done: false, area: 'ronda' },
+    { id: 'ronda_scooters', label: 'Dodge the runaway delivery scooters on the Ronda', done: false, area: 'ronda' },
     { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
     { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
@@ -117,6 +120,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
       if (goal('gorg_quests').done) ['bag', 'hoop', 'tram'].forEach((k) => doneKeys.add(`gorg:${k}`));
       if (goal('gorg_bridges').done) ['bridgeS', 'bridgeN'].forEach((k) => doneKeys.add(`gorg:${k}`));
       if (goal('gorg_carts').done) doneKeys.add('gorg:carts');
+      if (goal('ronda_quests').done) ['deck', 'bridge', 'fetch'].forEach((k) => doneKeys.add(`ronda:${k}`));
+      if (goal('ronda_bridge').done) doneKeys.add('ronda:bridgeCross');
+      if (goal('ronda_scooters').done) doneKeys.add('ronda:scooters');
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
       if (goal('plaza_castellers').done) doneKeys.add('plaza:castellers');
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));
