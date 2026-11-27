@@ -35,10 +35,11 @@ The leash is real rope. The one you see is the one doing the physics: it wraps p
 
 ## What's in it
 
-- **Walks in and around Barcelona**, from La Rambla and El Gòtic to Montjuïc, Sitges, Girona and Montserrat, plus a tutorial that teaches one trick at a time. Each walk can be played in any weather, by day or at night.
-- **Chases and statue bosses**, from a street sweeper at dawn to El Drac, the mosaic salamander.
-- **A choice of dogs**, each with a knack and skill goal of her own, plus buried finds, training, collars, bandanas and coats.
+- **Fifty-five main walks across five chapters**, plus a First Walk tutorial, from La Rambla and El Gòtic out to Sitges, Girona, Montserrat and new stops such as Rambla del Poblenou, Les Tres Xemeneies, Fira de Santa Llúcia and Santa Coloma. Each walk can be played in any weather, by day or at night.
+- **Ten chase walks and five statue bosses**, from La Neteja's dawn sweeper to El Mamut, El Drac, Els Lleons, La Lleona and El Gat.
+- **Seven dogs**, each with a knack and skill goal of her own, plus buried finds, training, collars, bandanas and coats.
 - **Dares and combo tricks**: swing round a pole, grind a ledge, fling your human, or take a dare for its own tune.
+- **Per-action control rebinding** for keyboard, gamepad buttons, sticks and triggers, with automatic Xbox and PlayStation prompt detection.
 - **English, Catalan and Spanish**, with adjustable screen shake, flashes, text size and controls.
 - No ads, no purchases, no account. Plays offline.
 

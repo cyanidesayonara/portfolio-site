@@ -137,8 +137,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const boothScreens = createBoardwalkBoothScreens({
     catSim,
     podSim,
-    commits: polrMeta?.commits ?? 2242,
-    mainWalks: polrMeta?.mainWalks ?? 51,
+    commits: polrMeta?.commits ?? 2295,
+    mainWalks: polrMeta?.mainWalks ?? 55,
     blogTitles,
   });
 
