@@ -747,7 +747,7 @@ export const UI: Record<Locale, UiDictionary> = {
     },
     home: {
       eyebrow: 'Desarrollador full-stack generalista',
-      headline: 'Solo código.',
+      headline: 'Just coding.',
       lede:
         'Soy Santtu, desarrollador generalista y consultor en Gofore. Llevo años escribiendo software a mano y ahora también construyo con agentes de IA bajo el mismo listón: planificado de antemano, probado y revisado antes de publicar nada. Las pruebas automáticas y CI vigilan las regresiones mientras la jugabilidad se afina probando cada partida, con un resultado tan fiable como cualquier código que haya escrito línea a línea.',
       ctaProjects: 'Ver los proyectos',
@@ -1145,7 +1145,7 @@ export const UI: Record<Locale, UiDictionary> = {
     },
     home: {
       eyebrow: 'Desenvolupador full-stack generalista',
-      headline: 'Només codi.',
+      headline: 'Just coding.',
       lede:
         "Soc en Santtu, desenvolupador generalista i consultor a Gofore. Fa anys que escric programari a mà i ara també construeixo amb agents d'IA sota el mateix llistó: planificat per endavant, provat i revisat abans de publicar res. Les proves automàtiques i CI vigilen les regressions mentre el tacte s'afina jugant-hi, amb un resultat tan fiable com qualsevol codi que hagi escrit línia per línia.",
       ctaProjects: 'Veure els projectes',

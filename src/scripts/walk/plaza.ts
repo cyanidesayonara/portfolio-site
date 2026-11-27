@@ -181,15 +181,16 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   builder.addBox(0.3, Y + 0.9, MK.z0 + 0.4, 1.7, Y + 1.55, MK.z0 + 1.6, 0x2f6b4f);
   builder.addBox(-1.2, Y + 1.55, MK.z0 + 0.5, 1.2, Y + 2.1, MK.z0 + 1.4, 0xd8cdb8);
   // Three round upper windows (center wider), like the loft openings of local masies.
+  // Kept high enough that the MERCAT sign sits cleanly between the door and the windows.
   const winGlass = M(glass, 0.35, 0.1);
   const winRing = M(stone, 0.85);
   for (const [cx, r] of [[-5.6, 1.15], [0, 1.55], [5.6, 1.15]] as [number, number][]) {
     const ring = cyl(r, r, 0.18, winRing, 18);
     ring.rotation.x = Math.PI / 2;
-    place(ring, cx, Y + 6.6, MK.z0 - 0.08);
+    place(ring, cx, Y + 7.35, MK.z0 - 0.08);
     const pane = cyl(r - 0.22, r - 0.22, 0.14, winGlass, 16);
     pane.rotation.x = Math.PI / 2;
-    place(pane, cx, Y + 6.6, MK.z0 - 0.1);
+    place(pane, cx, Y + 7.35, MK.z0 - 0.1);
   }
   // Wavy parapet: stepped cream coping across the front.
   for (const [x0, x1, h] of [
@@ -214,8 +215,8 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   }
   for (const x of [MK.x0, MK.x1 - 0.5]) builder.addBox(x, Y, MK.z0 - 0.15, x + 0.5, Y + 8.4, MK.z0 + 0.2, stone);
   addBox({ x0: MK.x0, x1: MK.x1, z0: MK.z0, z1: MK.z1, top: Y + 12, kind: 'building' });
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.2, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('MERCAT', 'Market hall', '#e5487a', { aspect: 6 }), roughness: 0.7 }));
-  place(sign, 0, Y + 7.85, MK.z0 - 0.12);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.0, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('MERCAT', 'Market hall', '#e5487a', { aspect: 6 }), roughness: 0.7 }));
+  place(sign, 0, Y + 5.45, MK.z0 - 0.12);
   yield;
 
   // ---- The butcher's stall (west) and produce/flower stall (east) out front ----

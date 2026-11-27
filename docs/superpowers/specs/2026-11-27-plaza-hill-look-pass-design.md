@@ -6,9 +6,7 @@ Replace the home punchline and tighten Plaça del Mercat and Dalt de la Vila so 
 
 ## Headline
 
-- EN: `Just coding.`
-- ES: `Solo código.`
-- CA: `Només codi.`
+- All locales: `Just coding.` (kept in English on purpose).
 - Leave the home lede as-is; it already explains the agent workflow.
 
 ## Look pass (layout and quests unchanged)
