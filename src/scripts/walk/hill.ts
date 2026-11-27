@@ -348,9 +348,11 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   yield;
 
   // ---- Església & Campanar (hilltop square, base at TOP_Y) ----
+  // Ochre nave and pale stone portal matched to the public look of the hilltop
+  // parish church. No saints, reliefs, or town name on screen.
   const CH = HILL.church;
-  const wallCol = 0xe6dcc6, trimCol = 0xd6cab4, roofCol = 0xb2563a;
-  // Main limestone nave.
+  const wallCol = 0xd2a66a, trimCol = 0xe8dfc8, roofCol = 0xb2563a, pale = 0xf2ebe0;
+  // Main ochre nave.
   builder.addBox(CH.x0, TOP_Y, CH.z0, CH.x1, TOP_Y + 13.6, CH.z1, wallCol);
   builder.addBox(CH.x0 - 0.25, TOP_Y + 13.6, CH.z0 - 0.25, CH.x1 + 0.25, TOP_Y + 14.2, CH.z1 + 0.25, trimCol);
   builder.addBox(CH.x0 + 0.8, TOP_Y + 14.2, CH.z0 + 0.4, CH.x1 - 0.8, TOP_Y + 15.6, CH.z1 - 0.4, roofCol);
@@ -359,9 +361,11 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   for (const px of [CH.x0, -4.2, 3.6, CH.x1 - 0.6]) {
     builder.addBox(px, TOP_Y, CH.z0 - 0.16, px + 0.6, TOP_Y + 13.6, CH.z0 + 0.1, trimCol);
   }
-  builder.addBox(-2.2, TOP_Y, CH.z0 - 0.08, 2.2, TOP_Y + 4.4, CH.z0 + 0.04, 0x3f2b1d);
-  builder.addBox(-2.6, TOP_Y + 4.4, CH.z0 - 0.18, 2.6, TOP_Y + 5.0, CH.z0 + 0.04, trimCol);
-  builder.addBox(-2.8, TOP_Y, CH.z0 - 0.65, 2.8, TOP_Y + 0.18, CH.z0, trimCol); // church stone threshold step
+  // Pale stone portal surround around the dark wooden door.
+  builder.addBox(-3.05, TOP_Y, CH.z0 - 0.22, 3.05, TOP_Y + 5.35, CH.z0 - 0.06, pale);
+  builder.addBox(-2.2, TOP_Y + 0.05, CH.z0 - 0.08, 2.2, TOP_Y + 4.4, CH.z0 + 0.04, 0x3f2b1d);
+  builder.addBox(-2.6, TOP_Y + 4.4, CH.z0 - 0.18, 2.6, TOP_Y + 5.0, CH.z0 + 0.04, pale);
+  builder.addBox(-2.8, TOP_Y, CH.z0 - 0.65, 2.8, TOP_Y + 0.18, CH.z0, pale); // church stone threshold step
   // Stone cross finial crowning the nave gable.
   builder.addBox(-0.14, TOP_Y + 16.8, CH.z0 + 0.9, 0.14, TOP_Y + 18.4, CH.z0 + 1.18, trimCol);
   builder.addBox(-0.55, TOP_Y + 17.65, CH.z0 + 0.92, 0.55, TOP_Y + 17.92, CH.z0 + 1.16, trimCol);
@@ -394,17 +398,28 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   place(roseGlass, 0, TOP_Y + 9.4, CH.z0 - 0.11);
   addBox({ x0: CH.x0, x1: CH.x1, z0: CH.z0, z1: CH.z1, top: TOP_Y + 17, kind: 'building' });
 
-  // Bell tower (Campanar) rising on the church's front-east corner.
+  // Bell tower (Campanar): square shaft, irregular octagon upper, tile cupola.
   const tx0 = 5.0, tx1 = 10.5, tz0 = 232.0, tz1 = 237.5, txMid = (tx0 + tx1) / 2, tzMid = (tz0 + tz1) / 2;
-  builder.addBox(tx0, TOP_Y, tz0, tx1, TOP_Y + 19.0, tz1, 0xdfd3ba);
+  const towerStone = 0xdfd3ba;
+  builder.addBox(tx0, TOP_Y, tz0, tx1, TOP_Y + 19.0, tz1, towerStone);
   builder.addBox(tx0 - 0.15, TOP_Y + 18.8, tz0 - 0.15, tx1 + 0.15, TOP_Y + 19.3, tz1 + 0.15, trimCol);
-  // Belfry corner piers leaving open arches for the bell.
-  for (const [px0, px1] of [[tx0, tx0 + 1.2], [tx1 - 1.2, tx1]]) {
-    for (const [pz0, pz1] of [[tz0, tz0 + 1.2], [tz1 - 1.2, tz1]]) {
-      builder.addBox(px0, TOP_Y + 19.3, pz0, px1, TOP_Y + 23.6, pz1, 0xdfd3ba);
-    }
+  // Irregular octagon belfry (8-sided cylinder) with open arches and a balustrade.
+  const octBody = new THREE.Mesh(new THREE.CylinderGeometry(2.95, 3.15, 5.2, 8), M(towerStone, 0.9));
+  place(octBody, txMid, TOP_Y + 21.9, tzMid);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    const wx = txMid + Math.cos(a) * 2.85, wz = tzMid + Math.sin(a) * 2.85;
+    const opening = box(0.95, 2.4, 0.18, M(0x1d2433, 0.85));
+    place(opening, wx, TOP_Y + 21.6, wz, -a + Math.PI / 2);
   }
-  builder.addBox(tx0 - 0.2, TOP_Y + 23.6, tz0 - 0.2, tx1 + 0.2, TOP_Y + 24.4, tz1 + 0.2, trimCol);
+  builder.addBox(tx0 - 0.35, TOP_Y + 24.5, tz0 - 0.35, tx1 + 0.35, TOP_Y + 24.85, tz1 + 0.35, trimCol);
+  // Balustrade posts around the terrace.
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const bx = txMid + Math.cos(a) * 3.35, bz = tzMid + Math.sin(a) * 3.35;
+    builder.addBox(bx - 0.08, TOP_Y + 24.85, bz - 0.08, bx + 0.08, TOP_Y + 25.55, bz + 0.08, pale);
+  }
+  builder.addBox(tx0 - 0.55, TOP_Y + 25.55, tz0 - 0.55, tx1 + 0.55, TOP_Y + 25.72, tz1 + 0.55, pale);
   // Clock face on the south tower face.
   const clockDial = cyl(1.0, 1.0, 0.14, M(0xf4efe4, 0.7), 16);
   clockDial.rotation.x = Math.PI / 2;
@@ -413,13 +428,14 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   const belfryLamp = box(2.4, 2.6, 2.4, mats.lampGlass);
   belfryLamp.userData.dynamic = true;
   place(belfryLamp, txMid, TOP_Y + 21.4, tzMid);
-  // Pyramidal terracotta spire & iron finial cross.
-  const spire = new THREE.Mesh(new THREE.ConeGeometry(4.1, 4.4, 4), M(roofCol, 0.85));
-  spire.rotation.y = Math.PI / 4;
-  place(spire, txMid, TOP_Y + 26.6, tzMid);
+  // Small octagonal lantern + reddish glazed-tile cupola (reads from the beach).
+  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.55, 2.2, 8), M(towerStone, 0.9));
+  place(lantern, txMid, TOP_Y + 26.85, tzMid);
+  const cupola = new THREE.Mesh(new THREE.SphereGeometry(1.85, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0xa33c2e, 0.55, 0.15));
+  place(cupola, txMid, TOP_Y + 27.95, tzMid);
   const ironM = mats.iron;
-  place(box(0.1, 2.0, 0.1, ironM), txMid, TOP_Y + 29.6, tzMid);
-  place(box(1.1, 0.1, 0.1, ironM), txMid, TOP_Y + 30.1, tzMid);
+  place(box(0.1, 1.4, 0.1, ironM), txMid, TOP_Y + 29.3, tzMid);
+  place(box(0.85, 0.1, 0.1, ironM), txMid, TOP_Y + 29.7, tzMid);
   addBox({ x0: tx0, x1: tx1, z0: tz0, z1: tz1, top: TOP_Y + 30, kind: 'building' });
   yield;
 
@@ -543,25 +559,25 @@ export function makeChurchLandmark(): THREE.Group {
   };
   // Hillside green-ochre plinth beneath the hilltop so the church never floats from afar.
   part(72, TOP_Y - 0.12, 30, 0, (TOP_Y - 0.12) / 2, 233, 0x7a8564);
-  // Church nave + terracotta roof + tall bell tower + pyramidal spire.
-  part(20, 14, 14, 0, TOP_Y + 7, 239, 0xe6dcc6);
+  // Ochre nave + terracotta roof + square shaft + octagon belfry + tile cupola.
+  part(20, 14, 14, 0, TOP_Y + 7, 239, 0xd2a66a);
   part(18.4, 2.2, 13.2, 0, TOP_Y + 15.1, 239, 0xb2563a);
-  part(5.5, 24.4, 5.5, 7.75, TOP_Y + 12.2, 234.75, 0xdfd3ba);
+  part(5.5, 19.2, 5.5, 7.75, TOP_Y + 9.6, 234.75, 0xdfd3ba);
+  part(6.2, 5.4, 6.2, 7.75, TOP_Y + 21.9, 234.75, 0xdfd3ba);
 
-  const spireGeo = new THREE.ConeGeometry(4.1, 4.4, 4);
-  spireGeo.rotateY(Math.PI / 4);
-  const spireBase = new THREE.Color(0xb2563a);
-  const spireMat = new THREE.MeshBasicMaterial({ color: 0xb2563a, fog: false });
-  const spire = new THREE.Mesh(spireGeo, spireMat);
-  spire.position.set(7.75, TOP_Y + 26.6, 234.75);
-  spire.onBeforeRender = (_r, scene) => {
+  const cupolaGeo = new THREE.SphereGeometry(1.9, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  const cupolaBase = new THREE.Color(0xa33c2e);
+  const cupolaMat = new THREE.MeshBasicMaterial({ color: 0xa33c2e, fog: false });
+  const cupola = new THREE.Mesh(cupolaGeo, cupolaMat);
+  cupola.position.set(7.75, TOP_Y + 27.9, 234.75);
+  cupola.onBeforeRender = (_r, scene) => {
     const fog = scene.fog as THREE.Fog | null;
-    spireMat.color.copy(spireBase);
-    if (fog) spireMat.color.lerp(fog.color, haze);
+    cupolaMat.color.copy(cupolaBase);
+    if (fog) cupolaMat.color.lerp(fog.color, haze);
   };
-  spire.userData.always = true;
-  spire.userData.dynamic = true;
-  g.add(spire);
+  cupola.userData.always = true;
+  cupola.userData.dynamic = true;
+  g.add(cupola);
 
   g.userData.always = true;
   g.userData.dynamic = true;

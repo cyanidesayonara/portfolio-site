@@ -349,7 +349,7 @@ export const UI: Record<Locale, UiDictionary> = {
     },
     home: {
       eyebrow: 'Generalist full-stack developer',
-      headline: 'Vibe coding, minus the vibes.',
+      headline: 'Just coding.',
       lede:
         "I'm Santtu, a generalist developer and consultant at Gofore. I've spent years building software by hand, and now I build with AI agents too, held to the same standard: planned up front, tested, and reviewed before anything ships. Automated tests and CI catch regressions while feel is tuned through playtesting, giving an end result as reliable as anything I've written line by line.",
       ctaProjects: 'See the projects',
@@ -747,7 +747,7 @@ export const UI: Record<Locale, UiDictionary> = {
     },
     home: {
       eyebrow: 'Desarrollador full-stack generalista',
-      headline: 'Vibe coding, sin vibras.',
+      headline: 'Just coding.',
       lede:
         'Soy Santtu, desarrollador generalista y consultor en Gofore. Llevo años escribiendo software a mano y ahora también construyo con agentes de IA bajo el mismo listón: planificado de antemano, probado y revisado antes de publicar nada. Las pruebas automáticas y CI vigilan las regresiones mientras la jugabilidad se afina probando cada partida, con un resultado tan fiable como cualquier código que haya escrito línea a línea.',
       ctaProjects: 'Ver los proyectos',
@@ -1145,7 +1145,7 @@ export const UI: Record<Locale, UiDictionary> = {
     },
     home: {
       eyebrow: 'Desenvolupador full-stack generalista',
-      headline: 'Vibe coding, sense vibes.',
+      headline: 'Just coding.',
       lede:
         "Soc en Santtu, desenvolupador generalista i consultor a Gofore. Fa anys que escric programari a mà i ara també construeixo amb agents d'IA sota el mateix llistó: planificat per endavant, provat i revisat abans de publicar res. Les proves automàtiques i CI vigilen les regressions mentre el tacte s'afina jugant-hi, amb un resultat tan fiable com qualsevol codi que hagi escrit línia per línia.",
       ctaProjects: 'Veure els projectes',
