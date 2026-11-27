@@ -15,8 +15,10 @@ import { makePerson, makeBird, M, box, cyl } from './models';
 import { collapseRig } from './bake';
 import { PLAZA, inPlazaPipica } from './plaza';
 import { GROUND_Y, type Level } from './level';
+import { createCastellers } from './castellers';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';
+import type { FeelState } from './telegraph';
 
 export type PlazaItem = 'paper' | 'frisbee' | 'botifarra';
 export const isPlazaItem = (c: string | null): c is PlazaItem => c === 'paper' || c === 'frisbee' || c === 'botifarra';
@@ -41,6 +43,7 @@ export interface PlazaCtx {
   /** Tell the game a chase is over (starts the shared cooldown). */
   chaseEnded: () => void;
   collide: (p: P, r: number, feetY: number) => void;
+  feel?: FeelState;
 }
 
 const Y = GROUND_Y;
@@ -234,6 +237,20 @@ export function createPlazaLife(ctx: PlazaCtx) {
     audio.whoosh(1.2);
   };
 
+  const castellers = createCastellers({
+    addObject: add,
+    groundY: Y,
+    hud,
+    audio,
+    feel: ctx.feel,
+    dog,
+    humanSay: ctx.humanSay,
+    addBones: ctx.addBones,
+    completeGoal: ctx.completeGoal,
+    onDone: ctx.onDone,
+    burst: ctx.burst,
+  });
+
   // ---- Per-frame ---------------------------------------------------------------------
   let clock = 0;
   let regularPose: 'stand' | 'walk' = 'stand';
@@ -242,6 +259,7 @@ export function createPlazaLife(ctx: PlazaCtx) {
     for (const k in saidT) saidT[k] -= dt;
     const near = dist(dog, PLAZA.center) < VIEW || chase !== null;
     for (const o of all) o.visible = near;
+    castellers.update(dt, time, near);
     if (!near) return;
 
     // People idling.
@@ -416,8 +434,9 @@ export function createPlazaLife(ctx: PlazaCtx) {
     return true;
   };
 
-  /** E: barking at the terrace pigeons from outside the tables clears them for good. */
+  /** E: barking at Castellers or at the terrace pigeons from outside the tables. */
   const bark = () => {
+    castellers.bark();
     if (quests.terrace) return;
     if (dist(dog, terraceCenter) > 8 || !pigeons.some((p) => p.fly <= 0 && !p.gone)) return;
     if (inTerrace(dog.x, dog.z)) {
@@ -446,6 +465,7 @@ export function createPlazaLife(ctx: PlazaCtx) {
     boti.held = false; boti.onCounter = true; boti.restockT = 0;
     paper.held = false; paper.x = PLAZA.paper.x; paper.z = PLAZA.paper.z;
     fris.held = false; fris.flight = null; fris.inHand = true; fris.throwT = 0.8;
+    castellers.reset();
   };
 
   const restore = (doneKeys: ReadonlySet<string>) => {
@@ -462,13 +482,16 @@ export function createPlazaLife(ctx: PlazaCtx) {
       quests.fetch = true;
       fris.count = Math.max(fris.count, 3);
     }
+    castellers.restore(doneKeys);
     done = Number(quests.paper) + Number(quests.terrace) + Number(quests.fetch);
   };
 
   return {
-    update, pickup, drop, bark, prompt, reset, restore,
+    update, pickup, drop, bark, prompt,
+    barkPrompt: () => castellers.prompt(),
+    reset, restore,
     chasing: () => chase !== null,
-    quests: () => ({ ...quests }),
+    quests: () => ({ ...quests, castellers: castellers.state.toppledOnce }),
     bubbles: () => [
       { id: 'vendor', x: vendor.group.position.x, y: Y + 2.1, z: vendor.group.position.z },
       { id: 'grandpa', x: PLAZA.grandpa.x, y: Y + 1.6, z: PLAZA.grandpa.z },
@@ -476,9 +499,10 @@ export function createPlazaLife(ctx: PlazaCtx) {
       { id: 'florist', x: PLAZA.florist.x, y: Y + 2.1, z: PLAZA.florist.z },
       { id: 'regular', x: PLAZA.regular.x, y: Y + 2.1, z: PLAZA.regular.z },
       { id: 'butcher', x: butcher.x, y: Y + 2.2, z: butcher.z },
+      { id: 'casteller', x: castellers.anchor.x, y: Y + 2.0, z: castellers.anchor.z },
     ],
     /** For tests. */
-    debug: { butcher, boti, fris, paper, pigeons },
+    debug: { butcher, boti, fris, paper, pigeons, castellers },
   };
 }
 

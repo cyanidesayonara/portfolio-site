@@ -29,6 +29,8 @@ import { createHillLife } from './hillLife';
 import { HILL } from './hill';
 import { createMarinaLife, type MarinaItem } from './marinaLife';
 import { MARINA } from './marina';
+import { createDimoniBoss } from './dimoniBoss';
+import { createTabalers } from './tabalers';
 import { bakeStatic, collapseRig } from './bake';
 import { DirectBuilder } from './meshbuilder';
 import { applyNearFade, fadeUniforms } from './fade';
@@ -364,9 +366,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     collide: (p, r, y) => collide(p, r, y),
     onFriend: (name) => { addBones(1); hud.shout('NEW FRIEND', 'good'); humanSay(`Aww, hi ${name}!`, 1.6); },
   });
-  // Plaça del Mercat: its people, quests and the butcher (plazaLife.ts).
+  let dimoniBoss!: ReturnType<typeof createDimoniBoss>;
+  // Plaça del Mercat: its people, quests, Castellers tower, and the butcher (plazaLife.ts).
   const plaza = createPlazaLife({
-    scene, level, hud, audio, dog, human, addBones, completeGoal, bumpGoal, burst,
+    scene, level, hud, audio, feel, dog, human, addBones, completeGoal, bumpGoal, burst,
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
@@ -388,7 +391,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
-    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !offLeash,
+    canStartThreat: () => !chase && chaseCooldown <= 0 && !plaza.chasing() && !dimoniBoss.active && !offLeash,
     onWet: () => { dog.wet = 1; },
     onHitDog: (vx, vz, vy = 2.0) => {
       dog.vx += vx;
@@ -462,13 +465,65 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     scene.add(collapseRig(d.person.group));
     return { ...d, id: `dv${i}`, x: level.correfoc.x0 + (i % 3) * 1.4, z: level.correfoc.z - 2 + Math.floor(i / 3) * 3 + (i % 2) * 0.8, ox: (i % 3) * 1.4, oz: -2 + Math.floor(i / 3) * 3 + (i % 2) * 0.8 };
   });
-  // The Dimoni's own devils: hidden until it burns, then they come for Millie.
+  // The Dimoni's own devils: hidden until the boss wakes or celebrates.
   const beachDevils = Array.from({ length: 3 }, (_, i) => {
     const d = makeDevil();
     scene.add(collapseRig(d.person.group));
     d.person.group.visible = false;
     return { ...d, id: `bd${i}`, x: level.dimoni.x, z: level.dimoni.z, heading: 0, flank: (i - 1) * 1.6 };
   });
+  dimoniBoss = createDimoniBoss({
+    scene,
+    hud,
+    audio,
+    telegraphs,
+    feel,
+    dog,
+    dimoni: level.dimoni,
+    devils: beachDevils,
+    waterY: WATER_Y,
+    floor: (x, z, y) => level.floor(x, z, y),
+    humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
+    addBones,
+    completeGoal,
+    onDone: markDone,
+    burst,
+    consumeWet: () => { dog.wet = 0; },
+    onHitDog: (vx, vz, vy = 2.0) => {
+      dog.vx += vx;
+      dog.vz += vz;
+      dog.vy = Math.max(dog.vy, vy);
+      dog.onGround = false;
+    },
+    onVictory: () => { fireworksT = 12; },
+    fireworksT: () => fireworksT,
+    canStart: () => !chase && chaseCooldown <= 0 && !offLeash && !plaza.chasing() && !marina.busy(),
+  });
+  const tabalers = createTabalers({
+    scene,
+    groundY: GROUND_Y,
+    hud,
+    audio,
+    telegraphs,
+    feel,
+    dog,
+    humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
+    addBones,
+    completeGoal,
+    onDone: markDone,
+    burst,
+    onHitDog: (vx, vz, vy = 1.9) => {
+      dog.vx += vx;
+      dog.vz += vz;
+      dog.vy = Math.max(dog.vy, vy);
+      dog.onGround = false;
+    },
+    busy: () => !!chase || offLeash || dimoniBoss.active || marina.busy(),
+  });
+  if (doneKeys.size) {
+    dimoniBoss.restore(doneKeys);
+    tabalers.restore(doneKeys);
+  }
   const swoopGulls = Array.from({ length: 3 }, (_, i) => {
     const b = makeBird('gull');
     b.group.scale.setScalar(1.25);
@@ -478,7 +533,6 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   });
   const gullThreat = { wave: 0, active: false, tx: 0, tz: 0, t: 0, dur: 0.85, dodged: 0, cd: 0, sx: 0, sz: 0 };
   const correfocRing = { active: false, x: 0, z: 0, t: 0, dur: 0.85, cd: 1.0 };
-  const devilRing = { active: false, x: 0, z: 0, t: 0, dur: 0.85, cd: 1.2 };
   const drummers = [0, 1].map((i) => {
     const p = makePerson({ top: 0x8a2f2c, trousers: 0x2a1a1a, hair: 0x1a1010, hairStyle: 'short', prop: 'none' });
     const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), M(0xc9a26b, 0.6));
@@ -501,30 +555,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
 
   // Chases (the real game's threat grid): La Neteja is slow and scares only
   // you, so your human dawdles; the correfoc is fast and scares you both.
-  type ChaseKind = 'neteja' | 'correfoc' | 'dimoni' | 'gulls';
+  type ChaseKind = 'neteja' | 'correfoc' | 'gulls';
   let chase: null | { kind: ChaseKind; t: number; speed: number } = null;
   let chaseCooldown = 0;
   const startChase = (kind: ChaseKind) => {
-    if (chase || chaseCooldown > 0 || offLeash || plaza.chasing() || marina.busy()) return;
-    chase = { kind, t: 0, speed: kind === 'neteja' ? 1.6 : kind === 'dimoni' ? 2.0 : 2.5 };
+    if (chase || chaseCooldown > 0 || offLeash || plaza.chasing() || marina.busy() || dimoniBoss.active) return;
+    chase = { kind, t: 0, speed: kind === 'neteja' ? 1.6 : 2.5 };
     if (kind === 'neteja') {
       hud.shout('LA NETEJA!', 'bad');
       hud.say('sweeper', 'Fora, gos!', 1.6, 'loud');
       hud.toast('Chase', 'Drag your human to the Rambla or into a side street', '#ff6b5a');
       audio.honk({ x: sw.x, z: sw.z });
-    } else if (kind === 'dimoni') {
-      hud.shout('CREMADA!', 'loud');
-      humanSay('They\'re coming for us!', 1.8, 'loud');
-      hud.toast('Chase', 'The Dimoni\'s devils are out: get into the sea or get well away', '#ff4a3d');
-      devilRing.active = false; devilRing.cd = 1.0;
-      beachDevils.forEach((bd, i) => {
-        // They burst out from behind the fence on the far side of the fire.
-        const away = Math.atan2(level.dimoni.z - dog.z, level.dimoni.x - dog.x);
-        const a = away + (i - 1) * 0.9;
-        bd.x = level.dimoni.x + Math.cos(a) * 6.4; bd.z = level.dimoni.z + Math.sin(a) * 6.4;
-        bd.person.group.visible = true;
-        hud.say(bd.id, pickOne(['Foc!', 'Visca!', 'Corre!']), 1.4, 'loud');
-      });
     } else if (kind === 'gulls') {
       hud.shout('GAVINES!', 'loud');
       humanSay('Watch out for the gulls!', 1.8, 'loud');
@@ -550,15 +591,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       swoopGulls.forEach((sg) => { sg.group.visible = false; });
     }
     if (kind === 'correfoc') correfocRing.active = false;
-    if (kind === 'dimoni') devilRing.active = false;
     if (won) {
       if (kind === 'gulls') {
         hud.shout('SCATTERED!', 'good');
         addBones(6);
         completeGoal('gulls');
       } else {
-        hud.shout(kind === 'neteja' ? 'ESCAPED!' : kind === 'dimoni' ? 'COOLED OFF!' : 'SAFE!', 'good');
-        addBones(kind === 'neteja' ? 5 : kind === 'dimoni' ? 7 : 6);
+        hud.shout(kind === 'neteja' ? 'ESCAPED!' : 'SAFE!', 'good');
+        addBones(kind === 'neteja' ? 5 : 6);
         completeGoal(kind);
       }
       feel.kick(0.18);
@@ -810,12 +850,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       { const g = birds.find((b) => b.kind === 'gull' && b.fly > 5.9); if (g) audio.gull({ x: g.x, z: g.z }); }
       completeGoal('birds');
     }
-    if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) {
-      fireworksT = 14;
-      audio.firework({ x: level.dimoni.x, z: level.dimoni.z });
-      if (!chase && chaseCooldown <= 0 && !offLeash) startChase('dimoni');
-      else hud.shout('CREMADA!', 'loud');
-    }
+    dimoniBoss.bark();
+    tabalers.bark();
     if (!chase && Math.hypot(dog.x - level.fishBucket.x, dog.z - level.fishBucket.z) < 5) startChase('gulls');
     if (!chase && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) startChase('neteja');
     if (!chase && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) startChase('correfoc');
@@ -1067,6 +1103,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     plaza.reset();
     hill.reset();
     marina.reset();
+    dimoniBoss.reset();
+    tabalers.reset();
     hud.banner('Back where we started', 'news');
   };
   let departing = false;
@@ -1387,9 +1425,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (holdStill) speed = 0;
       if (humanSwimming) speed = Math.min(speed, HUMAN_SWIM_SPEED);
       if (chase?.kind === 'neteja') { wantX = 0; wantZ = 0; speed = 0; human.state = 'phone'; human.stateT = 0.5; }
-      if (chase?.kind === 'dimoni' && d > 1.6) {
+      if (dimoniBoss.active && d > 1.6) {
         // Scared too: they keep right up with Millie.
-        wantX = dx / d; wantZ = dz / d; speed = 3.1;
+        wantX = dx / d; wantZ = dz / d; speed = 3.2;
       }
       if ((plaza.chasing() || marina.wakeActive()) && d > 1.6) {
         // Hurry along behind Millie when chased in the plaza or outrunning a boat wake.
@@ -2005,6 +2043,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hill.update(dt, time);
     marina.update(dt, time);
     strays.update(dt, time);
+    tabalers.update(dt, time);
+    dimoniBoss.update(dt, time);
     for (const w of walkers) {
       if (w.saidT > 0) w.saidT -= dt;
       const wVis = Math.hypot(w.x - dog.x, w.z - dog.z) < 52;
@@ -2187,44 +2227,6 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     } else if (cf.x < level.correfoc.x0) {
       cf.x = Math.min(level.correfoc.x0, cf.x + dt * 3);
     }
-    // The Dimoni's devils hunt Millie across the beach; the sea puts them off.
-    const hunting = chase?.kind === 'dimoni';
-    if (hunting && chase) {
-      chase.t += dt;
-      chase.speed = Math.min(3.6, chase.speed + dt * 0.18);
-      telegraphs.beacon(clamp(dog.x, -40, 44), WATER_Y + 0.05, -58.5, 3.2, time, 0x1fc9b7);
-      if (devilRing.active) {
-        devilRing.t += dt;
-        const fill = devilRing.t / devilRing.dur;
-        const dy = level.floor(devilRing.x, devilRing.z, 0);
-        telegraphs.ring(devilRing.x, dy + 0.05, devilRing.z, 1.65, fill, 0xff4a3d);
-        if (fill >= 1) {
-          devilRing.active = false;
-          devilRing.cd = 1.5;
-          burst(devilRing.x, dy + 0.3, devilRing.z, 0xff7a2a, 18, 2.6, 2.4, 0.5, 4);
-          feel.kick(0.22);
-          if (inRing(dog.x, dog.z, devilRing.x, devilRing.z, 1.65) || inRing(human.x, human.z, devilRing.x, devilRing.z, 1.65)) {
-            endChase(false);
-          } else if (Math.hypot(dog.x - devilRing.x, dog.z - devilRing.z) < 4.0) {
-            hud.shout('DODGED! +2', 'good');
-            addBones(2);
-          }
-        }
-      } else {
-        devilRing.cd -= dt;
-        if (devilRing.cd <= 0 && beachDevils.some((bd) => Math.hypot(bd.x - dog.x, bd.z - dog.z) < 4.8)) {
-          devilRing.active = true;
-          devilRing.t = 0;
-          devilRing.x = dog.x + dog.vx * 0.25;
-          devilRing.z = clamp(dog.z + dog.vz * 0.25, -56.5, -20.5);
-        }
-      }
-      const wet = level.surface(dog.x, dog.z, dog.y) === 'water';
-      const far = Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) > 34;
-      const caught = beachDevils.some((bd) => [dog, human].some((p) => Math.hypot(p.x - bd.x, p.z - bd.z) < 1.0));
-      if (caught) endChase(false);
-      else if (wet || far || chase.t > 26) endChase(true);
-    }
     // Gavines: swooping pier gulls telegraph dive rings and can be counter-barked mid-dive.
     if (chase?.kind === 'gulls') {
       chase.t += dt;
@@ -2296,13 +2298,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         }
       }
     }
+    const hunting = dimoniBoss.active;
     for (const bd of beachDevils) {
       if (!bd.person.group.visible) continue;
       let tx: number, tz: number, sp: number;
-      if (hunting && chase) {
+      if (hunting) {
         // Aim a little ahead of Millie, fanned out so they close in from the sides.
         const px = -Math.sin(dog.heading) * bd.flank, pz = Math.cos(dog.heading) * bd.flank;
-        tx = dog.x + dog.vx * 0.4 + px; tz = dog.z + dog.vz * 0.4 + pz; sp = chase.speed;
+        tx = dog.x + dog.vx * 0.4 + px; tz = dog.z + dog.vz * 0.4 + pz; sp = dimoniBoss.devilSpeed();
       } else {
         // Back to the bonfire, dancing around it while it burns.
         const a = time * 0.8 + bd.flank;
@@ -2411,10 +2414,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         fireworks.push({ x: fx, y: 0, z: fz, t: 0, color: pickOne([0xff4a3d, 0xffb020, 0x5eea8c, 0x1fc9b7, 0xe5487a, 0xffffff]) });
         audio.firework({ x: fx, z: fz });
       }
-    } else {
+    } else if (!dimoniBoss.active) {
       level.dimoni.glow.intensity = skySys.getMode() === 'night' ? 2 : 0;
       // Rebuilt for next year (instantly; it's a game).
-      level.dimoni.figure.position.y = 1.3; level.dimoni.figure.rotation.z = 0;
+      level.dimoni.figure.position.y = 1.3; level.dimoni.figure.rotation.z = 0; level.dimoni.figure.rotation.y = 0;
     }
     for (let i = fireworks.length - 1; i >= 0; i--) {
       const f = fireworks[i];
@@ -2456,15 +2459,18 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (!panels.coriolisFocus && !panels.catFocus && !panels.podOpen && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
     if (!dog.carrying && ((!ball.held && Math.hypot(ball.x - dog.x, ball.z - dog.z) < 0.9) || (!questBall.done && Math.hypot(questBall.x - dog.x, questBall.z - dog.z) < 0.9))) prompts.push({ key: 'G', label: 'Pick up' });
     { const pl = plaza.prompt(); if (pl) prompts.push({ key: 'G', label: pl }); }
+    { const bp = plaza.barkPrompt(); if (bp) prompts.push({ key: 'E', label: bp }); }
     { const hl = hill.prompt(); if (hl) prompts.push(hl); }
     { const ml = marina.prompt(); if (ml) prompts.push(ml); }
     if (dog.carrying) prompts.push({ key: 'G', label: 'Drop' });
-    if (Math.hypot(dog.x - level.dimoni.x, dog.z - level.dimoni.z) < 7 && fireworksT <= 0) prompts.push({ key: 'E', label: 'Bark at the Dimoni' });
+    { const dp = dimoniBoss.prompt(); if (dp) prompts.push(dp); }
+    { const tp = tabalers.prompt(); if (tp) prompts.push(tp); }
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - level.fishBucket.x, dog.z - level.fishBucket.z) < 5) prompts.push({ key: 'E', label: 'Raid the fish bucket' });
     if (chase?.kind === 'gulls' && gullThreat.active && gullThreat.t / gullThreat.dur > 0.35) prompts.push({ key: 'E', label: 'Counter-bark!' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - sw.x, dog.z - sw.z) < 7) prompts.push({ key: 'E', label: 'Bark at La Neteja' });
     if (!chase && chaseCooldown <= 0 && Math.hypot(dog.x - cf.x, dog.z - level.correfoc.z) < 9) prompts.push({ key: 'E', label: 'Bark at the devils' });
-    if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'dimoni' ? 'The devils are out! Into the sea!' : chase.kind === 'gulls' ? 'Gavines! Dodge the dive rings or bark [E] as they swoop!' : 'Correfoc! Run for the underpass!';
+    if (chase) banner = chase.kind === 'neteja' ? 'La Neteja is coming — get clear!' : chase.kind === 'gulls' ? 'Gavines! Dodge the dive rings or bark [E] as they swoop!' : 'Correfoc! Run for the underpass!';
+    else if (dimoniBoss.active) banner = 'El Dimoni Gegant — soak in the waves, then bark [E] near the bonfire!';
     else { const mb = marina.banner(); if (mb) banner = mb; }
     if (inTunnel && !banner) banner = 'Carrer del Mar ↔ the beach';
     if (offLeash && !banner) banner = 'Off the leash — run!';
@@ -2481,6 +2487,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         { x: 70, z: -28, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
         { x: 13, z: 131, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
         { x: 0, z: 145, color: '#e5487a', label: 'Mercat', kind: 'place' },
+        { x: 0, z: 127, color: '#e5487a', label: 'Castellers', kind: 'place' },
         { x: -48, z: -66, color: '#c9a26b', label: 'Old pier', kind: 'place' },
         { x: 0, z: 9, color: '#f4f1ea', label: 'Underpass', kind: 'place' },
         { x: 0, z: 62, color: '#f4f1ea', label: 'Carrer del Mar', kind: 'place' },
@@ -2493,6 +2500,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         { x: -151, z: -9, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
         { x: MARINA.lighthouse.x, z: MARINA.lighthouse.z, color: '#5eea8c', label: 'Far del Port', kind: 'place' },
         { x: -197, z: -12, color: '#ffb020', label: 'El Mico', kind: 'threat' },
+        { x: tabalers.state.x, z: tabalers.state.z, color: '#e5487a', label: 'Tabalers', kind: 'threat' },
       );
       if (!quest.ball) marks.push({ x: Q.kid.x, z: Q.kid.z - 1, color: '#ffc93c', label: 'Lost ball', kind: 'quest' });
       if (!quest.tofu) marks.push({ x: tofu.x, z: tofu.z, color: '#ffc93c', label: 'Tofu', kind: 'quest' });
@@ -2627,6 +2635,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     place('grocer', Q.grocer.x, RAMBLA_Y + 2.1, Q.grocer.z);
     place('baker', Q.baker.x, RAMBLA_Y + 2.1, Q.baker.z);
     place('sweeper', sw.x, RAMBLA_Y + 2.8, sw.z);
+    place('dimoni', level.dimoni.x, level.floor(level.dimoni.x, level.dimoni.z, 0) + 4.8, level.dimoni.z);
+    place('tabalers', tabalers.state.x, GROUND_Y + 2.2, tabalers.state.z);
     for (const w of walkers) place(w.id, w.x, w.m.group.position.y + 2.1, w.z);
     for (const r of riders) place(`r${r.x | 0}`, r.x, 2.3, r.z);
     for (const b of life.bubbles()) place(b.id, b.x, b.y, b.z);
@@ -2875,6 +2885,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       plaza, hill, marina, strays,
       get mico() { return marina.debug.mico; },
       get wake() { return marina.debug.wake; },
+      dimoni: dimoniBoss,
+      get castellers() { return plaza.debug.castellers; },
+      tabalers,
       get area() { return goalSys.getArea(); },
       get whirl() { return whirl; },
       get camMode() { return camMode; },
