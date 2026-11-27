@@ -166,22 +166,22 @@
         { "id": "alley-e", "name": "Market alley E", "width": 6, "surface": "paving", "points": [[17, 139], [17, 155]] }
       ],
       "blocks": [
-        { "x0": -41, "x1": -20, "z0": 101, "z1": 119, "floors": 5, "color": "#e9cf9a", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
-        { "x0": -41, "x1": -20, "z0": 119, "z1": 155, "floors": 4, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+x", "+z"], "groundFloor": true },
-        { "x0": 20, "x1": 41, "z0": 101, "z1": 119, "floors": 4, "color": "#dcd2bd", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-x"], "groundFloor": true },
-        { "x0": 20, "x1": 41, "z0": 119, "z1": 155, "floors": 5, "color": "#f0c27a", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "+z"], "groundFloor": true },
-        { "x0": -62, "x1": -41, "z0": 139, "z1": 155, "floors": 4, "color": "#e6dcc6", "roofColor": "#b2563a", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
-        { "x0": 41, "x1": 62, "z0": 139, "z1": 155, "floors": 3, "color": "#d9705a", "roofColor": "#9a8a78", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
-        { "x0": -62, "x1": -30, "z0": 161, "z1": 173, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
-        { "x0": -30, "x1": -3, "z0": 161, "z1": 173, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
-        { "x0": 3, "x1": 30, "z0": 161, "z1": 173, "floors": 4, "color": "#e8d4a8", "roofColor": "#c2997a", "shutterColor": "#2a5aa8", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
-        { "x0": 30, "x1": 62, "z0": 161, "z1": 173, "floors": 4, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#5f7a5a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
-        { "x0": -70, "x1": -62, "z0": 139, "z1": 173, "floors": 4, "color": "#d8cdb6", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
-        { "x0": 62, "x1": 70, "z0": 139, "z1": 173, "floors": 4, "color": "#d8cdb6", "roofColor": "#9a8a78", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true }
+        { "x0": -41, "x1": -20, "z0": 101, "z1": 119, "floors": 5, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
+        { "x0": -41, "x1": -20, "z0": 119, "z1": 155, "floors": 4, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["+x", "+z"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 101, "z1": 119, "floors": 4, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#2f5a3a", "facadeStyle": "rambla", "faces": ["-x"], "groundFloor": true },
+        { "x0": 20, "x1": 41, "z0": 119, "z1": 155, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "+z"], "groundFloor": true },
+        { "x0": -62, "x1": -41, "z0": 139, "z1": 155, "floors": 4, "color": "#f2ebe0", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
+        { "x0": 41, "x1": 62, "z0": 139, "z1": 155, "floors": 3, "color": "#d9b48a", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["+z"], "groundFloor": true },
+        { "x0": -62, "x1": -30, "z0": 161, "z1": 173, "floors": 4, "color": "#efe4cc", "roofColor": "#b88566", "shutterColor": "#2f5a3a", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -30, "x1": -3, "z0": 161, "z1": 173, "floors": 5, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+        { "x0": 3, "x1": 30, "z0": 161, "z1": 173, "floors": 4, "color": "#e8d4a8", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-z", "+z"], "groundFloor": true },
+        { "x0": 30, "x1": 62, "z0": 161, "z1": 173, "floors": 4, "color": "#eadcc0", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "rambla", "faces": ["-z"], "groundFloor": true },
+        { "x0": -70, "x1": -62, "z0": 139, "z1": 173, "floors": 4, "color": "#efe4cc", "roofColor": "#b88566", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
+        { "x0": 62, "x1": 70, "z0": 139, "z1": 173, "floors": 4, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true }
       ],
       "pavilions": [],
       "landmarks": [
-        { "id": "market", "label": "Mercat", "x0": -14, "x1": 14, "z0": 139, "z1": 151, "height": 10, "color": "#c98f6a", "roofColor": "#6f7d84" }
+        { "id": "market", "label": "Mercat", "x0": -14, "x1": 14, "z0": 139, "z1": 151, "height": 10, "color": "#efe4cc", "roofColor": "#b2563a" }
       ],
       "pois": [
         { "id": "plaza", "kind": "street", "label": "Plaça del Mercat", "x": 0, "z": 112, "color": "#f4f1ea" },
@@ -203,20 +203,20 @@
         { "id": "hill-square", "name": "Plaça de l'Església", "width": 48, "surface": "paving", "points": [[0, 218], [0, 236]] }
       ],
       "blocks": [
-        { "x0": -42, "x1": -22, "z0": 173, "z1": 184, "floors": 4, "baseY": 0, "color": "#e8d4a8", "roofColor": "#b88566", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
-        { "x0": 22, "x1": 42, "z0": 173, "z1": 184, "floors": 4, "baseY": 0, "color": "#e3a48a", "roofColor": "#9a6a55", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true },
-        { "x0": -40, "x1": -26, "z0": 196, "z1": 212, "floors": 3, "baseY": 5.08, "color": "#efe4cc", "roofColor": "#a87561", "shutterColor": "#7a8a6a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": false },
-        { "x0": 30, "x1": 42, "z0": 196, "z1": 212, "floors": 3, "baseY": 5.08, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": false },
-        { "x0": -36, "x1": -24, "z0": 218, "z1": 236, "floors": 3, "baseY": 10.38, "color": "#e6dcc6", "roofColor": "#b2563a", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": false },
-        { "x0": 24, "x1": 36, "z0": 218, "z1": 236, "floors": 3, "baseY": 10.38, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#4f6f7a", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
-        { "x0": -36, "x1": -10.5, "z0": 236, "z1": 248, "floors": 3, "baseY": 10.38, "color": "#dcd2bd", "roofColor": "#b88566", "shutterColor": "#6b5a48", "facadeStyle": "catalan", "faces": ["-z", "+x"], "groundFloor": false },
-        { "x0": 10.5, "x1": 36, "z0": 236, "z1": 248, "floors": 3, "baseY": 10.38, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#5f7a5a", "facadeStyle": "catalan", "faces": ["-z", "-x"], "groundFloor": false }
+        { "x0": -42, "x1": -22, "z0": 173, "z1": 184, "floors": 4, "baseY": 0, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": true },
+        { "x0": 22, "x1": 42, "z0": 173, "z1": 184, "floors": 4, "baseY": 0, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x"], "groundFloor": true },
+        { "x0": -40, "x1": -26, "z0": 196, "z1": 212, "floors": 3, "baseY": 5.08, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x"], "groundFloor": false },
+        { "x0": 30, "x1": 42, "z0": 196, "z1": 212, "floors": 3, "baseY": 5.08, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": false },
+        { "x0": -36, "x1": -24, "z0": 218, "z1": 236, "floors": 3, "baseY": 10.38, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": false },
+        { "x0": 24, "x1": 36, "z0": 218, "z1": 236, "floors": 3, "baseY": 10.38, "color": "#d2a66a", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
+        { "x0": -36, "x1": -10.5, "z0": 236, "z1": 248, "floors": 3, "baseY": 10.38, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-z", "+x"], "groundFloor": false },
+        { "x0": 10.5, "x1": 36, "z0": 236, "z1": 248, "floors": 3, "baseY": 10.38, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-z", "-x"], "groundFloor": false }
       ],
       "pavilions": [],
       "landmarks": [
         { "id": "museu", "label": "Museu", "x0": 16, "x1": 30, "z0": 196, "z1": 210, "height": 9.5, "baseY": 5.08, "color": "#dfc8a2", "roofColor": "#a85c42" },
-        { "id": "church", "label": "Església", "x0": -10, "x1": 10, "z0": 232, "z1": 246, "height": 14, "baseY": 10.38, "alwaysVisible": true, "color": "#e6dcc6", "roofColor": "#b2563a" },
-        { "id": "belltower", "label": "Campanar", "x0": 5, "x1": 10.5, "z0": 232, "z1": 237.5, "height": 25, "baseY": 10.38, "alwaysVisible": true, "color": "#dfd3ba", "roofColor": "#a85c42" }
+        { "id": "church", "label": "Església", "x0": -10, "x1": 10, "z0": 232, "z1": 246, "height": 14, "baseY": 10.38, "alwaysVisible": true, "color": "#d2a66a", "roofColor": "#b2563a" },
+        { "id": "belltower", "label": "Campanar", "x0": 5, "x1": 10.5, "z0": 232, "z1": 237.5, "height": 25, "baseY": 10.38, "alwaysVisible": true, "color": "#dfd3ba", "roofColor": "#a33c2e" }
       ],
       "pois": [
         { "id": "museu", "kind": "landmark", "label": "Museu", "x": 23, "z": 203, "color": "#ffb020" },

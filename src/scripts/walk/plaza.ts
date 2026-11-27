@@ -139,24 +139,70 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   while (!blocks.next().done) yield;
   for (const b of boxes) grid.addBox(b);
 
-  // ---- The market hall: brick, tall arched windows, a zinc roof and a big door ----
+  // ---- The market hall: cream Noucentista shell, tiled porch, round windows ----
+  // Matched to the public look of a 1920s Catalan municipal market (rendered
+  // facade, arched porch, three round upper windows, wavy parapet). No town name.
   const MK = PLAZA.market;
-  const brick = 0xc98f6a, stone = 0xe6dcc6, zinc = 0x6f7d84, dark = 0x2c3850;
-  builder.addBox(MK.x0, Y, MK.z0, MK.x1, Y + 8.4, MK.z1, brick);
+  const cream = 0xefe4cc, stone = 0xe6dcc6, tile = 0xb2563a, dark = 0x2c3850, glass = 0x5a6e82;
+  builder.addBox(MK.x0, Y, MK.z0, MK.x1, Y + 8.4, MK.z1, cream);
   builder.addBox(MK.x0 - 0.3, Y + 8.4, MK.z0 - 0.3, MK.x1 + 0.3, Y + 8.9, MK.z1 + 0.3, stone);
-  builder.addBox(MK.x0 + 1, Y + 8.9, MK.z0 + 1, MK.x1 - 1, Y + 10.4, MK.z1 - 1, zinc); // clerestory
-  builder.addBox(MK.x0 + 3, Y + 10.4, MK.z0 + 2.5, MK.x1 - 3, Y + 11.2, MK.z1 - 2.5, zinc);
-  for (let x = MK.x0 + 2.2; x < MK.x1 - 1; x += 3.4) {
-    if (Math.abs(x + 0.6) < 2.6) continue; // the doorway
-    builder.addBox(x, Y + 1.2, MK.z0 - 0.06, x + 1.4, Y + 6.6, MK.z0 + 0.02, dark);
-    builder.addBox(x - 0.2, Y + 6.6, MK.z0 - 0.1, x + 1.6, Y + 7.0, MK.z0, stone);
+  // Twin-pitch tile roof.
+  builder.addBox(MK.x0 + 0.6, Y + 8.9, MK.z0 + 0.6, MK.x1 - 0.6, Y + 10.2, MK.z1 - 0.6, tile);
+  builder.addBox(MK.x0 + 2.4, Y + 10.2, MK.z0 + 1.8, MK.x1 - 2.4, Y + 11.0, MK.z1 - 1.8, tile);
+  // Porch of three round arches projecting over the square.
+  const porchZ0 = MK.z0 - 3.2, porchZ1 = MK.z0 - 0.05;
+  builder.addBox(-7.2, Y, porchZ0, 7.2, Y + 0.18, porchZ1, stone); // porch floor
+  builder.addBox(-7.2, Y + 4.35, porchZ0 - 0.1, 7.2, Y + 4.7, porchZ1 + 0.05, stone); // porch lintel
+  builder.addBox(-7.4, Y + 4.7, porchZ0 - 0.2, 7.4, Y + 5.35, porchZ1 + 0.1, tile); // porch tile roof
+  for (const px of [-7.0, -2.35, 2.0, 6.65]) {
+    builder.addBox(px, Y, porchZ0, px + 0.35, Y + 4.4, porchZ0 + 0.35, cream);
+    builder.addBox(px, Y, porchZ1 - 0.35, px + 0.35, Y + 4.4, porchZ1, cream);
   }
-  builder.addBox(-2.4, Y, MK.z0 - 0.06, 2.4, Y + 4.2, MK.z0 + 0.02, 0x1d2433); // doorway
+  const archMat = M(cream, 0.9);
+  const darkMat = M(dark, 0.85);
+  for (const [cx, r] of [[-4.6, 1.85], [0, 2.15], [4.6, 1.85]] as [number, number][]) {
+    const ring = cyl(r, r, 0.22, archMat, 20);
+    ring.rotation.x = Math.PI / 2;
+    place(ring, cx, Y + 4.15, porchZ0 + 0.12);
+    // Dark half-discs read as open arches without blocking the stalls in front.
+    const voidMesh = cyl(r - 0.28, r - 0.28, 0.18, darkMat, 18);
+    voidMesh.rotation.x = Math.PI / 2;
+    place(voidMesh, cx, Y + 4.15, porchZ0 + 0.1);
+  }
+  // Only the porch piers collide so Millie can still reach the stalls under the arches.
+  for (const px of [-7.0, -2.35, 2.0, 6.65]) {
+    addBox({ x0: px, x1: px + 0.35, z0: porchZ0, z1: porchZ0 + 0.35, top: Y + 4.5, kind: 'building' });
+    addBox({ x0: px, x1: px + 0.35, z0: porchZ1 - 0.35, z1: porchZ1, top: Y + 4.5, kind: 'building' });
+  }
+  // Main portal and a glimpse of market stalls inside (not walkable).
+  builder.addBox(-2.4, Y, MK.z0 - 0.06, 2.4, Y + 4.2, MK.z0 + 0.02, 0x1d2433);
   builder.addBox(-2.8, Y + 4.2, MK.z0 - 0.14, 2.8, Y + 4.6, MK.z0, stone);
-  // Market entrance clock gable and warm lantern sconces flanking the portal.
-  builder.addBox(-1.6, Y + 8.9, MK.z0 - 0.25, 1.6, Y + 10.6, MK.z0 + 0.1, stone);
-  builder.addBox(-0.85, Y + 9.15, MK.z0 - 0.3, 0.85, Y + 10.35, MK.z0 - 0.22, 0xf4efe4);
-  builder.addBox(-1.8, Y + 10.6, MK.z0 - 0.32, 1.8, Y + 10.85, MK.z0 + 0.15, zinc);
+  builder.addBox(-1.8, Y + 0.9, MK.z0 + 0.4, -0.4, Y + 1.55, MK.z0 + 1.6, 0xc23b32);
+  builder.addBox(0.3, Y + 0.9, MK.z0 + 0.4, 1.7, Y + 1.55, MK.z0 + 1.6, 0x2f6b4f);
+  builder.addBox(-1.2, Y + 1.55, MK.z0 + 0.5, 1.2, Y + 2.1, MK.z0 + 1.4, 0xd8cdb8);
+  // Three round upper windows (center wider), like the loft openings of local masies.
+  const winGlass = M(glass, 0.35, 0.1);
+  const winRing = M(stone, 0.85);
+  for (const [cx, r] of [[-5.6, 1.15], [0, 1.55], [5.6, 1.15]] as [number, number][]) {
+    const ring = cyl(r, r, 0.18, winRing, 18);
+    ring.rotation.x = Math.PI / 2;
+    place(ring, cx, Y + 6.6, MK.z0 - 0.08);
+    const pane = cyl(r - 0.22, r - 0.22, 0.14, winGlass, 16);
+    pane.rotation.x = Math.PI / 2;
+    place(pane, cx, Y + 6.6, MK.z0 - 0.1);
+  }
+  // Wavy parapet: stepped cream coping across the front.
+  for (const [x0, x1, h] of [
+    [-13.2, -9.5, 0.55], [-9.5, -6.2, 1.05], [-6.2, -2.4, 0.7], [-2.4, 2.4, 1.25],
+    [2.4, 6.2, 0.7], [6.2, 9.5, 1.05], [9.5, 13.2, 0.55],
+  ] as [number, number, number][]) {
+    builder.addBox(x0, Y + 8.9, MK.z0 - 0.22, x1, Y + 8.9 + h, MK.z0 + 0.18, cream);
+    builder.addBox(x0, Y + 8.9 + h, MK.z0 - 0.28, x1, Y + 8.9 + h + 0.12, MK.z0 + 0.22, stone);
+  }
+  // Market entrance clock gable kept above the portal.
+  builder.addBox(-1.6, Y + 10.15, MK.z0 - 0.25, 1.6, Y + 11.85, MK.z0 + 0.1, stone);
+  builder.addBox(-0.85, Y + 10.4, MK.z0 - 0.3, 0.85, Y + 11.6, MK.z0 - 0.22, 0xf4efe4);
+  builder.addBox(-1.8, Y + 11.85, MK.z0 - 0.32, 1.8, Y + 12.1, MK.z0 + 0.15, tile);
   // Square planters flanking the market door and the square entrance.
   const potMat = M(0xb2563a, 0.85);
   const bushMat = M(0x4e8c40, 0.85, 0, { flatShading: true });
@@ -166,10 +212,10 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
     place(new THREE.Mesh(bushGeo, bushMat), px, Y + 0.62, pz);
     addBox({ x0: px - 0.35, x1: px + 0.35, z0: pz - 0.35, z1: pz + 0.35, top: Y + 1.0, kind: 'planter' });
   }
-  for (const x of [MK.x0, MK.x1 - 0.5]) builder.addBox(x, Y, MK.z0 - 0.15, x + 0.5, Y + 8.4, MK.z0 + 0.2, stone); // corner pilasters
-  addBox({ x0: MK.x0, x1: MK.x1, z0: MK.z0, z1: MK.z1, top: Y + 11, kind: 'building' });
+  for (const x of [MK.x0, MK.x1 - 0.5]) builder.addBox(x, Y, MK.z0 - 0.15, x + 0.5, Y + 8.4, MK.z0 + 0.2, stone);
+  addBox({ x0: MK.x0, x1: MK.x1, z0: MK.z0, z1: MK.z1, top: Y + 12, kind: 'building' });
   const sign = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.2, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('MERCAT', 'Market hall', '#e5487a', { aspect: 6 }), roughness: 0.7 }));
-  place(sign, 0, Y + 7.6, MK.z0 - 0.12);
+  place(sign, 0, Y + 7.85, MK.z0 - 0.12);
   yield;
 
   // ---- The butcher's stall (west) and produce/flower stall (east) out front ----
