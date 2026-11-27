@@ -23,6 +23,7 @@ import { PLAZA, inPlazaPipica, makePlazaDistrict } from './plaza';
 import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } from './hill';
 import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './marina';
 import { GORG, inGorgPipica, makeGorgDistrict } from './gorg';
+import { RONDA, inRondaPipica, makeRondaDistrict } from './ronda';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { groundAroundMetro, makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
@@ -1432,6 +1433,22 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(gorg.root);
   bowls.push({ ...GORG.bowl });
   fountains.push({ ...GORG.drink });
+  // Ronda i Parc (ronda.ts): streams in north of Canal i Galeria.
+  const rondaGlass = makeLanternPost().glass;
+  lampGlass.push(rondaGlass);
+  for (const [x, z] of RONDA.lamps) lampSpots.push(new THREE.Vector3(x, GROUND_Y + 4.4, z));
+  const ronda = makeRondaDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('ronda')!, ground, newInstancer: () => new Instancer(), r,
+    mats: {
+      conc: concMat, concTile: conc.tileMeters, panot: panotMat, panotTile: panot.tileMeters,
+      deck: deckMat, sand: sandMat, water: waterMat,
+      litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM, lampGlass: rondaGlass,
+    },
+  });
+  districts.push(ronda);
+  root.add(ronda.root);
+  bowls.push({ ...RONDA.bowl });
+  fountains.push({ ...RONDA.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
@@ -1446,8 +1463,16 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  /** Which pipicà (x, z) is in: 0 beach, 1 Plaça del Mercat, 2 Dalt de la Vila, 3 Marina, 4 Gorg, -1 neither. */
-  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : inHillPipica(x, z) ? 2 : inMarinaPipica(x, z) ? 3 : inGorgPipica(x, z) ? 4 : -1);
+  /** Which pipicà (x, z) is in: 0 beach, 1 Plaza, 2 Hill, 3 Marina, 4 Gorg, 5 Ronda, -1 neither. */
+  const pipicaAt = (x: number, z: number) => (
+    x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0
+      : inPlazaPipica(x, z) ? 1
+      : inHillPipica(x, z) ? 2
+      : inMarinaPipica(x, z) ? 3
+      : inGorgPipica(x, z) ? 4
+      : inRondaPipica(x, z) ? 5
+      : -1
+  );
   const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
   /** Where Millie's human waits while she's off the leash in each pipicà. */
   const pipicaBenches: { x: number; z: number; heading?: number }[] = [
@@ -1456,12 +1481,19 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     { ...HILL.pipicaBench, heading: Math.PI },
     { ...MARINA.pipicaBench, heading: Math.PI },
     { ...GORG.pipicaBench, heading: Math.PI },
+    { ...RONDA.pipicaBench, heading: Math.PI },
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
+    // Ronda i Parc north of Gorg (west strip inland).
+    if (p.z >= 106 && p.z <= 196 && p.x < -91.5) {
+      p.x = Math.max(-220, Math.min(-104.5, p.x));
+      p.z = Math.max(106.2, Math.min(194.2, p.z));
+      return;
+    }
     // Gorg / Canal i Galeria corridor west of the Rambla.
     if (p.z >= 14 && p.z <= 106 && p.x < -91.5) {
       p.x = Math.max(-220, p.x);
-      p.z = Math.max(14.3, Math.min(100.2, p.z));
+      p.z = Math.max(14.3, Math.min(106.0, p.z));
       return;
     }
     // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
@@ -1508,6 +1540,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     ...HILL.pedPaths,
     ...MARINA.pedPaths,
     ...GORG.pedPaths,
+    ...RONDA.pedPaths,
   ];
 
   return {
