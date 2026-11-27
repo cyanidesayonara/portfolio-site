@@ -22,6 +22,7 @@ import { makeCitySkyline, makeInlandHills } from './horizon';
 import { PLAZA, inPlazaPipica, makePlazaDistrict } from './plaza';
 import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } from './hill';
 import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './marina';
+import { GORG, inGorgPipica, makeGorgDistrict } from './gorg';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { groundAroundMetro, makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
@@ -219,10 +220,10 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // The Rambla's slabs, the promenade's concrete, the boardwalk's planks.
   // Leave holes where the underpass cuts down below street level.
   // The metro entrance's stairwell is a hole in the Rambla's slabs too.
-  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(-140, 140, CUT.rambla0, 34, SEAFRONT_LAYOUT.metro)) {
+  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(-104, 140, CUT.rambla0, 34, SEAFRONT_LAYOUT.metro)) {
     root.add(ground(gx0, gx1, gz0, gz1, GROUND_Y, slabMat, slab.tileMeters));
   }
-  root.add(ground(-140, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
+  root.add(ground(-104, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, 140, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(-104, 140, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
   root.add(ground(-104, -92, -18, -10, GROUND_Y, panotMat, panot.tileMeters));
@@ -419,7 +420,12 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   place(makeSkip(), 37, GROUND_Y, 71, Math.PI / 2);
   place(makeExcavator(), -38, GROUND_Y, 89, 1.2);
-  obresLine(-92, 14.6, -92, 33.4);
+  // Rambla opens west into Canal i Galeria at x -104; add a guiding fingerpost near -94.
+  place(makeFingerpost([
+    { title: 'Canal · Galeria', sub: 'Tramvia · Pavelló', color: '#1fc9b7', angle: Math.PI },
+    { title: 'Rambla · Centre', sub: 'Metro · Estació', color: '#ffb020', angle: 0 },
+  ]), -94, GROUND_Y, 22);
+  addCircle(-94, 22, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   obresLine(92, 14.6, 92, 33.4);
   // Seafront promenade opens west at x -92 into El Port; edge rails keep Millie on the transition quay.
   obresLine(92, -19.6, 92, 3.6);
@@ -444,7 +450,6 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     addCircle(-94, -8, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   }
   place(makeExcavator(), 97, GROUND_Y, 22, -1.4);
-  place(makeSkip(0xdb5c24), -97, GROUND_Y, 24, Math.PI / 2);
   // Rock breakwaters close the beach.
   const rockGeo = new THREE.IcosahedronGeometry(1, 0);
   const rockMats = [M(0xb8b4aa, 0.95, 0, { flatShading: true }), M(0x9a968e, 0.95, 0, { flatShading: true }), M(0xc9c4b8, 0.95, 0, { flatShading: true })];
@@ -1411,6 +1416,22 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(marina.root);
   bowls.push({ ...MARINA.bowl });
   fountains.push({ ...MARINA.drink });
+  // Canal i Galeria / Gorg (gorg.ts): streams in west beyond the Rambla.
+  const gorgGlass = makeLanternPost().glass;
+  lampGlass.push(gorgGlass);
+  for (const [x, z] of GORG.lamps) lampSpots.push(new THREE.Vector3(x, GROUND_Y + 4.4, z));
+  const gorg = makeGorgDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('gorg')!, ground, newInstancer: () => new Instancer(), r,
+    mats: {
+      conc: concMat, concTile: conc.tileMeters, panot: panotMat, panotTile: panot.tileMeters,
+      deck: deckMat, sand: sandMat, water: waterMat,
+      litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM, lampGlass: gorgGlass,
+    },
+  });
+  districts.push(gorg);
+  root.add(gorg.root);
+  bowls.push({ ...GORG.bowl });
+  fountains.push({ ...GORG.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
@@ -1425,8 +1446,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  /** Which pipicà (x, z) is in: 0 beach, 1 Plaça del Mercat, 2 Dalt de la Vila, 3 Marina, -1 neither. */
-  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : inHillPipica(x, z) ? 2 : inMarinaPipica(x, z) ? 3 : -1);
+  /** Which pipicà (x, z) is in: 0 beach, 1 Plaça del Mercat, 2 Dalt de la Vila, 3 Marina, 4 Gorg, -1 neither. */
+  const pipicaAt = (x: number, z: number) => (x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0 : inPlazaPipica(x, z) ? 1 : inHillPipica(x, z) ? 2 : inMarinaPipica(x, z) ? 3 : inGorgPipica(x, z) ? 4 : -1);
   const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
   /** Where Millie's human waits while she's off the leash in each pipicà. */
   const pipicaBenches: { x: number; z: number; heading?: number }[] = [
@@ -1434,8 +1455,15 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     PLAZA.pipicaBench,
     { ...HILL.pipicaBench, heading: Math.PI },
     { ...MARINA.pipicaBench, heading: Math.PI },
+    { ...GORG.pipicaBench, heading: Math.PI },
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
+    // Gorg / Canal i Galeria corridor west of the Rambla.
+    if (p.z >= 14 && p.z <= 106 && p.x < -91.5) {
+      p.x = Math.max(-220, p.x);
+      p.z = Math.max(14.3, Math.min(100.2, p.z));
+      return;
+    }
     // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
     if (p.z > 34 && p.z < PLAZA.z0) { p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
     if (p.z >= PLAZA.z0 && p.z < HILL.z0) {
@@ -1479,6 +1507,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     ...PLAZA.pedPaths,
     ...HILL.pedPaths,
     ...MARINA.pedPaths,
+    ...GORG.pedPaths,
   ];
 
   return {
