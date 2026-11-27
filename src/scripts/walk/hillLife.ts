@@ -8,8 +8,11 @@ import * as THREE from 'three';
 import { makePerson, makeDog, makeBird, M, cyl } from './models';
 import { collapseRig } from './bake';
 import { HILL, inHillPipica } from './hill';
+import { createMosaicBoss } from './mosaicBoss';
+import { createSenglars, type SenglarsChase } from './senglars';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';
+import type { FeelState, TelegraphPool } from './telegraph';
 
 type P = { x: number; z: number };
 
@@ -17,6 +20,8 @@ export interface HillCtx {
   scene: THREE.Scene;
   hud: Hud;
   audio: WalkAudio;
+  telegraphs: TelegraphPool;
+  feel: FeelState;
   dog: { x: number; y: number; z: number; vx: number; vz: number };
   humanSay: (text: string, ttl?: number, tone?: 'paper' | 'win' | 'loud') => void;
   addBones: (n: number, why?: string) => void;
@@ -25,6 +30,8 @@ export interface HillCtx {
   onDone?: (key: string) => void;
   burst: (x: number, y: number, z: number, color: number, n?: number, spd?: number, up?: number, life?: number, g?: number) => void;
   offLeash: () => boolean;
+  canStartThreat?: () => boolean;
+  onHitDog?: (vx: number, vz: number, vy?: number) => void;
 }
 
 const VIEW = 85;
@@ -72,6 +79,39 @@ export function createHillLife(ctx: HillCtx) {
     saidT[id] = every;
     hud.say(id, text, ttl, tone);
   };
+
+  // ---- Boss #3 (Roman Mosaic Guardian at Museu) + Chase #2 (Senglars) ----
+  let senglars!: SenglarsChase;
+  const mosaic = createMosaicBoss({
+    addObject: add,
+    hud,
+    audio,
+    telegraphs: ctx.telegraphs,
+    feel: ctx.feel,
+    dog,
+    humanSay: ctx.humanSay,
+    addBones: ctx.addBones,
+    completeGoal: ctx.completeGoal,
+    onDone: ctx.onDone,
+    burst: ctx.burst,
+    onHitDog: (vx, vz, vy) => ctx.onHitDog?.(vx, vz, vy),
+    canStart: () => (ctx.canStartThreat?.() ?? true) && !senglars.active,
+  });
+  senglars = createSenglars({
+    scene,
+    hud,
+    audio,
+    telegraphs: ctx.telegraphs,
+    feel: ctx.feel,
+    dog,
+    humanSay: ctx.humanSay,
+    addBones: ctx.addBones,
+    completeGoal: ctx.completeGoal,
+    onDone: ctx.onDone,
+    burst: ctx.burst,
+    onHitDog: (vx, vz, vy) => ctx.onHitDog?.(vx, vz, vy),
+    canStart: () => (ctx.canStartThreat?.() ?? true) && !mosaic.active,
+  });
 
   // ---- People ----
   const guide = person(
@@ -158,6 +198,8 @@ export function createHillLife(ctx: HillCtx) {
     for (const k in saidT) saidT[k] -= dt;
     const near = dist(dog, HILL.center) < VIEW;
     for (const o of all) o.visible = near;
+    mosaic.update(dt, time, near);
+    senglars.update(dt, time, near);
     if (!near) return;
 
     guide.animate(time, { speed: 0, pose: 'stand' });
@@ -262,8 +304,10 @@ export function createHillLife(ctx: HillCtx) {
     }
   };
 
-  /** E: barking by the church portal rings the belfry bell, and barks near hilltop pigeons scatter them. */
+  /** E: mid-terrace boss barks, hillside boar trigger, church bell, and hilltop pigeons. */
   const bark = () => {
+    if (mosaic.bark()) return;
+    if (senglars.bark()) return;
     if (dog.y < TOP_Y - 1) return;
     if (pigeons.some((p) => p.fly <= 0 && dist(dog, p) < 7)) scatterPigeons();
     if (dist(dog, HILL.portal) > 7) return;
@@ -275,16 +319,26 @@ export function createHillLife(ctx: HillCtx) {
     }
   };
 
+  const onWhirl = (poleX: number, poleZ: number) => mosaic.onWhirl(poleX, poleZ);
+
   const prompt = (): { key: string; label: string } | null => {
+    const mp = mosaic.prompt();
+    if (mp) return mp;
+    const sp = senglars.prompt();
+    if (sp) return sp;
     if (!quests.bell && dog.y >= TOP_Y - 1 && dist(dog, HILL.portal) < 7) {
       return { key: 'E', label: 'Ring the church bell' };
     }
     return null;
   };
 
+  const banner = () => mosaic.banner() ?? senglars.banner();
+
   const reset = () => {
     bellRingT = 0;
     miradorT = 0;
+    mosaic.reset();
+    senglars.reset();
   };
 
   const restore = (doneKeys: ReadonlySet<string>) => {
@@ -292,12 +346,19 @@ export function createHillLife(ctx: HillCtx) {
     if (doneKeys.has('hill:mirador')) quests.mirador = true;
     if (doneKeys.has('hill:home')) homeDone = true;
     doneCount = Number(quests.bell) + Number(quests.mirador);
+    mosaic.restore(doneKeys);
+    senglars.restore(doneKeys);
   };
 
   return {
     update,
     bark,
+    onWhirl,
     prompt,
+    banner,
+    busy: () => mosaic.active || senglars.active,
+    mosaicActive: () => mosaic.active,
+    senglarsActive: () => senglars.active,
     reset,
     restore,
     quests: () => ({ ...quests, home: homeDone }),
@@ -305,6 +366,7 @@ export function createHillLife(ctx: HillCtx) {
       { id: 'guide', x: HILL.guide.x, y: MID_Y + 2.1, z: HILL.guide.z },
       { id: 'caretaker', x: HILL.caretaker.x, y: TOP_Y + 2.1, z: HILL.caretaker.z },
       { id: 'miradorLocal', x: 17.5, y: TOP_Y + 1.7, z: 219.7 },
+      { id: 'mosaic', ...mosaic.bubblePos() },
     ],
     debug: {
       get bellRingT() { return bellRingT; },
@@ -312,6 +374,8 @@ export function createHillLife(ctx: HillCtx) {
       get homeDone() { return homeDone; },
       pigeons,
       parkDog,
+      mosaic,
+      senglars,
     },
   };
 }
