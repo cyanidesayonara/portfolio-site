@@ -34,7 +34,7 @@ npm run sync:apply
     client-payload: '{"project": "${{ github.event.repository.name }}", "tag": "${{ github.ref_name }}"}'
 ```
 
-Wired today on tag/release paths for `path-of-leash-resistance` and `stemma`, and on push-to-`master` deploys for `dop3pod` (not on the daily catalog cron, so episode refreshes do not open empty sync PRs). Each notify step is `continue-on-error: true` until `PORTFOLIO_SYNC_TOKEN` is set in that repository's secrets; once the secret exists, a successful release opens or updates `chore/sync-projects` on this repo the same day.
+Wired today on tag/release paths for `path-of-leash-resistance` and `stemma`, and on push-to-`master` deploys for `dop3pod` (not on the daily catalog cron, so episode refreshes do not open empty sync PRs). Each notify step is `continue-on-error: true` until the token is configured. For `stemma` and `dop3pod`, store `PORTFOLIO_SYNC_TOKEN` as a repository Actions secret. For `path-of-leash-resistance`, store it as an **environment secret** on the `portfolio` environment (tags `v*` only); that repo forbids production secrets outside environments. Once set, a successful release opens or updates `chore/sync-projects` on this repo the same day.
 
 **What still needs a human or agent pass:** descriptive prose in `src/content/projects/*.md` (and any Spanish/Catalan mirrors) whenever a release changes player-facing features, walk counts, bosses, or store messaging. The sync job updates tags, dates, and PoLR metrics automatically; it does not rewrite marketing copy. After a meaningful release, either merge the `chore/sync-projects` PR and follow with a short prose PR, or fold both into one.
 
