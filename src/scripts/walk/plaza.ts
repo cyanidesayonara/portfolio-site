@@ -143,7 +143,7 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   // Matched to the public look of a 1920s Catalan municipal market (rendered
   // facade, arched porch, three round upper windows, wavy parapet). No town name.
   const MK = PLAZA.market;
-  const cream = 0xefe4cc, stone = 0xe6dcc6, tile = 0xb2563a, dark = 0x2c3850, glass = 0x5a6e82;
+  const cream = 0xefe4cc, stone = 0xe6dcc6, tile = 0xb2563a, glass = 0x5a6e82;
   builder.addBox(MK.x0, Y, MK.z0, MK.x1, Y + 8.4, MK.z1, cream);
   builder.addBox(MK.x0 - 0.3, Y + 8.4, MK.z0 - 0.3, MK.x1 + 0.3, Y + 8.9, MK.z1 + 0.3, stone);
   // Twin-pitch tile roof.
@@ -152,22 +152,30 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   // Porch of three round arches projecting over the square.
   const porchZ0 = MK.z0 - 3.2, porchZ1 = MK.z0 - 0.05;
   builder.addBox(-7.2, Y, porchZ0, 7.2, Y + 0.18, porchZ1, stone); // porch floor
-  builder.addBox(-7.2, Y + 4.35, porchZ0 - 0.1, 7.2, Y + 4.7, porchZ1 + 0.05, stone); // porch lintel
-  builder.addBox(-7.4, Y + 4.7, porchZ0 - 0.2, 7.4, Y + 5.35, porchZ1 + 0.1, tile); // porch tile roof
+  // The porch fascia carries the MERCAT sign; the tile roof sits above it.
+  const fasciaTop = Y + 5.4;
+  builder.addBox(-7.2, Y + 4.35, porchZ0 - 0.1, 7.2, fasciaTop, porchZ1 + 0.05, stone); // porch fascia
+  builder.addBox(-7.4, fasciaTop, porchZ0 - 0.2, 7.4, fasciaTop + 0.45, porchZ1 + 0.1, tile); // porch tile roof
   for (const px of [-7.0, -2.35, 2.0, 6.65]) {
     builder.addBox(px, Y, porchZ0, px + 0.35, Y + 4.4, porchZ0 + 0.35, cream);
     builder.addBox(px, Y, porchZ1 - 0.35, px + 0.35, Y + 4.4, porchZ1, cream);
   }
-  const archMat = M(cream, 0.9);
-  const darkMat = M(dark, 0.85);
-  for (const [cx, r] of [[-4.6, 1.85], [0, 2.15], [4.6, 1.85]] as [number, number][]) {
-    const ring = cyl(r, r, 0.22, archMat, 20);
-    ring.rotation.x = Math.PI / 2;
-    place(ring, cx, Y + 4.15, porchZ0 + 0.12);
-    // Dark half-discs read as open arches without blocking the stalls in front.
-    const voidMesh = cyl(r - 0.28, r - 0.28, 0.18, darkMat, 18);
-    voidMesh.rotation.x = Math.PI / 2;
-    place(voidMesh, cx, Y + 4.15, porchZ0 + 0.1);
+  // Open round arches between the piers: cream spandrels fill each bay above a
+  // semicircle that springs from the piers, with a stone archivolt on the edge.
+  const archMat = M(cream, 0.9, 0, { side: THREE.DoubleSide });
+  const archivoltMat = M(stone, 0.85, 0, { side: THREE.DoubleSide });
+  const archTop = Y + 4.35;
+  for (const [bx0, bx1] of [[-6.65, -2.35], [-2.0, 2.0], [2.35, 6.65]] as [number, number][]) {
+    const r = (bx1 - bx0) / 2, cx = (bx0 + bx1) / 2, spring = archTop - r;
+    const spandrel = new THREE.Shape();
+    spandrel.moveTo(-r, 0);
+    spandrel.lineTo(-r, r);
+    spandrel.lineTo(r, r);
+    spandrel.lineTo(r, 0);
+    spandrel.absarc(0, 0, r, 0, Math.PI, false);
+    place(new THREE.Mesh(new THREE.ShapeGeometry(spandrel, 20), archMat), cx, spring, porchZ0 - 0.02);
+    const band = new THREE.Mesh(new THREE.RingGeometry(r - 0.2, r, 24, 1, 0, Math.PI), archivoltMat);
+    place(band, cx, spring, porchZ0 - 0.05);
   }
   // Only the porch piers collide so Millie can still reach the stalls under the arches.
   for (const px of [-7.0, -2.35, 2.0, 6.65]) {
@@ -181,16 +189,17 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   builder.addBox(0.3, Y + 0.9, MK.z0 + 0.4, 1.7, Y + 1.55, MK.z0 + 1.6, 0x2f6b4f);
   builder.addBox(-1.2, Y + 1.55, MK.z0 + 0.5, 1.2, Y + 2.1, MK.z0 + 1.4, 0xd8cdb8);
   // Three round upper windows (center wider), like the loft openings of local masies.
-  // Kept high enough that the MERCAT sign sits cleanly between the door and the windows.
+  // Kept above the porch roof so the arches and the roof line read cleanly beneath them.
   const winGlass = M(glass, 0.35, 0.1);
   const winRing = M(stone, 0.85);
-  for (const [cx, r] of [[-5.6, 1.15], [0, 1.55], [5.6, 1.15]] as [number, number][]) {
+  for (const [cx, r] of [[-5.6, 1.1], [0, 1.4], [5.6, 1.1]] as [number, number][]) {
     const ring = cyl(r, r, 0.18, winRing, 18);
     ring.rotation.x = Math.PI / 2;
     place(ring, cx, Y + 7.35, MK.z0 - 0.08);
+    // Pane face sits 3 cm proud of the ring face so the two never z-fight.
     const pane = cyl(r - 0.22, r - 0.22, 0.14, winGlass, 16);
     pane.rotation.x = Math.PI / 2;
-    place(pane, cx, Y + 7.35, MK.z0 - 0.1);
+    place(pane, cx, Y + 7.35, MK.z0 - 0.13);
   }
   // Wavy parapet: stepped cream coping across the front.
   for (const [x0, x1, h] of [
@@ -215,8 +224,9 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   }
   for (const x of [MK.x0, MK.x1 - 0.5]) builder.addBox(x, Y, MK.z0 - 0.15, x + 0.5, Y + 8.4, MK.z0 + 0.2, stone);
   addBox({ x0: MK.x0, x1: MK.x1, z0: MK.z0, z1: MK.z1, top: Y + 12, kind: 'building' });
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.0, 0.1), new THREE.MeshStandardMaterial({ map: signTexture('MERCAT', 'Market hall', '#e5487a', { aspect: 6 }), roughness: 0.7 }));
-  place(sign, 0, Y + 5.45, MK.z0 - 0.12);
+  // MERCAT sign on the front of the porch fascia, in front of the arches.
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.9, 0.08), new THREE.MeshStandardMaterial({ map: signTexture('MERCAT', 'Market hall', '#e5487a', { aspect: 6 }), roughness: 0.7 }));
+  place(sign, 0, Y + 4.875, porchZ0 - 0.15);
   yield;
 
   // ---- The butcher's stall (west) and produce/flower stall (east) out front ----
