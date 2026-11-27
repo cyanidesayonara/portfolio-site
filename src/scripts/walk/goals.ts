@@ -43,6 +43,8 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'butcher', label: 'Get away with the butcher’s botifarra', done: false, area: 'plaza' },
     { id: 'hill_quests', label: 'Explore Dalt de la Vila', done: false, count: 0, target: 2, area: 'hill' },
     { id: 'cats', label: 'Send 3 old-town cats running', done: false, count: 0, target: 3, area: 'hill' },
+    { id: 'hill_senglars', label: 'Outrun the wild boars on Dalt de la Vila', done: false, area: 'hill' },
+    { id: 'hill_mosaic', label: 'Outsmart the Roman Mosaic Guardian at Museu', done: false, area: 'hill' },
     { id: 'hill_top', label: 'Climb to the hilltop church and head home', done: false, area: 'hill' },
   ];
 
@@ -112,6 +114,8 @@ export function createGoalSystem(opts: GoalSystemOpts) {
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
       if (goal('plaza_castellers').done) doneKeys.add('plaza:castellers');
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));
+      if (goal('hill_senglars').done) doneKeys.add('hill:senglars');
+      if (goal('hill_mosaic').done) doneKeys.add('hill:mosaic');
       if (goal('hill_top').done) doneKeys.add('hill:home');
       if (goal('finds').done) [0, 1, 2].forEach((i) => doneKeys.add(`find:${i}`));
       if (goal('hurdles').done) [0, 1, 2].forEach((i) => doneKeys.add(`hurdle:${i}`));
