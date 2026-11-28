@@ -6,8 +6,9 @@
 import * as THREE from 'three';
 import { makePerson, makeDog, M, box, cyl, sphere, shadowed } from './models';
 import { collapseRig } from './bake';
-import { RONDA, inRondaPipica, onRondaBridge } from './ronda';
-import { RONDA_BRIDGE, RONDA_GROUND_Y, RONDA_TRENCH, RONDA_TRENCH_Y } from './rondaGeom';
+// Runs in Ronda's local frame (game3d.ts passes localFrame views): local anchors and predicates.
+import { RONDA_LOCAL as RONDA } from './ronda';
+import { RONDA_BRIDGE, RONDA_GROUND_Y, RONDA_TRENCH, RONDA_TRENCH_Y, inRondaPipica, onRondaBridge } from './rondaGeom';
 import { TrafficState, ScooterRushState, SCOOTER_LANES } from './rondaLogic';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';

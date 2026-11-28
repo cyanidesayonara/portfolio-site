@@ -121,7 +121,8 @@ export interface TownLayout {
   ramps: number[];
   tracks: number[];
   /** The metro entrance: an open stairwell on the Rambla going down toward +x from its head at x0. */
-  metro: MetroDef;
+  /** Metro entrances, first the one the 2D street's metro links to. */
+  metros: (MetroDef & { id: string; label: string })[];
   zones: ZoneDef[];
   districts: DistrictData[];
 }

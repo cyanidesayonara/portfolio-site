@@ -16,7 +16,7 @@ export const GORG_CANAL = {
 } as const;
 
 /** The safety clamp's reach for Canal i Galeria: entered between `enterZ0..enterZ1` beyond the Rambla's seam. */
-export const GORG_CLAMP = { x0: -220, z0: 14.3, z1: 106.0, enterZ0: 14, enterZ1: 106 } as const;
+export const GORG_CLAMP = { x0: -220, x1: -104.4, z0: 14.3, z1: 106.0, enterZ0: 14, enterZ1: 106 } as const;
 
 export const GORG_PIPICA = {
   x0: -156,

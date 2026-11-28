@@ -31,7 +31,7 @@ import { PLAZA } from './plaza';
 import { boneSpots, mapPlaceMarks, poiPos } from './placements';
 import { createMarinaLife, type MarinaItem } from './marinaLife';
 import { MARINA } from './marina';
-import { MARINA_DX } from './marinaOffset';
+import { MARINA_DX, GORG_DX, RONDA_DX } from './marinaOffset';
 import { localFrame } from './localFrame';
 import { createGorgLife, type GorgItem } from './gorgLife';
 import { GORG } from './gorg';
@@ -177,9 +177,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex, boothScreens: boothScreens.textures })), () => {
     transit.setProgress(Math.min(70, (stepsDone / LEVEL_STEPS) * 70));
   }, 14);
-  const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : viaMetro ? level.metro.dog : level.start.dog;
-  const startHuman = viaTrain ? { x: level.station.x - 1.8, z: 22.0 } : viaMetro ? level.metro.human : level.start.human;
-  const startHeading = viaTrain ? Math.PI : viaMetro ? level.metro.heading : -Math.PI / 2;
+  const metroIn = level.metros[searchParams.get('at') ?? ''] ?? level.metros[level.metroOrder[0]];
+  const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : viaMetro ? metroIn.dog : level.start.dog;
+  const startHuman = viaTrain ? { x: level.station.x - 1.8, z: 22.0 } : viaMetro ? metroIn.human : level.start.human;
+  const startHeading = viaTrain ? Math.PI : viaMetro ? metroIn.heading : -Math.PI / 2;
   const streamer = new Streamer(level.districts, level.grid);
   await runSliced(streamer.warm(startDog.x, startDog.z), (f) => {
     transit.setProgress(70 + (f ?? 0) * 30);
@@ -428,8 +429,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     },
   });
   // Canal i Galeria / Gorg: turquoise canal, tram, streetball court, Nala & runaway shopping carts.
+  // Canal i Galeria and Ronda i Parc share the port's frame (marinaOffset.ts).
+  const gorgFrame = localFrame(scene, GORG_DX);
   gorg = createGorgLife({
-    scene, hud, audio, telegraphs, feel, dog, addBones, completeGoal, bumpGoal, burst,
+    scene: gorgFrame.scene, hud, audio: gorgFrame.audio(audio), telegraphs: gorgFrame.telegraphs(telegraphs), feel,
+    dog: gorgFrame.view(dog), addBones, completeGoal, bumpGoal, burst: gorgFrame.burst(burst),
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
@@ -442,8 +446,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     },
   });
   // Ronda i Parc: sunken highway trench, overpass, skate park, pipica 6 & delivery scooters.
+  const rondaFrame = localFrame(scene, RONDA_DX);
   ronda = createRondaLife({
-    scene, hud, audio, telegraphs, feel, dog, addBones, completeGoal, bumpGoal, burst,
+    scene: rondaFrame.scene, hud, audio: rondaFrame.audio(audio), telegraphs: rondaFrame.telegraphs(telegraphs), feel,
+    dog: rondaFrame.view(dog), addBones, completeGoal, bumpGoal, burst: rondaFrame.burst(burst),
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
@@ -944,8 +950,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       const fx = dog.x + Math.cos(dog.heading) * 0.55, fz = dog.z + Math.sin(dog.heading) * 0.55;
       if (plaza.drop(fx, fz)) return;
       if (marina.drop(fx - MARINA_DX, fz)) return;
-      if (gorg.drop(fx, fz)) return;
-      if (ronda.drop(fx, fz)) return;
+      if (gorg.drop(fx - GORG_DX, fz)) return;
+      if (ronda.drop(fx - RONDA_DX, fz)) return;
       if (fabrica.drop(fx, fz)) return;
       if (dog.carrying === 'questBall') {
         questBall.held = false;
@@ -1192,6 +1198,28 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     hud.banner('Back where we started', 'news');
   };
   let departing = false;
+  /** Whether the metro menu (pick an entrance or the 2D street) is open at a metro entrance. */
+  let metroMenu = false;
+  /** Ride the metro to another entrance: down the stairs, build what is near it, and up again. */
+  const rideMetro = (id: string) => {
+    const dest = level.metros[id];
+    if (!dest || departing) return;
+    departing = true;
+    metroMenu = false;
+    releaseAll();
+    audio.chime();
+    void playDepartureDoors(host, `Metro L2 · ${dest.label}…`, reducedMotion, 'metro').then(async () => {
+      await runSliced(streamer.warm(dest.dog.x, dest.dog.z), () => {}, 14);
+      dog.x = dest.dog.x; dog.z = dest.dog.z; dog.y = dogFloor(dog.x, dog.z, 5); dog.vx = dog.vz = dog.vy = 0; dog.onGround = true;
+      dog.heading = dest.heading;
+      human.x = dest.human.x; human.z = dest.human.z; human.y = humanFloor(human.x, human.z, 5); human.vx = human.vz = 0;
+      leash.reset(dog, handXZ());
+      camSnap = true;
+      host.querySelectorAll('.loading.depart').forEach((el) => el.remove());
+      departing = false;
+      hud.toast('Up from the metro', dest.label);
+    });
+  };
   // Back from the 2D street can restore this page from the bfcache with the doors shut.
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted) return;
@@ -1235,7 +1263,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   };
 
   q('[data-restart]')?.addEventListener('click', resetWalk);
-  const PROMPT_CODE: Record<string, string> = { X: 'KeyX', Enter: 'Enter', G: 'KeyG', E: 'KeyE', Space: 'Space' };
+  const PROMPT_CODE: Record<string, string> = { X: 'KeyX', Enter: 'Enter', G: 'KeyG', E: 'KeyE', Space: 'Space', 1: 'Digit1', 2: 'Digit2', 3: 'Digit3' };
   let digPulse = 0;
   let digSfxCd = 0;
   hud.onPrompt = (k) => {
@@ -1297,9 +1325,16 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       case 'Minus': case 'NumpadSubtract': zoomBy(1.15); break;
       case 'Equal': case 'NumpadAdd': zoomBy(1 / 1.15); break;
       case 'BracketLeft': case 'BracketRight': orbitBy(0); break;
-      case 'Digit1': skySys.applySky('day'); break;
-      case 'Digit2': skySys.applySky('rain'); break;
-      case 'Digit3': skySys.applySky('night'); break;
+      case 'Digit1': case 'Digit2': case 'Digit3': {
+        const n = Number(code.slice(5)) - 1;
+        if (metroMenu && nearStop?.id === 'metro') {
+          const id = level.metroOrder[n];
+          if (id && id !== nearStop.station) rideMetro(id);
+          break;
+        }
+        skySys.applySky((['day', 'rain', 'night'] as const)[n]);
+        break;
+      }
       case 'KeyR': resetWalk(); break;
       case 'KeyX':
         if (nearCoriolis()) panels.toggleCoriolis();
@@ -1316,7 +1351,9 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
         else host.blur();
         break;
       case 'Enter':
-        if (nearStop) goToStop(nearStop);
+        // At a metro entrance the first Enter opens the menu; Enter again takes the metro to the 2D street.
+        if (nearStop?.id === 'metro' && !metroMenu) { metroMenu = true; audio.click(); }
+        else if (nearStop) goToStop(nearStop);
         break;
     }
   };
@@ -2542,6 +2579,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     let found: Level['stops'][number] | null = null;
     for (const s of level.stops) if (Math.hypot(dog.x - s.x, dog.z - s.z) < s.r) found = s;
     nearStop = found;
+    if (found?.id !== 'metro') metroMenu = false;
     const prompts: { key: string; label: string }[] = [];
     let banner: string | null = null;
     if (panels.coriolisFocus) { banner = 'Coriolis LED wall — arrows, Enter, [M] menu, [X] step back'; }
@@ -2552,7 +2590,14 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     else if (nearPodBooth()) { prompts.push({ key: 'X', label: podLabels.prompt }); }
     else if (nearStemma()) { prompts.push({ key: 'X', label: panels.stemmaOpen ? 'Close the mixer' : 'Pick the music' }); }
     if (found && !panels.coriolisFocus && !panels.catFocus && !panels.podOpen) {
-      prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro to 2D street' : `Visit ${found.label}` });
+      if (found.id === 'metro' && metroMenu) {
+        prompts.push({ key: 'Enter', label: 'Metro to 2D street' });
+        level.metroOrder.forEach((id, i) => {
+          if (id !== found!.station) prompts.push({ key: String(i + 1), label: `Metro to ${level.metros[id].label}` });
+        });
+      } else {
+        prompts.push({ key: 'Enter', label: found.id === 'station' ? 'Ride train to 2D street' : found.id === 'metro' ? 'Take the metro' : `Visit ${found.label}` });
+      }
       banner = banner ?? `${found.label} · ${found.kind}`;
     }
     if (!panels.coriolisFocus && !panels.catFocus && !panels.podOpen && level.mounds.some((m) => !m.dug && Math.hypot(m.x - dog.x, m.z - dog.z) < 1.8)) prompts.push({ key: 'Space', label: 'Dig' });
@@ -2745,8 +2790,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of marina.bubbles()) place(b.id, b.x + MARINA_DX, b.y, b.z);
-    for (const b of gorg.bubbles()) place(b.id, b.x, b.y, b.z);
-    for (const b of ronda.bubbles()) place(b.id, b.x, b.y, b.z);
+    for (const b of gorg.bubbles()) place(b.id, b.x + GORG_DX, b.y, b.z);
+    for (const b of ronda.bubbles()) place(b.id, b.x + RONDA_DX, b.y, b.z);
     for (const b of fabrica.bubbles()) place(b.id, b.x, b.y, b.z);
 
     skySys.followTarget(camLook);

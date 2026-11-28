@@ -12,7 +12,7 @@ import { CASTELLERS_POS } from './castellersLogic.ts';
 import { MOSAIC_HOME } from './mosaicLogic.ts';
 import { SENGLARS_MAP_POS } from './senglarsLogic.ts';
 import { MICO_HOME } from './micoLogic.ts';
-import { MARINA_DX } from './marinaOffset.ts';
+import { MARINA_DX, GORG_DX } from './marinaOffset.ts';
 import { CARTS_MAP_POS } from './gorgLogic.ts';
 import { HILL_DX, shiftX } from './hillOffset.ts';
 
@@ -61,7 +61,7 @@ const MAP_PLACES: (Ref & { color: string; label: string; kind: 'place' | 'threat
   { district: 'gorg', poi: 'pavello', color: '#3d73c7', label: 'Pavelló', kind: 'place' },
   { district: 'gorg', poi: 'tram', color: '#5eea8c', label: 'Tramvia', kind: 'place' },
   { district: 'gorg', poi: 'pipica5', color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
-  { at: CARTS_MAP_POS, color: '#ff6b5a', label: 'Carts', kind: 'threat' },
+  { at: shiftX(CARTS_MAP_POS, GORG_DX), color: '#ff6b5a', label: 'Carts', kind: 'threat' },
   { at: shiftX(MICO_HOME, MARINA_DX), color: '#ffb020', label: 'El Mico', kind: 'threat' },
   // The hill's boss and chase logic run in its local frame (hillOffset.ts).
   { at: shiftX(MOSAIC_HOME, HILL_DX), color: '#ffb020', label: 'Guardian', kind: 'threat' },

@@ -7,8 +7,9 @@
 import * as THREE from 'three';
 import { makePerson, makeDog, M, box, cyl, sphere, shadowed } from './models';
 import { collapseRig } from './bake';
-import { GORG, inGorgPipica, onGorgBridge } from './gorg';
-import { GORG_GROUND_Y, GORG_TRAM } from './gorgGeom';
+// Runs in Gorg's local frame (game3d.ts passes localFrame views): local anchors and predicates.
+import { GORG_LOCAL as GORG } from './gorg';
+import { GORG_GROUND_Y, GORG_TRAM, inGorgPipica, onGorgBridge } from './gorgGeom';
 import { TramState, CartRushState, CART_LANES } from './gorgLogic';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';

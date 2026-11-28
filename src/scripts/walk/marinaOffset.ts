@@ -11,3 +11,10 @@ export { shiftX } from './hillOffset.ts';
 
 /** World x = marina-local x + MARINA_DX. */
 export const MARINA_DX = 472;
+
+/**
+ * Canal i Galeria and Ronda i Parc share the port's frame: Gorg's canal runs straight inland
+ * from the port's canal, as the real one does, and Ronda sits north of Gorg.
+ */
+export const GORG_DX = MARINA_DX;
+export const RONDA_DX = MARINA_DX;

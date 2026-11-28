@@ -131,7 +131,7 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   // The metro square's paving, around the stairwell (the entrance itself is resident, built in level.ts).
   {
     const MS = PLAZA.metroSquare;
-    for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(MS.x0, MS.x1, MS.z0, MS.z1, SEAFRONT_LAYOUT.metro)) {
+    for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(MS.x0, MS.x1, MS.z0, MS.z1, SEAFRONT_LAYOUT.metros.find((m) => m.id === 'plaza')!)) {
       root.add(env.ground(gx0, gx1, gz0, gz1, Y + 0.001, mats.panot, mats.panotTile));
     }
     // Behind it, a low wall with a planter, then a small courtyard before the next row of houses.

@@ -134,11 +134,11 @@ describe('the moved hill and the metro (re-orientation step 2)', () => {
     }
   });
 
-  it('puts the metro entrance in its square off Carrer Major, not on the Rambla', () => {
-    const metro = (layout as unknown as { metro: Rect }).metro;
+  it('puts the first metro entrance in its square off Carrer Major, not on the Rambla', () => {
+    const metro = (layout as unknown as { metros: (Rect & { id: string })[] }).metros[0];
     const sq = zone('metroSquare');
+    assert.equal(metro.id, 'plaza', "the 2D street's metro links to the first entrance");
     assert.ok(metro.x0 > sq.x0 && metro.x1 < sq.x1 && metro.z0 > sq.z0 && metro.z1 < sq.z1);
-    assert.ok(inside(byId.get('plaza')!.bounds, poiPos(layout, 'plaza', 'metro').x, poiPos(layout, 'plaza', 'metro').z));
     assert.ok(!byId.get('rambla')!.pois.some((p) => p.id === 'metro'));
   });
 
@@ -171,6 +171,34 @@ describe('the port (re-orientation step 3)', () => {
     const a = MICO_ARENA_LOCAL;
     assert.ok(inside(marina.bounds, a.x0 + MARINA_DX, a.z0) && inside(marina.bounds, a.x1 + MARINA_DX, a.z1));
     assert.ok(inside(marina.bounds, poiPos(layout, 'marina', 'lighthouse').x, poiPos(layout, 'marina', 'lighthouse').z));
+  });
+});
+
+describe('Canal i Galeria, Ronda and Carrer del Progrés (re-orientation step 4)', () => {
+  const b = (id: string) => byId.get(id)!.bounds;
+  const zone = (id: string) => (layout as unknown as { zones: (Rect & { id: string })[] }).zones.find((z) => z.id === id)!;
+
+  it('puts Gorg inland of the port, its canal straight on from the port canal', () => {
+    assert.equal(zone('gorgCanal').x0, zone('marinaCanal').x0);
+    assert.equal(zone('gorgCanal').x1, zone('marinaCanal').x1);
+    assert.equal(b('gorg').x0, b('marina').x0 - 6);
+    assert.equal(b('ronda').z0, b('gorg').z1, 'Ronda sits north of Gorg');
+  });
+
+  it('closes the gap between La Fàbrica and Gorg with Carrer del Progrés', () => {
+    assert.equal(b('progres').x0, b('fabrica').x1);
+    assert.equal(b('progres').x1, b('gorg').x0);
+  });
+
+  it('puts a metro entrance where each real L2 stop is, inside its district', () => {
+    const metros = (layout as unknown as { metros: (Rect & { id: string })[] }).metros;
+    assert.deepEqual(metros.map((m) => m.id), ['plaza', 'progres', 'gorg']);
+    for (const m of metros) {
+      const d = byId.get(m.id)!;
+      assert.ok(inside(d.bounds, m.x0, m.z0) && inside(d.bounds, m.x1, m.z1), `metro ${m.id} outside its district`);
+    }
+    // Southwest (+x) in the real order: town hall terminus, then the middle stop, then Gorg.
+    assert.ok(metros[0].x0 < metros[1].x0 && metros[1].x0 < metros[2].x0);
   });
 });
 

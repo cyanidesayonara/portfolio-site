@@ -21,15 +21,24 @@ import type { ColliderGrid, District } from './world';
 import type { BoxCollider, CircleCollider } from './level';
 import {
   RONDA_BRIDGE, RONDA_PIPICA, RONDA_SKATE, RONDA_TRENCH, RONDA_TRENCH_Y,
-  inRondaPipica, onRondaBridge, rondaFloor, rondaSurface,
+  inRondaPipica as inRondaPipicaLocal, onRondaBridge as onRondaBridgeLocal, rondaFloor as rondaFloorLocal, rondaSurface as rondaSurfaceLocal,
 } from './rondaGeom';
+import { RONDA_DX, shiftX } from './marinaOffset';
 
-export { rondaFloor, rondaSurface, inRondaPipica, onRondaBridge, RONDA_BRIDGE, RONDA_PIPICA, RONDA_SKATE, RONDA_TRENCH };
+export { RONDA_BRIDGE, RONDA_PIPICA, RONDA_SKATE, RONDA_TRENCH };
 
-const PIP = SEAFRONT_LAYOUT.pipica6 ?? RONDA_PIPICA;
+/** Ronda i Parc's predicates in world coordinates (rondaGeom.ts works in the local frame). */
+export const rondaFloor = (x: number, z: number) => rondaFloorLocal(x - RONDA_DX, z);
+export const rondaSurface = (x: number, z: number) => rondaSurfaceLocal(x - RONDA_DX, z);
+export const inRondaPipica = (x: number, z: number) => inRondaPipicaLocal(x - RONDA_DX, z);
+export const onRondaBridge = (x: number, z: number) => onRondaBridgeLocal(x - RONDA_DX, z);
+
+/** This district's pipicà in its local frame (the layout data holds world positions). */
+const PIP = SEAFRONT_LAYOUT.pipica6 ? shiftX(SEAFRONT_LAYOUT.pipica6, -RONDA_DX) : RONDA_PIPICA;
 
 /** Anchors shared between Ronda geometry (ronda.ts) and runtime events (rondaLife.ts). */
-export const RONDA = {
+/** Shared anchors in the district's local frame (it shares the port's frame; marinaOffset.ts). */
+export const RONDA_LOCAL = {
   id: 'ronda',
   x1: -104,
   minX: -220,
@@ -62,6 +71,9 @@ export const RONDA = {
   ] as [number, number][][],
 };
 
+/** The same anchors in world coordinates (the district is built locally and shifted by RONDA_DX). */
+export const RONDA = shiftX(RONDA_LOCAL, RONDA_DX);
+
 export interface RondaEnv {
   groundY: number;
   grid: ColliderGrid;
@@ -85,7 +97,7 @@ export interface RondaEnv {
 /** Ronda i Parc as a streamable inland overpass district. */
 export function makeRondaDistrict(env: RondaEnv): District {
   const d: District = {
-    id: RONDA.id,
+    id: RONDA_LOCAL.id,
     label: env.layout.label,
     bounds: env.layout.bounds,
     root: new THREE.Group(),
@@ -101,7 +113,9 @@ export function makeRondaDistrict(env: RondaEnv): District {
       d.root.clear();
     },
   };
-  d.root.name = RONDA.id;
+  d.root.name = RONDA_LOCAL.id;
+  // Everything below is built in the local frame; the root carries it into place.
+  d.root.position.x = RONDA_DX;
   return d;
 }
 
@@ -114,11 +128,11 @@ function* buildRondaSteps(env: RondaEnv, d: District): Generator<void, void, voi
     root.add(o);
     return o;
   };
-  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, district: RONDA.id });
+  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, x0: b.x0 + RONDA_DX, x1: b.x1 + RONDA_DX, district: RONDA_LOCAL.id });
   const addCircle = (x: number, z: number, rr: number, top: number, kind: string, canPee: boolean, canWhirl: boolean) => {
-    const c: CircleCollider = { x, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: RONDA.id };
-    if (canWhirl || kind === 'tree' || kind === 'palm') c.obstacle = { x, z, r: rr, kind: 'pole' };
-    else if (['bench', 'bin', 'fountain', 'table'].includes(kind)) c.obstacle = { x, z, r: rr, kind: 'furniture' };
+    const c: CircleCollider = { x: x + RONDA_DX, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: RONDA_LOCAL.id };
+    if (canWhirl || kind === 'tree' || kind === 'palm') c.obstacle = { x: x + RONDA_DX, z, r: rr, kind: 'pole' };
+    else if (['bench', 'bin', 'fountain', 'table'].includes(kind)) c.obstacle = { x: x + RONDA_DX, z, r: rr, kind: 'furniture' };
     grid.addCircle(c);
   };
 
@@ -264,25 +278,25 @@ function* buildRondaSteps(env: RondaEnv, d: District): Generator<void, void, voi
       }),
     );
     place(pSign, PIP.x1 + 0.1, Y + 1.75, PIP.gateZ0 - 1.5);
-    place(makeWaterBowl(), RONDA.bowl.x, Y, RONDA.bowl.z);
-    place(makeBench(), RONDA.pipicaBench.x + 0.35, Y, RONDA.pipicaBench.z, -Math.PI / 2);
+    place(makeWaterBowl(), RONDA_LOCAL.bowl.x, Y, RONDA_LOCAL.bowl.z);
+    place(makeBench(), RONDA_LOCAL.pipicaBench.x + 0.35, Y, RONDA_LOCAL.pipicaBench.z, -Math.PI / 2);
     addBox({
-      x0: RONDA.pipicaBench.x + 0.15, x1: RONDA.pipicaBench.x + 0.7,
-      z0: RONDA.pipicaBench.z - 0.9, z1: RONDA.pipicaBench.z + 0.9,
+      x0: RONDA_LOCAL.pipicaBench.x + 0.15, x1: RONDA_LOCAL.pipicaBench.x + 0.7,
+      z0: RONDA_LOCAL.pipicaBench.z - 0.9, z1: RONDA_LOCAL.pipicaBench.z + 0.9,
       top: Y + 0.5, kind: 'bench',
     });
   }
   yield;
 
   // ---- Trees, lamps, benches, fountain, fingerpost, perimeter ----
-  for (let i = 0; i < RONDA.trees.length; i++) {
-    const [tx, tz] = RONDA.trees[i];
+  for (let i = 0; i < RONDA_LOCAL.trees.length; i++) {
+    const [tx, tz] = RONDA_LOCAL.trees[i];
     const t = makePlaneTree(800 + i);
     place(t.group, tx, Y, tz, r() * Math.PI);
     addCircle(tx, tz, t.radius, Y + 6, 'tree', true, true);
     if (i % 2 === 1) yield;
   }
-  for (const [x, z] of RONDA.lamps) {
+  for (const [x, z] of RONDA_LOCAL.lamps) {
     const lamp = makeLanternPost();
     lamp.group.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -302,8 +316,8 @@ function* buildRondaSteps(env: RondaEnv, d: District): Generator<void, void, voi
       top: Y + 0.5, kind: 'bench',
     });
   }
-  place(makeFountain(), RONDA.drink.x, Y, RONDA.drink.z, Math.PI / 2);
-  addCircle(RONDA.drink.x, RONDA.drink.z, 0.25, Y + 1.1, 'fountain', true, false);
+  place(makeFountain(), RONDA_LOCAL.drink.x, Y, RONDA_LOCAL.drink.z, Math.PI / 2);
+  addCircle(RONDA_LOCAL.drink.x, RONDA_LOCAL.drink.z, 0.25, Y + 1.1, 'fountain', true, false);
   place(makeFingerpost([
     { title: 'Ronda', sub: 'Pont · Parc', color: '#ffb020', angle: Math.PI / 2 },
     { title: 'Canal i Galeria', sub: 'Sud', color: '#1fc9b7', angle: Math.PI },
