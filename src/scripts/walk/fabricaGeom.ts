@@ -27,7 +27,8 @@ export const FABRICA_PIPICA = {
 } as const;
 
 /** The Rambla strip past the old x = 92 rail, now walkable up to the new end rail. */
-export const RAMBLA_EAST = { x0: 91.5, x1: 139.4, z0: 14.3, z1: 33.6 } as const;
+/** The Rambla's +x stretch past La Fàbrica, on to Canal i Galeria (gorg.ts) at x 252. */
+export const RAMBLA_EAST = { x0: 91.5, x1: 252, z0: 14.3, z1: 33.6 } as const;
 
 export const inFabricaPipica = (x: number, z: number): boolean =>
   x > FABRICA_PIPICA.x0 && x < FABRICA_PIPICA.x1 && z > FABRICA_PIPICA.z0 && z < FABRICA_PIPICA.z1;

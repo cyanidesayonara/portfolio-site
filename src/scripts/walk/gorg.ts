@@ -21,15 +21,28 @@ import type { ColliderGrid, District } from './world';
 import type { BoxCollider, CircleCollider } from './level';
 import {
   GORG_CANAL, GORG_COURT, GORG_GALLERY, GORG_PAVELLO,
-  GORG_PIPICA, GORG_TRAM, GORG_WATER_Y, gorgFloor, gorgSurface, inGorgPipica, onGorgBridge,
+  GORG_PIPICA, GORG_TRAM, GORG_WATER_Y, gorgFloor as gorgFloorLocal, gorgSurface as gorgSurfaceLocal, inGorgPipica as inGorgPipicaLocal, onGorgBridge as onGorgBridgeLocal,
 } from './gorgGeom';
+import { GORG_DX, shiftX } from './marinaOffset';
+import { groundAroundMetro } from './metro';
 
-export { gorgFloor, gorgSurface, inGorgPipica, onGorgBridge, GORG_CANAL, GORG_COURT, GORG_PIPICA, GORG_TRAM };
+/** The metro entrance by the tram stop, in Gorg's local frame (layout data `metros`, id gorg). */
+const METRO_LOCAL = shiftX(SEAFRONT_LAYOUT.metros.find((m) => m.id === 'gorg')!, -GORG_DX);
 
-const PIP = SEAFRONT_LAYOUT.pipica5 ?? GORG_PIPICA;
+export { GORG_CANAL, GORG_COURT, GORG_PIPICA, GORG_TRAM };
+
+/** Canal i Galeria's predicates in world coordinates (gorgGeom.ts works in the local frame). */
+export const gorgFloor = (x: number, z: number) => gorgFloorLocal(x - GORG_DX, z);
+export const gorgSurface = (x: number, z: number) => gorgSurfaceLocal(x - GORG_DX, z);
+export const inGorgPipica = (x: number, z: number) => inGorgPipicaLocal(x - GORG_DX, z);
+export const onGorgBridge = (x: number, z: number) => onGorgBridgeLocal(x - GORG_DX, z);
+
+/** This district's pipicà in its local frame (the layout data holds world positions). */
+const PIP = SEAFRONT_LAYOUT.pipica5 ? shiftX(SEAFRONT_LAYOUT.pipica5, -GORG_DX) : GORG_PIPICA;
 
 /** Anchors shared between Gorg geometry (gorg.ts) and runtime events (gorgLife.ts). */
-export const GORG = {
+/** Shared anchors in the district's local frame (it shares the port's frame; marinaOffset.ts). */
+export const GORG_LOCAL = {
   id: 'gorg',
   x1: -104,
   minX: -220,
@@ -62,6 +75,9 @@ export const GORG = {
   ] as [number, number][][],
 };
 
+/** The same anchors in world coordinates (the district is built locally and shifted by GORG_DX). */
+export const GORG = shiftX(GORG_LOCAL, GORG_DX);
+
 export interface GorgEnv {
   groundY: number;
   grid: ColliderGrid;
@@ -93,7 +109,7 @@ const mtx = (x: number, y: number, z: number, ry = 0, sx = 1, sy = 1, sz = 1) =>
 /** Canal i Galeria as a streamable western boulevard district. */
 export function makeGorgDistrict(env: GorgEnv): District {
   const d: District = {
-    id: GORG.id,
+    id: GORG_LOCAL.id,
     label: env.layout.label,
     bounds: env.layout.bounds,
     root: new THREE.Group(),
@@ -109,7 +125,9 @@ export function makeGorgDistrict(env: GorgEnv): District {
       d.root.clear();
     },
   };
-  d.root.name = GORG.id;
+  d.root.name = GORG_LOCAL.id;
+  // Everything below is built in the local frame; the root carries it into place.
+  d.root.position.x = GORG_DX;
   return d;
 }
 
@@ -122,11 +140,11 @@ function* buildGorgSteps(env: GorgEnv, d: District): Generator<void, void, void>
     root.add(o);
     return o;
   };
-  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, district: GORG.id });
+  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, x0: b.x0 + GORG_DX, x1: b.x1 + GORG_DX, district: GORG_LOCAL.id });
   const addCircle = (x: number, z: number, rr: number, top: number, kind: string, canPee: boolean, canWhirl: boolean) => {
-    const c: CircleCollider = { x, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: GORG.id };
-    if (canWhirl || kind === 'tree' || kind === 'palm') c.obstacle = { x, z, r: rr, kind: 'pole' };
-    else if (['bench', 'bin', 'fountain', 'table', 'hoop'].includes(kind)) c.obstacle = { x, z, r: rr, kind: 'furniture' };
+    const c: CircleCollider = { x: x + GORG_DX, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: GORG_LOCAL.id };
+    if (canWhirl || kind === 'tree' || kind === 'palm') c.obstacle = { x: x + GORG_DX, z, r: rr, kind: 'pole' };
+    else if (['bench', 'bin', 'fountain', 'table', 'hoop'].includes(kind)) c.obstacle = { x: x + GORG_DX, z, r: rr, kind: 'furniture' };
     grid.addCircle(c);
   };
 
@@ -136,7 +154,9 @@ function* buildGorgSteps(env: GorgEnv, d: District): Generator<void, void, void>
 
   // ---- Paving, turquoise canal basin, masonry walls & twin timber bridges ----
   // East bank (-162..-104) & West bank (-220..-178), plus north canal cap (96..102).
-  root.add(env.ground(-162, -104, 14, 102, Y + 0.002, mats.panot, mats.panotTile));
+  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(-162, -104, 14, 102, METRO_LOCAL)) {
+    root.add(env.ground(gx0, gx1, gz0, gz1, Y + 0.002, mats.panot, mats.panotTile));
+  }
   root.add(env.ground(-220, -178, 14, 102, Y + 0.002, mats.panot, mats.panotTile));
   root.add(env.ground(-178, -162, 96, 102, Y + 0.002, mats.panot, mats.panotTile));
   // Lighter concrete canal promenades flanking the basin.
@@ -317,20 +337,20 @@ function* buildGorgSteps(env: GorgEnv, d: District): Generator<void, void, void>
       new THREE.MeshStandardMaterial({ map: signTexture('Pipicà', 'Off-leash area', '#8bcb3c', { aspect: 2.2 / 0.7 }), roughness: 0.7 }),
     );
     place(pSign, PIP.x1 + 0.1, Y + 1.75, PIP.gateZ0 - 1.5);
-    place(makeWaterBowl(), GORG.bowl.x, Y, GORG.bowl.z);
-    place(makeBench(), GORG.pipicaBench.x + 0.35, Y, GORG.pipicaBench.z, -Math.PI / 2);
-    addBox({ x0: GORG.pipicaBench.x + 0.15, x1: GORG.pipicaBench.x + 0.7, z0: GORG.pipicaBench.z - 0.9, z1: GORG.pipicaBench.z + 0.9, top: Y + 0.5, kind: 'bench' });
+    place(makeWaterBowl(), GORG_LOCAL.bowl.x, Y, GORG_LOCAL.bowl.z);
+    place(makeBench(), GORG_LOCAL.pipicaBench.x + 0.35, Y, GORG_LOCAL.pipicaBench.z, -Math.PI / 2);
+    addBox({ x0: GORG_LOCAL.pipicaBench.x + 0.15, x1: GORG_LOCAL.pipicaBench.x + 0.7, z0: GORG_LOCAL.pipicaBench.z - 0.9, z1: GORG_LOCAL.pipicaBench.z + 0.9, top: Y + 0.5, kind: 'bench' });
   }
 
   // ---- Trees, lamps, benches, fountains, and outer perimeter fences ----
-  for (let i = 0; i < GORG.trees.length; i++) {
-    const [tx, tz] = GORG.trees[i];
+  for (let i = 0; i < GORG_LOCAL.trees.length; i++) {
+    const [tx, tz] = GORG_LOCAL.trees[i];
     const t = i % 2 === 0 ? makePlaneTree(700 + i) : makeDatePalm(700 + i, 9.5 + (i % 3));
     place(t.group, tx, Y, tz, r() * Math.PI);
     addCircle(tx, tz, t.radius, Y + 6, 'tree', true, true);
     if (i % 2 === 1) yield;
   }
-  for (const [x, z] of GORG.lamps) {
+  for (const [x, z] of GORG_LOCAL.lamps) {
     const lamp = makeLanternPost();
     lamp.group.traverse((o) => { const m = o as THREE.Mesh; if (m.material === lamp.glass) m.material = mats.lampGlass; });
     place(lamp.group, x, Y, z);
@@ -341,24 +361,25 @@ function* buildGorgSteps(env: GorgEnv, d: District): Generator<void, void, void>
     const along = Math.abs(Math.sin(ry)) < 0.5;
     addBox({ x0: bx - (along ? 0.9 : 0.45), x1: bx + (along ? 0.9 : 0.45), z0: bz - (along ? 0.45 : 0.9), z1: bz + (along ? 0.45 : 0.9), top: Y + 0.5, kind: 'bench' });
   }
-  place(makeFountain(), GORG.drink.x, Y, GORG.drink.z, Math.PI / 2);
-  addCircle(GORG.drink.x, GORG.drink.z, 0.25, Y + 1.1, 'fountain', true, false);
+  place(makeFountain(), GORG_LOCAL.drink.x, Y, GORG_LOCAL.drink.z, Math.PI / 2);
+  addCircle(GORG_LOCAL.drink.x, GORG_LOCAL.drink.z, 0.25, Y + 1.1, 'fountain', true, false);
   place(makeFingerpost([
-    { title: 'Rambla', sub: 'Centre · Estació', color: '#ffb020', angle: 0 },
+    { title: 'Rambla', sub: 'Centre · Estació', color: '#ffb020', angle: Math.PI },
     { title: 'Galeria · Pavelló', sub: 'Nord del canal', color: '#1fc9b7', angle: Math.PI / 2 },
   ]), -156, Y, 30.8);
   addCircle(-156, 30.8, 0.14, Y + 3.4, 'pole', true, true);
 
-  // Outer borders: west wall (-220), north fence (100.5) with a gap toward Ronda, east town edge.
-  for (let z = 16; z <= 98; z += 4) place(makeHeras(4.0), -220, Y, z, Math.PI / 2);
-  addBox({ x0: -220.2, x1: -219.8, z0: 14, z1: 100.5, top: 9, kind: 'fence' });
+  // Outer borders: the west edge opens onto the Rambla (z 14..38.8, with the tram), the north fence
+  // (100.5) has a gap toward Ronda, and the far east edge is closed for now.
+  for (let z = 42; z <= 98; z += 4) place(makeHeras(4.0), -220, Y, z, Math.PI / 2);
+  addBox({ x0: -220.2, x1: -219.8, z0: 38.8, z1: 100.5, top: 9, kind: 'fence' });
   // Leave an open approach corridor around x = -165 for Phase 8 Ronda.
   for (let x = -218; x <= -178; x += 4) place(makeHeras(4.0), x, Y, 100.5, 0);
   for (let x = -150; x <= -106; x += 4) place(makeHeras(4.0), x, Y, 100.5, 0);
   addBox({ x0: -220, x1: -178, z0: 100.3, z1: 100.7, top: 9, kind: 'fence' });
   addBox({ x0: -152, x1: -104, z0: 100.3, z1: 100.7, top: 9, kind: 'fence' });
-  for (let z = 62; z <= 98; z += 4) place(makeHeras(4.0), -104, Y, z, Math.PI / 2);
-  addBox({ x0: -104.2, x1: -103.8, z0: 38.8, z1: 100.5, top: 9, kind: 'fence' });
+  for (let z = 16; z <= 98; z += 4) place(makeHeras(4.0), -104, Y, z, Math.PI / 2);
+  addBox({ x0: -104.2, x1: -103.8, z0: 14, z1: 100.5, top: 9, kind: 'fence' });
 
   const flush = builder.flushSteps(root);
   while (!flush.next().done) yield;

@@ -26,11 +26,13 @@ import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './mari
 import { GORG, inGorgPipica, makeGorgDistrict } from './gorg';
 import { RONDA, inRondaPipica, makeRondaDistrict } from './ronda';
 import { MARINA_CLAMP } from './marinaGeom';
+import { GORG_DX } from './marinaOffset';
+import { makeBlocksDistrict } from './blocksDistrict';
 import { HILL_DX } from './hillOffset';
 import { GORG_CLAMP } from './gorgGeom';
 import { RONDA_CLAMP } from './rondaGeom';
 import { FABRICA, inFabricaPipica, makeFabricaDistrict } from './fabrica';
-import { RAMBLA_EAST, clampFabrica } from './fabricaGeom';
+import { FABRICA_BOUNDS, RAMBLA_EAST, clampFabrica } from './fabricaGeom';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
@@ -54,7 +56,7 @@ export interface CircleCollider {
   x: number; z: number; r: number; top: number; minY?: number; maxY?: number;
   kind: string; canPee: boolean; canWhirl: boolean; marked: boolean; obstacle?: Obstacle; district?: string;
 }
-export interface Stop { id: string; label: string; kind: string; href: string; color: string; x: number; z: number; r: number }
+export interface Stop { id: string; label: string; kind: string; href: string; color: string; x: number; z: number; r: number; /** Metro stops: which entrance (layout `metros` id). */ station?: string }
 export interface Mound { x: number; z: number; name: string; dug: boolean; mesh: THREE.Object3D; loot: THREE.Object3D }
 export type Surface = 'paving' | 'sand' | 'water' | 'deck';
 
@@ -81,8 +83,8 @@ const EDGE = {
   clamp: 91.5,
   /** The fingerpost at the mouth of Avinguda de la Fàbrica. */
   fabricaPost: 94,
-  /** The Rambla's end rail, at the mouth of Avinguda de la Fàbrica. */
-  ramblaE: 140,
+  /** The Rambla runs on past Avinguda de la Fàbrica into Canal i Galeria (gorg.ts). */
+  ramblaE: 252,
   /** The promenade and the beach run on past the old pier to the port, at the breakwater's root. */
   promE: 258,
   /** The beach sand's far edge (under the breakwater's root). */
@@ -93,6 +95,8 @@ const EDGE = {
 /** Harbor basin water inside the port's breakwater (marina.ts), kept apart from the open sea. */
 const HARBOR_WATER = { x0: 266, x1: 372, z0: -40.02, z1: -17.5 } as const;
 const RAMPS = SEAFRONT_LAYOUT.ramps;
+/** The small square off the Rambla on Carrer del Progrés, with its metro entrance. */
+const PROGRES_SQUARE = SEAFRONT_LAYOUT.zones.find((z) => z.id === 'progresSquare')!;
 const PIER = SEAFRONT_LAYOUT.pier;
 /** The pier's center line. */
 const PIER_X = (PIER.x0 + PIER.x1) / 2;
@@ -470,14 +474,14 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   place(makeSkip(), 37, GROUND_Y, 71, Math.PI / 2);
   place(makeExcavator(), -38, GROUND_Y, 89, 1.2);
-  // Rambla opens west into Canal i Galeria at x -104; add a guiding fingerpost near -94.
+  // The Rambla's -x end is closed; its +x end runs on past Avinguda de la Fàbrica (fabrica.ts) and the
+  // streets of Carrer del Progrés into Canal i Galeria (gorg.ts), with a fingerpost before the canal.
+  obresLine(EDGE.west, 14.6, EDGE.west, 33.4);
   place(makeFingerpost([
-    { title: 'Canal · Galeria', sub: 'Tramvia · Pavelló', color: '#1fc9b7', angle: Math.PI },
-    { title: 'Rambla · Centre', sub: 'Metro · Estació', color: '#ffb020', angle: 0 },
-  ]), EDGE.groinW, GROUND_Y, 22);
-  addCircle(EDGE.groinW, 22, 0.14, GROUND_Y + 3.2, 'pole', true, true);
-  // The Rambla runs on past x 92 to the mouth of Avinguda de la Fàbrica (fabrica.ts); its end rail is at x 140.
-  obresLine(EDGE.ramblaE, 14.6, EDGE.ramblaE, 33.4);
+    { title: 'Canal · Galeria', sub: 'Tramvia · Pavelló', color: '#1fc9b7', angle: 0 },
+    { title: 'Rambla · Centre', sub: 'Metro · Estació', color: '#ffb020', angle: Math.PI },
+  ]), EDGE.ramblaE - 8, GROUND_Y, 31.6);
+  addCircle(EDGE.ramblaE - 8, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   place(makeFingerpost([
     { title: 'Av. de la Fàbrica', sub: 'Forn · Xemeneia', color: '#d98c2b', angle: 0 },
     { title: 'Estació · Centre', sub: 'Metro · Platja', color: '#ffb020', angle: Math.PI },
@@ -696,13 +700,18 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
   stops0.push({ id: 'station', label: 'Estació', kind: 'Train to 2D street', href: '/?via=train', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 2.2, r: 5.5 });
 
-  // ---- The metro entrance, in a small square off Carrer Major (metro.ts; paving in plaza.ts) ----
-  const metroDef = SEAFRONT_LAYOUT.metro;
-  const metro = makeMetroEntrance(metroDef, GROUND_Y);
-  root.add(metro.group);
-  boxes.push({ ...metro.rail, kind: 'rail' });
-  addCircle(metro.totem.x, metro.totem.z, metro.totem.r, metro.totem.top, 'pole', true, true);
-  stops0.push({ id: 'metro', label: 'Metro', kind: 'Metro to 2D street', href: '/?via=metro', color: metroDef.lineColor, x: metro.head.x, z: metro.head.z, r: 2.2 });
+  // ---- Metro entrances where the real L2 stations are (metro.ts): off Carrer Major, in the square on
+  // Carrer del Progrés, and by the tram stop in Canal i Galeria. Their districts lay the paving around them.
+  const metroArrivals: Record<string, { label: string; dog: { x: number; z: number }; human: { x: number; z: number }; heading: number }> = {};
+  for (const def of SEAFRONT_LAYOUT.metros) {
+    const metro = makeMetroEntrance(def, GROUND_Y);
+    root.add(metro.group);
+    boxes.push({ ...metro.rail, kind: 'rail' });
+    addCircle(metro.totem.x, metro.totem.z, metro.totem.r, metro.totem.top, 'pole', true, true);
+    stops0.push({ id: 'metro', station: def.id, label: 'Metro', kind: 'Metro L2', href: '/?via=metro', color: def.lineColor, x: metro.head.x, z: metro.head.z, r: 2.2 });
+    // Arriving: up the stairs, facing the street (-z).
+    metroArrivals[def.id] = { label: def.label, dog: { x: metro.head.x - 1.3, z: metro.head.z }, human: { x: metro.head.x + 0.2, z: metro.head.z + 0.5 }, heading: -Math.PI / 2 };
+  }
 
   yield 'The underpass';
   // ---- The underpass ----------------------------------------------------------------------
@@ -1524,6 +1533,31 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   });
   districts.push(fabrica);
   root.add(fabrica.root);
+  // Carrer del Progrés: the streets between La Fàbrica and Canal i Galeria, blocks only for now,
+  // with the second metro entrance in a square off the Rambla (blocksDistrict.ts).
+  const progres = makeBlocksDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('progres')!, ground, newInstancer: () => new Instancer(), r,
+    mats: { panot: panotMat, panotTile: panot.tileMeters, wall: wallPlasterMat, litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM },
+    metros: SEAFRONT_LAYOUT.metros.filter((m) => m.id === 'progres'),
+  });
+  districts.push(progres);
+  root.add(progres.root);
+  // The shopping center just inland of the highway beyond Ronda i Parc: a big pale box with a glass
+  // band and a generic sign, always in view on the skyline from the +x side.
+  {
+    const mall = new THREE.Group();
+    const body = box(56, 13, 28, M(0xd9d6ce, 0.8));
+    body.position.set(0, 6.5, 0);
+    const band = box(56.2, 2.4, 28.2, M(0x2c3850, 0.2, 0.4));
+    band.position.set(0, 9.2, 0);
+    const cap = box(57, 0.6, 29, M(0xb9b4aa, 0.8));
+    cap.position.set(0, 13.3, 0);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(12, 2, 0.2), new THREE.MeshStandardMaterial({ map: signTexture('Centre comercial', 'Botigues · Cinema', '#e5302a', { aspect: 6 }), roughness: 0.6 }));
+    sign.position.set(-14, 11.6, -14.2);
+    mall.add(body, band, cap, sign);
+    shadowed(mall);
+    place(mall, 324, GROUND_Y, 214);
+  }
   bowls.push({ ...FABRICA.bowl });
   fountains.push({ ...FABRICA.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
@@ -1563,28 +1597,33 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     { ...FABRICA.pipicaBench, heading: 0 },
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
+    // Canal i Galeria and Ronda i Parc, inland of the port (they share its frame).
+    if (p.x > GORG.minX - 0.4 && p.z >= GORG_CLAMP.enterZ0 && p.z <= GORG_CLAMP.enterZ1) {
+      p.x = Math.min(GORG_CLAMP.x1 + GORG_DX, p.x);
+      p.z = Math.max(GORG_CLAMP.z0, Math.min(GORG_CLAMP.z1, p.z));
+      return;
+    }
+    if (p.x > RONDA.minX - 0.4 && p.z >= RONDA_CLAMP.enterZ0 && p.z <= RONDA_CLAMP.enterZ1) {
+      p.x = Math.max(RONDA_CLAMP.x0 + GORG_DX, Math.min(RONDA_CLAMP.x1 + GORG_DX, p.x));
+      p.z = Math.max(RONDA_CLAMP.z0, Math.min(RONDA_CLAMP.z1, p.z));
+      return;
+    }
+    // The metro square on Carrer del Progrés, off the Rambla.
+    if (p.z > RAMBLA_EAST.z1 && p.x > PROGRES_SQUARE.x0 && p.x < PROGRES_SQUARE.x1) {
+      p.x = Math.max(PROGRES_SQUARE.x0 + 0.4, Math.min(PROGRES_SQUARE.x1 - 0.4, p.x));
+      p.z = Math.min(p.z, PROGRES_SQUARE.z1 - 0.4);
+      return;
+    }
     // La Fàbrica: the avenue and the chimney square inland of the Rambla's +x end.
-    if (p.x > EDGE.clamp && p.z > RAMBLA_EAST.z1) {
+    if (p.x > EDGE.clamp && p.x < FABRICA_BOUNDS.x1 && p.z > RAMBLA_EAST.z1) {
       const c = clampFabrica(p.x, p.z);
       p.x = c.x; p.z = c.z;
       return;
     }
-    // The Rambla's +x stretch, up to its end rail.
+    // The Rambla's +x stretch, on into Canal i Galeria.
     if (p.x > EDGE.clamp && p.z > 4) {
       p.x = Math.min(RAMBLA_EAST.x1, p.x);
-      p.z = Math.max(RAMBLA_EAST.z0, p.z);
-      return;
-    }
-    // Ronda i Parc north of Gorg (west strip inland).
-    if (p.z >= RONDA_CLAMP.enterZ0 && p.z <= RONDA_CLAMP.enterZ1 && p.x < -EDGE.clamp) {
-      p.x = Math.max(RONDA_CLAMP.x0, Math.min(RONDA_CLAMP.x1, p.x));
-      p.z = Math.max(RONDA_CLAMP.z0, Math.min(RONDA_CLAMP.z1, p.z));
-      return;
-    }
-    // Gorg / Canal i Galeria corridor west of the Rambla.
-    if (p.z >= GORG_CLAMP.enterZ0 && p.z <= GORG_CLAMP.enterZ1 && p.x < -EDGE.clamp) {
-      p.x = Math.max(GORG_CLAMP.x0, p.x);
-      p.z = Math.max(GORG_CLAMP.z0, Math.min(GORG_CLAMP.z1, p.z));
+      p.z = Math.max(RAMBLA_EAST.z0, p.x >= FABRICA_BOUNDS.x1 ? Math.min(RAMBLA_EAST.z1, p.z) : p.z);
       return;
     }
     // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
@@ -1681,8 +1720,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     },
     correfoc: { x0: 80, x1: -2, z: 24 },
     station: { x: STATION_X },
-    // Arriving by metro: up the stairs, facing Carrer Major.
-    metro: { dog: { x: metro.head.x - 1.3, z: metro.head.z }, human: { x: metro.head.x + 0.2, z: metro.head.z + 0.5 }, heading: -Math.PI / 2 },
+    /** Arriving by metro at each entrance (layout `metros` ids; the first is the 2D street's link). */
+    metros: metroArrivals,
+    metroOrder: SEAFRONT_LAYOUT.metros.map((m) => m.id),
   };
 }
 

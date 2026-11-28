@@ -112,6 +112,12 @@ export class Streamer {
 
   /** Steps that build and bake everything within `near` of (x, z): for the loading screen. */
   *warm(x: number, z: number): Generator<number, void, void> {
+    // Finish whatever update() was in the middle of first, so no district is built twice.
+    if (this.job) {
+      while (!this.job.g.next().done) yield 0;
+      this.finish(this.job);
+      this.job = null;
+    }
     const todo = this.districts.filter((d) => distToBounds(d.bounds, x, z) < this.near && (!d.built || !d.baked));
     let done = 0;
     for (const d of todo) {
