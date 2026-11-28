@@ -1,107 +1,119 @@
-# `/walk` re-orientation: a miniature of the real town -- design proposal
+# `/walk` re-orientation: a miniature of the real town -- design
 
-Status: proposal for Santtu's review (2026-11-28). Nothing in this document is built yet; no code moves until Santtu picks a direction.
+Status: direction agreed with Santtu on 2026-11-28 (see "Decisions"). No code has moved yet; each migration step below lands as its own PR.
 
 ## Why
 
-The 3D walk is modeled on a real Catalan seafront town (never named on screen). The sea is -z and the default camera faces it, so **+x is the right-hand side when looking out to sea: southwest, toward Barcelona**, and **-x is northeast, toward Montgat**. Today the port (Marina), Gorg (Canal i Galeria) and the C-31 trench (Ronda i Parc) sit on the -x side, which is the mirror image of the real town. The old oil pier is also on the wrong side of the station (x -48), and so is the old distillery with its chimney. Santtu wants the level to end up as a miniaturized but still recognizable version of the real town, so the overall layout needs to be planned from a real map before more districts are added.
+The 3D walk is modeled on a real Catalan seafront town (never named on screen). The sea is -z and the default camera faces it, so **+x is the right-hand side when looking out to sea: southwest, toward Barcelona**, and **-x is northeast, toward Montgat**. Today the port (Marina), Gorg (Canal i Galeria) and the C-31 stretch (Ronda i Parc) sit on the -x side, which is the mirror image of the real town. The old oil pier, the old distillery and the horizon's city skyline are mirrored as well. The goal is a miniaturized but still recognizable version of the real town: not photorealistic, but where possible each place should look like the real thing.
+
+## Decisions (Santtu, 2026-11-28)
+
+1. **Rebuild, not mirror.** Marina, Gorg and Ronda are rebuilt at their real positions and in their real shapes, from the map and reference photos, keeping their gameplay (quests, chases, bosses, pipicàs and goal ids). A mirror would be quicker but would keep invented shapes in the wrong places.
+2. **Distillery in its real position:** seaward of the tracks, a little way toward Barcelona from the station, at the old pier's root.
+3. **Realistic metro:** three L2 entrances where the real stations are (Pompeu Fabra near the town hall, Pep Ventura, Gorg), and maybe a fourth (Santa Coloma) later.
+4. **Move the hill** to its real position (it is too far toward +x today).
+5. **Montgat side order:** left to this design (see step 6 of the migration).
 
 ## The real town, measured from the station
 
-Positions below come from OpenStreetMap data (November 2026), projected onto the game's axes with the commuter-rail station as the origin. "Along" is meters along the coast (positive = southwest, toward Barcelona, which is game +x); "inland" is meters away from the sea (game +z). They are rounded and only meant for layout.
+Positions come from OpenStreetMap data (November 2026), projected onto the game's axes with the commuter-rail station as the origin. "Along" is meters along the coast (positive = southwest, toward Barcelona = game +x); "inland" is meters away from the sea (game +z). Rounded; only meant for layout. "Game" is the target position under the scale below.
 
-| Place | Along (m) | Inland (m) | Notes |
-| --- | ---: | ---: | --- |
-| Commuter-rail station (game `Estació`) | 0 | 0 | Tracks run along the coast between the town and the beach. |
-| The Rambla (seafront promenade street) | -250 .. -620 | ~5 | Runs northeast from the station, alongside the tracks. |
-| Carrer de Mar (pedestrian shopping street) | ~-210 | 60 .. 150 | Runs inland from the Rambla. |
-| Main market square and its (temporary) market hall | ~-95 | ~270 | Next to the town hall square. |
-| Town hall square | ~-300 | ~390 | |
-| L2 metro terminus near the town hall | ~-35 | ~540 | The real metro station closest to the center. |
-| Museum (Roman city remains) | ~-490 | ~535 | Old town on the hill. |
-| Old town church | ~-465 | ~665 | Hilltop; the finish line in the game. |
-| Carrer de Sant Pau / Carrer de Prim | -600 .. -700 | 275 .. 340 | The old streets on the Montgat side of the center. |
-| Old distillery (anise factory) | ~+415 | ~-50 | Between the tracks and the promenade, at the pier's root. |
-| The old oil pier | ~+480 (root) | -250 (shore end) | Runs out to sea from the promenade. |
-| A covered neighborhood market | ~+485 | ~465 | Inland, on the Barcelona side of the center. |
-| L2 metro stop on the Barcelona side | ~+720 | ~610 | |
-| Port / marina (pontoons, breakwater) | +1260 .. +1370 | -230 .. -290 | The beach runs southwest from the pier to the port. |
-| Gorg (L2/L10 metro, end of the T5 tram) | ~+1250 | ~655 | Inland of the port. |
-| Shopping center | ~+1190 | ~1095 | Just inland of the C-31. |
-| C-31 highway | full width | ~1000 (center), 800-950 behind the old town, bends to the coast near Montgat | Runs parallel to the coast and splits the town from the inland neighborhoods. |
-| Montgat station | ~-2700 | ~-350 | The coast bends seaward to the northeast. |
+| Place | Along (m) | Inland (m) | Game x, z | Notes |
+| --- | ---: | ---: | --- | --- |
+| Commuter-rail station (`Estació`) | 0 | 0 | 47, 17 (unchanged) | Tracks run along the coast between the town and the beach. |
+| The Rambla | -250 .. -620 | ~5 | | Runs northeast from the station. The game's Rambla is already a squeezed stand-in. |
+| Carrer de Mar | ~-210 | 60 .. 150 | x 0 (unchanged) | Pedestrian shopping street inland from the Rambla. |
+| Main market square and market hall | ~-95 | ~270 | ~23, 90 | The game's Plaça del Mercat (x -70..70, z 101..173) already covers it. |
+| Town hall square | ~-300 | ~390 | ~-28, 130 | |
+| **L2 Pompeu Fabra** (terminus) | ~-35 | ~540 | **~38, 180** | Inland of Carrer Major's +x half, once the hill moves. |
+| Museum (Roman city remains) | ~-490 | ~535 | ~-76, 179 | Old town on the hill. |
+| Old town church | ~-465 | ~665 | ~-70, 221 | Hilltop finish line. |
+| Carrer de Sant Pau / Carrer de Prim | -600 .. -700 | 275 .. 340 | ~-103 .. -128, 92 .. 113 | Old streets on the Montgat side of the center. |
+| Beach and promenade, Montgat side | -700 .. -1050 | | ~-128 .. -171 | Continues toward Montgat (station ~2700 m away). |
+| **Old distillery** (anise factory) | ~+415 | ~-50 | **~151, -16** | Between the tracks and the promenade. |
+| **Old oil pier** | ~+480 (root) | -250 (shore end) | **~167, root at the promenade** | Runs out to sea from the promenade beside the distillery. |
+| Covered neighborhood market | ~+485 | ~465 | ~168, 155 | Inland of La Fàbrica. |
+| **L2 Pep Ventura** | ~+720 | ~610 | **~225, 203** | |
+| Port canal (water) | ~+1210 | ~120 | ~286, 40 | A real canal runs inland from the port basin; the game's canal fits here. |
+| Small park pond | ~+1210 | ~290 | ~286, 98 | Possible model for a pond park near the canal. |
+| Port / marina pontoons, breakwater | +1260 .. +1370 | -230 .. -290 | ~292 .. 306, -76 .. -96 | The beach runs southwest from the pier to the port. |
+| **L2/L10 Gorg** and the T5 tram terminus | ~+1250 .. +1320 | ~650 | **~291 .. 299, 217** | The tram continues southwest along the coast toward Sant Roc. |
+| Shopping center | ~+1190 | ~1095 | ~283, 365 | Just inland of the C-31, next to a small hill. |
+| C-31 highway | full width | ~1000 (center and +x), 800-950 behind the old town | z ~330 .. 345 at +x, ~300 behind the hill | OSM marks many short bridge segments where it crosses streets (no tunnel or cutting tags), so here it may run at grade or raised rather than sunken. Confirm with photos before modeling. |
+| Santa Coloma metro | ~+1630 | ~3070 | off the map | Far inland across the C-31; it is an L1 station, not L2. |
 
-What this means for the game:
+### Scale
 
-- **The center is already about right.** The real Carrer de Mar, market square and old town all sit slightly northeast (-x) of the station and climb inland, which is what the game has: `Estació` at x 47, Carrer del Mar at x 0, Plaça del Mercat and Dalt de la Vila straight inland. At roughly quarter scale the hill would sit a bit further toward -x (around x -70), but that is a nice-to-have, not a mismatch.
-- **Everything on the -x side is mirrored.** The pier, the distillery, the beach run to the port, the port, Gorg, the shopping center and the C-31 stretch the game uses all belong at +x.
-- **La Fàbrica (Phase 9, PR #35) is on the correct side.** At x 96..176 inland of the Rambla it lines up with the real neighborhood market and the streets between the center and Gorg.
-- **The horizon is mirrored too.** `horizon.ts` places the big city's skyline "to the southwest (-X)", but southwest is +x. The skyline and the three chimneys belong on the +x side; the -x horizon should show the coast bending seaward toward Montgat and its headland.
+The current center already fits roughly: **game x = 47 + along / 4** within 700 m of the station, then **one eighth** beyond that (so the port is not a three-minute walk); **game z = inland / 3**. Every target position in this document comes from that rule, then nudged so districts tile cleanly.
+
+What this means:
+
+- **Keep:** Estació, the Rambla, Carrer del Mar, Plaça del Mercat, the beach pipicà, the boardwalk pavilions and La Fàbrica (Phase 9, PR #35) are on the correct side and roughly in scale.
+- **Move:** the old pier, the distillery and its chimney, the hill, the metro, Marina, Gorg and Ronda, and the horizon skyline.
 
 ## Target layout
 
-Squeezing is fine: the center keeps roughly quarter scale; the run to the port is compressed harder (around one sixth) so the port stays a short walk from the pier. Coordinates assume Phase 9 (La Fàbrica) is merged.
+Coordinates assume Phase 9 (La Fàbrica) is merged. Bounds are rough and will be tightened in each step's PR.
 
-| District | Today | Target | Change |
+| District | Today | Target | What it becomes |
 | --- | --- | --- | --- |
-| `seafront` (beach, promenade, boardwalk, pavilions) | x -104..165 | x -104..180 | Promenade and beach extend to the marina at x 180. The beach end at -104 gets an end rail (later it extends toward Montgat, see "Montgat side" below). |
-| Old oil pier (`pier` in `seafront.json`) | x -50..-46 | x 128..132 | Moves to the +x side of the station, past the pipicà. Same deck, legs, rise and length. |
-| Old distillery and chimney (`town` landmarks) | x -90..-42, z 35..57 | Seaward of the tracks next to the pier root, around x 140..178, z -20..3 | Real factory stands between the tracks and the promenade. Needs the promenade to jog around it; see open questions. The freed `town` slot gets ordinary blocks. |
-| `rambla` | x -104..140 (Phase 9) | x -104..180 | The +x end opens into Gorg at x 180 (as the -x end opens into Gorg today). The -x end gets an end rail. |
-| `town` (Carrer del Mar) | x -104..96 | unchanged | Only the distillery slot changes. |
-| `plaza` (Plaça del Mercat) | x -70..70, z 101..173 | unchanged | Gains the metro entrance (see below). |
-| `hill` (Dalt de la Vila) | x -48..48, z 173..256 | unchanged for now | Optional later: slide about 40-60 m toward -x to match the real old town. Expensive (terrain, stairs, Carrer Major join); not needed for recognizability. |
-| `fabrica` (La Fàbrica) | x 96..176, z 33.5..104 | unchanged | Already on the correct side. |
-| `marina` (El Port) | x -226..-104, z -120..4 | x 180..302, z -120..4 | Mirrored across: `x' = 76 - x`. Its town edge (today x -104) stays the town edge (x 180). |
-| `gorg` (Canal i Galeria) | x -226..-104, z 14..108 | x 180..302, z 14..108 | Mirrored the same way; sits inland of the port and +x of La Fàbrica, as in the real town. The tram line keeps running along the coast. |
-| `ronda` (Ronda i Parc) | x -226..-104, z 108..196 | x 180..302, z 108..196 | Mirrored the same way. Add the shopping center as a landmark or stand-in on the trench's inland side (real: just inland of the C-31). |
-| Metro entrance (`metro`) | Rambla, x -78..-72 | Plaza's +x side by Carrer Major, around x 40..50, z 145..155 | Matches the real L2 terminus (slightly +x of the old town axis, inland of the market square). Signs stay generic ("Metro", "L2", "SORTIDA"). |
-| `mapBounds` | x -228..180 (Phase 9) | x -110..306 after the moves; grows again toward -x when the Montgat side is built | See risks. |
+| `seafront` | x -104..165 | x -104..272 | The beach and promenade continue past the pier to the port. A second beach stretch (between pier and port) gets its own life spots. |
+| Old oil pier | x -50..-46 | x 165..169 | Same deck, legs and length; its root meets the promenade beside the distillery. |
+| Old distillery + chimney | in `town`, x -90..-42, z 35..57 | Seaward of the tracks, about x 138..162, z -20..3 | Modeled after the real factory (long low industrial halls, tall brick chimney). The promenade bends seaward around it. The freed `town` slot gets ordinary blocks. |
+| `rambla` | x -104..140 | x -104..140 (unchanged) | The -x end, which opens into Gorg today, gets an end rail until the Montgat side is built. |
+| `town` | x -104..96 | unchanged | Only the distillery slot changes. |
+| `plaza` | x -70..70, z 101..173 | unchanged | Carrer Major's -x end becomes the way up to the moved hill. |
+| `hill` | x -48..48, z 173..256 | about x -120..-24, z 173..256 | Museum and church nearly on the same x, museum lower (real: museum slightly toward -x of the church and lower). The climb starts from Carrer Major's -x end. The always-visible church landmark moves with it. |
+| Pompeu Fabra metro | Rambla, x -78..-72 | about x 30..46, z 175..185 | In the slot the hill frees behind Carrer Major's +x half. Replaces today's Rambla entrance. |
+| `fabrica` | x 96..176, z 33.5..104 | unchanged | Later: grow inland toward the covered neighborhood market (~168, 155). |
+| New fill district (Pep Ventura area; on-screen name to pick, not the station name) | -- | about x 176..260, z 104..240 | Plain residential blocks between La Fàbrica and Gorg, with the Pep Ventura metro entrance (~225, 203). Mostly stand-ins at first. |
+| `marina` (rebuilt) | x -226..-104, z -120..4 | about x 272..350, z -130..4 | The real port: basin with finger pontoons, quays, a breakwater with a light at its tip, the canal mouth. Keeps the Mico boss, the wake chase, the fourth pipicà and its three quests. |
+| `gorg` (rebuilt, split in two) | x -226..-104, z 14..108 | **Canal:** about x 260..340, z 4..120. **Gorg:** about x 260..340, z 120..260 | Canal: the real port canal with its bridges and waterfront arcade (today's canal, twin bridges, Galeria and bag quest). Gorg: the metro entrance, the T5 tram terminus, the streetball court and Pavelló, fifth pipicà, hoop and tram quests, the cart chase. The `gorg` id stays on whichever half keeps the existing quests; the other half gets a new id. |
+| `ronda` (rebuilt) | x -226..-104, z 108..196 | about x 200..340, z 290..360 | The C-31 edge of town: the highway (raised or at grade, per photos) with the footbridge, the park and skate area, sixth pipicà, the scooter chase. The shopping center stands just beyond (~283, 365) as a landmark or stand-in. |
+| C-31 behind the hill | -- | z ~300, x -200..200 | Distant scenery (horizon or stand-in), not walkable at first. |
+| `mapBounds` | x -228..180, z -134..256 | about x -200..352, z -134..380 | Grows as each step lands. |
 
-Why mirror rather than translate: reflecting x keeps each district's internal relationships. The side that faces the Rambla today keeps facing it, the canal stays on the same side of the arcade relative to town, and the entrances, fingerposts and chase routes keep working without being redesigned. A plain translation would put the marina's far breakwater next to the pier.
+### The metro line
 
-How to mirror without breaking text: move positions and negate yaw rotations in code (`x' = 76 - x`, `rotY' = -rotY`, swap `"+x"`/`"-x"` in block `faces`). Never use a negative scale on a group: it flips sign text and triangle winding.
+- **Entrances:** Pompeu Fabra (plaza, behind Carrer Major), Pep Ventura (between La Fàbrica and Gorg), Gorg (next to the tram terminus). Signs stay generic: "Metro", "L2", "SORTIDA". The real station names stay off screen, because together they would identify the town (the same reason `metro.ts` keeps today's station unnamed). The picker and the line map in the car use the game's own district names instead ("Plaça del Mercat", "La Fàbrica", "Canal i Galeria") or plain line dots.
+- **Riding:** taking the metro at any entrance offers the other two 3D stations or the 2D street. A short ride reuses the existing L2 car and tunnel cutscene in `transit.ts`, then the arrival walk up the stairs.
+- **Arrival:** `?via=metro` gains a station id such as `&at=plaza` (default: the plaza entrance, which is the 2D street's link). Arriving at a station inside a streamed district needs that district built during the loading bar.
+- **Santa Coloma (later):** it is on L1 in reality, so it would be a different line color and a transfer, or a separate trip from the 2D street. Off the map for now.
 
-### Montgat side (-x), after the moves
+### Montgat side (-x)
 
-The -x side frees up for what the original expansion plan called "the other side":
+Built last, after the +x side and the hill are in place:
 
-- **Sant Pau i Prim:** a district of the old narrow streets northeast of Carrer de Mar (real: 600-700 m northeast, 275-340 m inland; game: around x -104..-200, z 34..150), with its own pipicà, quests and a chase.
-- **Beach toward Montgat:** the promenade and beach continue past x -104 with the coast bending slightly seaward. Good place for later beach life.
-- Until those are built, the vacated area shows plain stand-in blocks and the Rambla and promenade end at rails at x -104.
+1. **Sant Pau i Prim** (about x -104..-200, z 34..170): the old narrow streets northeast of Carrer de Mar, at the foot of the moved hill, so it also gives a second way up. Own pipicà, quests and chase. This comes first because it ties the moved hill, the town and the Rambla together.
+2. **Beach toward Montgat** (seafront past x -104, coast bending seaward): beach life, maybe the Dimoni boss's real home turf.
+
+Until then, the Rambla and promenade end at rails at x -104 and the vacated area shows stand-in blocks.
 
 ## Migration order
 
-Each step lands as its own PR and leaves the game playable. Saved progress (`walk3d-progress-v1`) stores only goal ids, counts, bones and `done` keys such as `gorg:bag` or `marina:mico`; it stores no positions. As long as district ids, goal ids, area ids (`progress.ts` `AREAS`) and quest keys stay the same, every save stays valid through every step. Each PR should keep that explicit: no renamed ids, and a test that loads a saved snapshot from before the move.
+Each step is its own PR and leaves the game playable. Saved progress (`walk3d-progress-v1`) stores only goal ids, counts, bones and `done` keys such as `gorg:bag` or `marina:mico`; it stores no positions. As long as district ids, goal ids, area ids (`progress.ts` `AREAS`) and quest keys stay the same, every save stays valid. Each PR adds a test that loads a saved snapshot from before the move. New districts get new ids and new goals; they never reuse old ones.
 
-0. **Prep, no visible change.** Audit absolute coordinates outside the district modules and route them through the layout data or the `*Geom.ts` constants: the minimap POIs and quest markers in `game3d.ts` (around lines 2567-2597), `boneSpots` (includes two pier spots), the Rambla-to-Gorg fingerpost and walls in `level.ts` (around lines 224-231, 424, 442), `harborWater` (line 274), sand extents, ambient routes in `life.ts`, and positional audio (the Ronda honks). Add a unit test that district bounds do not overlap and each district's POIs and pipicà sit inside its bounds. Needs Phase 9 merged first.
-1. **Horizon and pier.** Flip the skyline to +x and add a Montgat-side coastline at -x (`horizon.ts`). Move the pier to x 128..132 and its bone spots; move or extend the swim area if the pier should stay reachable by swimming. Cheap, and immediately more recognizable from spawn.
-2. **Marina to +x.** Mirror `marinaGeom.ts`, `marina.ts`, `marinaLife.ts`, the Mico boss and the wake chase to x 180..302. Extend the promenade and beach to x 180; put an end rail on the promenade at x -104. The marina is reached only from the promenade, so it can move on its own.
-3. **Gorg and Ronda to +x, together.** Ronda is entered from Gorg, so they move in one step. Open the Rambla's +x end into Gorg at x 180 and close its -x end with a rail; move the tram and the two chases (carts, scooters); add the shopping center landmark beside the trench.
-4. **Distillery and chimney** next to the pier root, seaward of the tracks; fill the old `town` slot with blocks.
-5. **Metro to the plaza** (Carrer Major's +x side). The 2D street link stays keyed by the `metro` stop id, so only the 3D position changes.
-6. **Montgat side:** Sant Pau i Prim district and the beach continuation, as new phases with their own pipicà, quests and chase.
-7. **Optional:** slide the hill toward -x.
+0. **Prep, no visible change.** Route absolute coordinates outside the district modules through layout data or `*Geom.ts` constants: minimap POIs and quest markers in `game3d.ts` (around lines 2567-2597), `boneSpots` (two pier spots), the Rambla-to-Gorg fingerpost and walls in `level.ts` (around lines 224-231, 424, 442), `harborWater` (line 274), sand extents, ambient routes in `life.ts`, positional audio (the Ronda honks). Add a test that district bounds do not overlap and each district's POIs and pipicà sit inside its bounds. Gather reference photos for the port, canal, Gorg, the C-31 and the distillery.
+1. **Seafront: horizon, pier and distillery.** Flip the skyline to +x and add a Montgat-side coastline at -x (`horizon.ts`). Move the pier to x 165..169 and the distillery and chimney seaward of the tracks; extend the beach and promenade toward the port. Cheap and immediately more recognizable from spawn.
+2. **Hill and Pompeu Fabra.** Move Dalt de la Vila toward -x, reconnect the climb at Carrer Major's -x end, and move the metro entrance into the freed slot. Keeps the Home door generic (see Privacy).
+3. **Port.** Rebuild `marina` at x 272..350 from photos; it is reached only from the promenade, so it can move on its own. The promenade end at x -104 gets a rail.
+4. **Canal, Gorg, Pep Ventura and Ronda together.** Ronda is entered from Gorg today, so they move in one release (one PR or several merged together). Rebuild the canal and Gorg, add the Pep Ventura fill district and the C-31 edge with the shopping center, add the Pep Ventura and Gorg metro entrances and the station picker, and close the Rambla's -x end.
+5. **Montgat side:** Sant Pau i Prim, then the beach toward Montgat.
+6. **Optional:** C-31 scenery behind the hill, La Fàbrica's inland growth toward the covered market, Santa Coloma.
 
 ## Risks and checks
 
-- **Streaming.** `Streamer` in `world.ts` keeps districts live within 80 m, shows stand-ins beyond 100 m, builds as Millie approaches and unloads beyond 170 m. Spawn (x -22, z -3.4) is about 200 m from x 180, so nothing on the new +x side builds at spawn. The new hot spot is the Rambla/promenade junction around x 160..180, where La Fàbrica, Gorg and the marina can all be live at once next to the resident seafront, Rambla and town. Today's worst junction (x -104) has two live districts; this one has three. Measure draw calls and slice times there; if needed, bias Gorg's or the marina's live radius down or leave a few meters of gap at x 176..180.
-- **Spawn draw calls `<= 770`.** The pier is part of the resident seafront, so moving it to x 130 changes what is in view at spawn (it is 150 m away and mostly in fog). Re-measure spawn, the pier end and Carrer del Mar after step 1.
-- **Metro arrival inside a streamed district.** `?via=metro` spawns at the metro head. After step 5 that is on the plaza, which streams in today; the plaza must build during the loading bar for metro arrivals, and the plaza already measures about 696-724 draw calls. Check the metro arrival against the 770 budget before shipping step 5.
-- **Minimap.** `minimap.ts` draws a canvas sized from `mapBounds`. After the moves the width stays close to today's (about 416 m); once the Montgat side is built it grows to about 530 m. Check canvas memory and the enlarged (`M`) view on phones.
-- **Collider grid.** Cells are hashed, not bounded, so moving districts needs no grid change, but colliders are tagged by district; each move must keep the tag so unloading still drops them.
-- **Tests and test hooks.** `tests/marina.test.ts`, `mico-wake.test.ts`, `gorg.test.ts` and `ronda.test.ts` assert absolute coordinates; they move with the constants. Update `docs/3d-walk-handover.md` (architecture table, `__walk` notes, map plan) in the same PR as each move.
-- **2D street.** The 2D street's order of stops is its own design and does not need to mirror the 3D map; only the `metro` and `station` stop links matter, and their ids do not change.
+- **Streaming.** `Streamer` in `world.ts` keeps districts live within 80 m, shows stand-ins beyond 100 m and unloads beyond 170 m. Spawn (x -22, z -3.4) is more than 170 m from everything new on the +x side, so spawn is unaffected there. New hot spots: the pier root and distillery (resident seafront next to La Fàbrica), and the canal / Gorg / Pep Ventura junction, where three streamed districts meet. Measure draw calls and slice times at each junction; bias live radii down if needed.
+- **Spawn draw calls `<= 770`.** The pier and distillery are part of the resident seafront, so they change what is drawn at spawn (they are 190 m away, mostly in fog). Re-measure spawn, the pier end and Carrer del Mar after step 1.
+- **Metro arrivals in streamed districts.** All three entrances sit in streamed districts (plaza, Pep Ventura, Gorg). Each arrival must build its district during the loading bar, and the plaza already measures about 696-724 draw calls. Check every arrival against the 770 budget.
+- **Hill move.** The hill has the most hand-placed geometry (terrain, stairs, retaining walls, stray-cat routes, the Senglars chase down the hill, the Mosaic boss outside the Museu). Move it as one offset applied to `HILL` and the terrain grid, then re-run the routes and the stress test.
+- **Map size.** The map grows to about 550 x 515 m. `minimap.ts` sizes its canvas from `mapBounds`; check memory and the enlarged (`M`) view on phones, and lower its pixels per meter if needed.
+- **Walking distances.** Spawn to the port is about 320 m. The metro picker and the promenade make that fine, but each district should still be reachable on foot.
+- **Collider grid.** Cells are hashed, not bounded, so moves need no grid change; colliders must keep their district tag so unloading still drops them.
+- **Tests and docs.** `tests/marina.test.ts`, `mico-wake.test.ts`, `gorg.test.ts` and `ronda.test.ts` assert absolute coordinates and change with each rebuild. Update `docs/3d-walk-handover.md` in the same PR as each step.
+- **2D street.** Its stop order is its own design. Only the `metro` and `station` links matter; Pompeu Fabra becomes the metro's 3D end of that link.
 
 ## Naming and privacy
 
-- The town stays unnamed on screen. New sign text stays generic or uses street and place names that appear in many Catalan towns ("Estació", "the old pier", "Port", "Metro / L2", "Carrer de Sant Pau", "Carrer de Prim").
-- The hilltop Home stays a generic door. Nothing in this plan places any stop at, or names, a residential street near the church.
-
-## Open questions for Santtu
-
-1. **Mirror or rebuild:** mirror Marina, Gorg and Ronda as described (fast, keeps their content), or rebuild them closer to the real port and Gorg from reference photos?
-2. **Distillery:** move it seaward of the tracks next to the pier (true to the real town, but the promenade has to jog around it), or keep it inland at +x next to La Fàbrica's chimney (simpler)?
-3. **Metro:** the plaza position (real L2 terminus), or inside Gorg next to the tram stop (the other real L2 stop the map reaches)?
-4. **Hill:** leave the hill where it is, or plan the -x slide?
-5. **Montgat side:** which comes first after the moves, Sant Pau i Prim or the beach continuation?
+- The town stays unnamed on screen. Sign text stays generic or uses names common across Catalan towns ("Estació", "the old pier", "Port", "Metro / L2", "Carrer de Sant Pau", "Carrer de Prim").
+- Moving the hill to its real position must not make Home more identifying. The Home door stays a generic door at an arbitrary spot on the hilltop, not modeled on any real street, building or doorway near the church.
