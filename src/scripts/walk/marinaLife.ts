@@ -7,8 +7,9 @@
 import * as THREE from 'three';
 import { makePerson, makeBird, makeDog, M, box, cyl, sphere, rod, shadowed } from './models';
 import { collapseRig } from './bake';
-import { MARINA, inMarinaPipica, PONTOON_Y, BREAKWATER_Y } from './marina';
-import { MARINA_GROUND_Y, MARINA_WATER_Y, PONTOON_A, PONTOON_B } from './marinaGeom';
+// Runs in the marina's local frame (game3d.ts passes localFrame views): local anchors and predicates.
+import { MARINA_LOCAL as MARINA, PONTOON_Y, BREAKWATER_Y } from './marina';
+import { MARINA_GROUND_Y, MARINA_WATER_Y, PONTOON_A, PONTOON_B, inMarinaPipica } from './marinaGeom';
 import { createMicoBoss } from './micoBoss';
 import { WakeChaseState } from './wakeLogic';
 import type { Hud } from './hud';
@@ -350,7 +351,7 @@ export function createMarinaLife(ctx: MarinaCtx) {
       buoyM.visible = false;
     }
 
-    // Gulls at Moll de Ponent crates.
+    // Gulls at the Moll de Llevant crates.
     if (!quests.gulls && dist(dog, MARINA.fisherman) < 6) {
       say('fisherman', 'Aquestes gavines em roben les sardines! Borda!', 2.2, 'paper', 10);
     }

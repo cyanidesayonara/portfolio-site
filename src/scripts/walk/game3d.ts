@@ -31,6 +31,8 @@ import { PLAZA } from './plaza';
 import { boneSpots, mapPlaceMarks, poiPos } from './placements';
 import { createMarinaLife, type MarinaItem } from './marinaLife';
 import { MARINA } from './marina';
+import { MARINA_DX } from './marinaOffset';
+import { localFrame } from './localFrame';
 import { createGorgLife, type GorgItem } from './gorgLife';
 import { GORG } from './gorg';
 import { createRondaLife, type RondaItem } from './rondaLife';
@@ -408,8 +410,11 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   });
   const hillDistrict = level.districts.find((d) => d.id === HILL.id)!;
   // The Marina & Breakwater: moored boats, lighthouse, buoy, crate gulls, El Mico boss & wake chase.
+  // The port's runtime works in the marina's local frame (marinaOffset.ts); it sees the world through these views.
+  const marinaFrame = localFrame(scene, MARINA_DX);
   marina = createMarinaLife({
-    scene, hud, audio, telegraphs, feel, dog, human, addBones, completeGoal, bumpGoal, burst,
+    scene: marinaFrame.scene, hud, audio: marinaFrame.audio(audio), telegraphs: marinaFrame.telegraphs(telegraphs), feel,
+    dog: marinaFrame.view(dog), human: marinaFrame.view(human), addBones, completeGoal, bumpGoal, burst: marinaFrame.burst(burst),
     onDone: markDone,
     humanSay: (t, ttl, tone) => humanSay(t, ttl, tone),
     offLeash: () => offLeash,
@@ -938,7 +943,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       // Drop.
       const fx = dog.x + Math.cos(dog.heading) * 0.55, fz = dog.z + Math.sin(dog.heading) * 0.55;
       if (plaza.drop(fx, fz)) return;
-      if (marina.drop(fx, fz)) return;
+      if (marina.drop(fx - MARINA_DX, fz)) return;
       if (gorg.drop(fx, fz)) return;
       if (ronda.drop(fx, fz)) return;
       if (fabrica.drop(fx, fz)) return;
@@ -1415,7 +1420,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     // Human on the sand while the dog is up on the Rambla (or the reverse): head for a ramp.
     const pier = level.layout.pier;
     const onPier = (p: { x: number; z: number }) => p.x > pier.x0 - 0.5 && p.x < pier.x1 + 0.5 && p.z < pier.root;
-    const onBeach = (p: { x: number; z: number }) => p.x > -94 && p.z < -20.3 && !onPier(p);
+    // The sand runs from the western groin to the port's breakwater (whose pontoons and quays are not beach).
+    const onBeach = (p: { x: number; z: number }) => p.x > -94 && p.x < MARINA.minX && p.z < -20.3 && !onPier(p);
     return onBeach(human) !== onBeach(dog);
   };
 
@@ -2738,7 +2744,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     for (const b of life.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of plaza.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of hill.bubbles()) place(b.id, b.x, b.y, b.z);
-    for (const b of marina.bubbles()) place(b.id, b.x, b.y, b.z);
+    for (const b of marina.bubbles()) place(b.id, b.x + MARINA_DX, b.y, b.z);
     for (const b of gorg.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of ronda.bubbles()) place(b.id, b.x, b.y, b.z);
     for (const b of fabrica.bubbles()) place(b.id, b.x, b.y, b.z);

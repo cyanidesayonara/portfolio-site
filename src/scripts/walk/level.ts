@@ -71,11 +71,11 @@ const CUT = { x: 3, tunnelX: 2, rambla0: 22, rambla1: 14, sea0: 4, sea1: -4, flo
  * these, so every ground strip, rail, groin and fingerpost on a seam reads them from here.
  */
 const EDGE = {
-  /** The Rambla and the promenade meet Canal i Galeria and the marina. */
+  /** The Rambla meets Canal i Galeria; the promenade ends at a rail. */
   west: -104,
   /** The western rock groin; the beach sand starts here. */
   groinW: -94,
-  /** The marina transition quay ends and the boardwalk starts. */
+  /** The short quay at the promenade's -x end ends and the boardwalk starts. */
   quayE: -92,
   /** The central strip's safety clamp (and where the Rambla's +x stretch starts). */
   clamp: 91.5,
@@ -83,17 +83,15 @@ const EDGE = {
   fabricaPost: 94,
   /** The Rambla's end rail, at the mouth of Avinguda de la Fàbrica. */
   ramblaE: 140,
-  /** The promenade's end rail and the eastern rock groin, past the old pier toward the port. */
-  promE: 200,
-  /** How far +x the seafront's safety clamp lets Millie go. */
-  beachClampE: 197.4,
-  /** The beach sand's far edge. */
-  sandE: 206,
-  /** Where the railway, its fences and catenary run out on the +x side. */
-  trackE: 220,
+  /** The promenade and the beach run on past the old pier to the port, at the breakwater's root. */
+  promE: 258,
+  /** The beach sand's far edge (under the breakwater's root). */
+  sandE: 262,
+  /** Where the railway, its fences and catenary run out on the +x side, past the port. */
+  trackE: 380,
 } as const;
-/** Harbor basin water inland of the open sea; moves with the marina. */
-const HARBOR_WATER = { x0: -232, x1: EDGE.groinW, z0: -40.02, z1: -17.5 } as const;
+/** Harbor basin water inside the port's breakwater (marina.ts), kept apart from the open sea. */
+const HARBOR_WATER = { x0: 266, x1: 372, z0: -40.02, z1: -17.5 } as const;
 const RAMPS = SEAFRONT_LAYOUT.ramps;
 const PIER = SEAFRONT_LAYOUT.pier;
 /** The pier's center line. */
@@ -279,7 +277,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(promCurb);
   const deck = ground(EDGE.quayE, EDGE.promE, -20, -10, GROUND_Y + 0.01, deckMat, 3);
   root.add(deck);
-  // Beach, under the sea too (stops at the western rock groin x -94 so it clears the marina basin).
+  // Beach, under the sea too, from the western rock groin to the port's breakwater root.
   root.add(ground(EDGE.groinW, EDGE.sandE, -120, -20, 0, sandMat, 6, 1, 50, (_x, z) => sandFloor(z)));
   const wet = ground(EDGE.groinW, EDGE.sandE, -62, -54, 0, new THREE.MeshStandardMaterial({ color: 0x8a6c44, roughness: 0.5, transparent: true, opacity: 0.4 }), 4, 1, 8, (_x, z) => sandFloor(z) + 0.012);
   root.add(wet);
@@ -485,9 +483,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     { title: 'Estació · Centre', sub: 'Metro · Platja', color: '#ffb020', angle: Math.PI },
   ]), EDGE.fabricaPost, GROUND_Y, 31.6);
   addCircle(EDGE.fabricaPost, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
-  // The promenade runs on past the old pier to an end rail; it opens west at x -92 into El Port,
-  // where edge rails keep Millie on the transition quay.
-  obresLine(EDGE.promE, -19.6, EDGE.promE, 3.6);
+  // The promenade runs on past the old pier into the port (marina.ts) at the breakwater's root.
+  // Its -x end is closed by a rail beyond the short quay there.
+  obresLine(EDGE.west, -17.6, EDGE.west, 3.6);
   {
     const wallM = M(0xb9b2a4, 0.85);
     const railM = M(0x383e4a, 0.5, 0.5);
@@ -503,10 +501,10 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     root.add(bwRail);
     boxes.push({ x0: EDGE.quayE - 0.2, x1: EDGE.quayE + 0.2, z0: -20.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
     place(makeFingerpost([
-      { title: 'Port · Espigó', sub: 'Boats · Far', color: '#3d73c7', angle: Math.PI },
-      { title: 'Platja', sub: 'Passeig · Pier', color: '#ffb020', angle: 0 },
-    ]), EDGE.groinW, GROUND_Y, -8);
-    addCircle(EDGE.groinW, -8, 0.14, GROUND_Y + 3.2, 'pole', true, true);
+      { title: 'Port · Espigó', sub: 'Boats · Far', color: '#3d73c7', angle: 0 },
+      { title: 'Platja', sub: 'Passeig · Pier', color: '#ffb020', angle: Math.PI },
+    ]), EDGE.promE - 8, GROUND_Y, -8);
+    addCircle(EDGE.promE - 8, -8, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   }
   place(makeExcavator(), 97, GROUND_Y, 22, -1.4);
   // Rock breakwaters close the beach.
@@ -526,7 +524,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       }
     }
   };
-  for (const ex of [EDGE.groinW, EDGE.promE]) {
+  // (The +x end of the beach is the port's breakwater.)
+  for (const ex of [EDGE.groinW]) {
     rocksAt(ex, -20.5, -80);
     boxes.push({ x0: ex - 3, x1: ex + 3, z0: -90, z1: -20.3, top: 3, kind: 'rocks' });
   }
@@ -838,7 +837,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   // Past the end of the boardwalk: masts on the open stretch on either side of the old distillery
   // (its frontage is a narrow lane, kept clear).
-  for (const x of [108, 128, 182, 194]) addLamp(makeSpotMast(), x, GROUND_Y, -1.5);
+  for (const x of [108, 128, 182, 194, 216, 238]) addLamp(makeSpotMast(), x, GROUND_Y, -1.5);
   // Extra promenade mast right beside spawn so pole whirling is an immediate first-screen hook.
   addLamp(makeSpotMast(), -24, GROUND_Y, -1.5);
   for (let x = -80; x <= EDGE.promE - 4; x += 12) {
@@ -1604,13 +1603,14 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       p.x = Math.max(HILL.minX, Math.min(HILL.maxX, p.x));
       return;
     }
-    if (p.z < 4 && p.x < -EDGE.clamp) {
-      p.x = Math.max(MARINA_CLAMP.x0, p.x);
+    // The port, from the end of the beach out to its closed far end (marina.ts).
+    if (p.z < 4 && p.x > EDGE.promE) {
+      p.x = Math.min(MARINA.x1 - 0.4, p.x);
       p.z = Math.max(MARINA_CLAMP.z0, Math.min(MARINA_CLAMP.z1, p.z));
       return;
     }
-    // The seafront runs on past the old pier; the Rambla stays between the two clamps.
-    p.x = Math.max(-EDGE.clamp, Math.min(p.z < 4 ? EDGE.beachClampE : EDGE.clamp, p.x));
+    // The seafront runs on past the old pier to the port; the Rambla stays between the two clamps.
+    p.x = Math.max(-EDGE.clamp, Math.min(p.z < 4 ? EDGE.promE : EDGE.clamp, p.x));
     // Out to the buoy line inside the swim zone; to the shallows elsewhere.
     if (!onPier(p.x, p.z)) p.z = Math.max(p.z, p.x > SWIM.x0 && p.x < SWIM.x1 ? SWIM.z + 0.3 : -64);
   };

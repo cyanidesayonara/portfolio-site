@@ -1,12 +1,12 @@
 /*
   3D presentation, telegraphs, and animation for Boss #1: El Mico de Bronze.
-  Owns the oversized articulated bronze statue at West Quay (Moll de Ponent),
+  Owns the oversized articulated bronze statue at Moll de Llevant (in the marina's local frame),
   its thrown bronze jugs, dizzy stun stars, and HUD boss-bar wiring.
 */
 import * as THREE from 'three';
 import { M, box, cyl, sphere, rod, shadowed } from './models';
 import { collapseRig } from './bake';
-import { MARINA } from './marina';
+import { MARINA_LOCAL as MARINA } from './marina';
 import { MARINA_GROUND_Y } from './marinaGeom';
 import { MicoState, MICO_HOME, MICO_PLAYER_MAX_HITS } from './micoLogic';
 import type { Hud } from './hud';
