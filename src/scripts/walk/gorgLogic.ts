@@ -100,6 +100,8 @@ export const CART_SAFE_SOUTH_Z = 42.5;
 export const CART_SAFE_EAST_X = -176.8;
 export const CART_HIT_R = 1.05;
 export const CART_COOLDOWN = 15;
+/** Where the minimap marks the cart run. */
+export const CARTS_MAP_POS = { x: CART_LANES[1], z: 64 } as const;
 
 export interface CartEntity {
   lane: number;

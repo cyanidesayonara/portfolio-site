@@ -10,6 +10,8 @@ export const SENGLARS_END_Z = 172.5;
 export const SENGLARS_SAFE_LOW_Z = 176.0;
 export const SENGLARS_SAFE_HIGH_Z = 198.2;
 export const SENGLARS_SAFE_EAST_X = 11.2;
+/** Where the minimap marks the boar run. */
+export const SENGLARS_MAP_POS = { x: 0, z: 187 } as const;
 export const SENGLARS_COOLDOWN = 14;
 export const SENGLARS_HIT_R = 1.05;
 
