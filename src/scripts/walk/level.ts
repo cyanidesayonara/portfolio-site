@@ -26,12 +26,13 @@ import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './mari
 import { GORG, inGorgPipica, makeGorgDistrict } from './gorg';
 import { RONDA, inRondaPipica, makeRondaDistrict } from './ronda';
 import { MARINA_CLAMP } from './marinaGeom';
+import { HILL_DX } from './hillOffset';
 import { GORG_CLAMP } from './gorgGeom';
 import { RONDA_CLAMP } from './rondaGeom';
 import { FABRICA, inFabricaPipica, makeFabricaDistrict } from './fabrica';
 import { RAMBLA_EAST, clampFabrica } from './fabricaGeom';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
-import { groundAroundMetro, makeMetroEntrance } from './metro';
+import { makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
 import {
   M, box, cyl, rod, shadowed,
@@ -265,10 +266,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(drain);
   // The Rambla's slabs, the promenade's concrete, the boardwalk's planks.
   // Leave holes where the underpass cuts down below street level.
-  // The metro entrance's stairwell is a hole in the Rambla's slabs too.
-  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(EDGE.west, EDGE.ramblaE, CUT.rambla0, 34, SEAFRONT_LAYOUT.metro)) {
-    root.add(ground(gx0, gx1, gz0, gz1, GROUND_Y, slabMat, slab.tileMeters));
-  }
+  root.add(ground(EDGE.west, EDGE.ramblaE, CUT.rambla0, 34, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(EDGE.west, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, EDGE.ramblaE, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(EDGE.west, EDGE.promE, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
@@ -699,7 +697,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   boxes.push({ x0: STATION_X - stW / 2, x1: STATION_X + stW / 2, z0: 14.2, z1: 14.2 + stD, top: GROUND_Y + stH, kind: 'building' });
   stops0.push({ id: 'station', label: 'Estació', kind: 'Train to 2D street', href: '/?via=train', color: '#e5302a', x: STATION_X, z: 14.2 + stD + 2.2, r: 5.5 });
 
-  // ---- The metro entrance, at the west end of the Rambla (metro.ts) ----
+  // ---- The metro entrance, in a small square off Carrer Major (metro.ts; paving in plaza.ts) ----
   const metroDef = SEAFRONT_LAYOUT.metro;
   const metro = makeMetroEntrance(metroDef, GROUND_Y);
   root.add(metro.group);
@@ -1594,7 +1592,11 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (p.z > 34 && p.z < PLAZA.z0) { p.x = Math.max(-33.6, Math.min(33.6, p.x)); return; }
     if (p.z >= PLAZA.z0 && p.z < HILL.z0) {
       p.x = Math.max(PLAZA.street.x0 + 0.4, Math.min(PLAZA.street.x1 - 0.4, p.x));
-      if (p.z > PLAZA.street.z1 - 0.4 && Math.abs(p.x) >= 2.9) p.z = PLAZA.street.z1 - 0.4;
+      // North of the street: only the way up to the hill and the metro square are open.
+      if (p.z > PLAZA.street.z1 - 0.4) {
+        if (p.x > PLAZA.metroSquare.x0 + 0.4 && p.x < PLAZA.metroSquare.x1 - 0.4) p.z = Math.min(p.z, PLAZA.metroSquare.z1 - 0.4);
+        else if (Math.abs(p.x - HILL_DX) >= 2.9) p.z = PLAZA.street.z1 - 0.4;
+      }
       return;
     }
     if (p.z >= HILL.z0) {
@@ -1679,8 +1681,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     },
     correfoc: { x0: 80, x1: -2, z: 24 },
     station: { x: STATION_X },
-    // Arriving by metro: up the stairs, heading west along the Rambla.
-    metro: { dog: { x: metro.head.x - 1.3, z: metro.head.z }, human: { x: metro.head.x + 0.2, z: metro.head.z + 0.5 }, heading: Math.PI },
+    // Arriving by metro: up the stairs, facing Carrer Major.
+    metro: { dog: { x: metro.head.x - 1.3, z: metro.head.z }, human: { x: metro.head.x + 0.2, z: metro.head.z + 0.5 }, heading: -Math.PI / 2 },
   };
 }
 

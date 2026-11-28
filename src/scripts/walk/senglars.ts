@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { M, box, cyl, sphere, shadowed } from './models';
 import { collapseRig } from './bake';
-import { HILL, hillFloor } from './hill';
+import { HILL, hillFloorLocal as hillFloor } from './hill';
 import { SenglarsState, SENGLARS_LANES } from './senglarsLogic';
 import type { Hud } from './hud';
 import type { WalkAudio } from './audio';
