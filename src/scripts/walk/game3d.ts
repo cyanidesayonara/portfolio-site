@@ -177,7 +177,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const level: Level = await runSliced(counted(buildLevelSteps(scene, { coriolisTex, boothScreens: boothScreens.textures })), () => {
     transit.setProgress(Math.min(70, (stepsDone / LEVEL_STEPS) * 70));
   }, 14);
-  const metroIn = level.metros[searchParams.get('at') ?? ''] ?? level.metros[level.metroOrder[0]];
+  const atParam = searchParams.get('at') ?? '';
+  const metroIn = level.metroOrder.includes(atParam) ? level.metros[atParam] : level.metros[level.metroOrder[0]];
   const startDog = viaTrain ? { x: level.station.x, z: 21.8 } : viaMetro ? metroIn.dog : level.start.dog;
   const startHuman = viaTrain ? { x: level.station.x - 1.8, z: 22.0 } : viaMetro ? metroIn.human : level.start.human;
   const startHeading = viaTrain ? Math.PI : viaMetro ? metroIn.heading : -Math.PI / 2;
@@ -1200,6 +1201,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   let departing = false;
   /** Whether the metro menu (pick an entrance or the 2D street) is open at a metro entrance. */
   let metroMenu = false;
+  /** While a metro ride warms its destination, the per-frame streamer waits (they would race). */
+  let metroWarming = false;
   /** Ride the metro to another entrance: down the stairs, build what is near it, and up again. */
   const rideMetro = (id: string) => {
     const dest = level.metros[id];
@@ -1209,10 +1212,19 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     releaseAll();
     audio.chime();
     void playDepartureDoors(host, `Metro L2 · ${dest.label}…`, reducedMotion, 'metro').then(async () => {
-      await runSliced(streamer.warm(dest.dog.x, dest.dog.z), () => {}, 14);
-      dog.x = dest.dog.x; dog.z = dest.dog.z; dog.y = dogFloor(dog.x, dog.z, 5); dog.vx = dog.vz = dog.vy = 0; dog.onGround = true;
+      // Behind the closed doors: move first, then build what is near the destination with the
+      // per-frame streamer paused, so the two never work on the same district.
+      dog.x = dest.dog.x; dog.z = dest.dog.z; dog.vx = dog.vz = dog.vy = 0; dog.onGround = true;
       dog.heading = dest.heading;
-      human.x = dest.human.x; human.z = dest.human.z; human.y = humanFloor(human.x, human.z, 5); human.vx = human.vz = 0;
+      human.x = dest.human.x; human.z = dest.human.z; human.vx = human.vz = 0;
+      metroWarming = true;
+      try {
+        await runSliced(streamer.warm(dest.dog.x, dest.dog.z), () => {}, 14);
+      } finally {
+        metroWarming = false;
+      }
+      dog.y = dogFloor(dog.x, dog.z, 5);
+      human.y = humanFloor(human.x, human.z, 5);
       leash.reset(dog, handXZ());
       camSnap = true;
       host.querySelectorAll('.loading.depart').forEach((el) => el.remove());
@@ -1861,7 +1873,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const listenDir = new THREE.Vector3();
   let fStep = { simScale: 1, shakeX: 0, shakeY: 0 };
   const update = (rawDt: number) => {
-    streamer.update(dog.x, dog.z);
+    if (!metroWarming) streamer.update(dog.x, dog.z);
     // Goals card follows the area Millie is in.
     goalSys.setArea(areaOfDistrict(level.districtAt(dog.x, dog.z).id));
     level.churchLandmark.visible = !hillDistrict.root.visible;
