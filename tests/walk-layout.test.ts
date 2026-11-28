@@ -202,6 +202,26 @@ describe('Canal i Galeria, Ronda and Carrer del Progrés (re-orientation step 4)
   });
 });
 
+describe('the Montgat side (re-orientation step 5)', () => {
+  const b = (id: string) => byId.get(id)!.bounds;
+
+  it('runs the Rambla and the seafront on northeast (-x) toward Montgat', () => {
+    assert.ok(b('rambla').x0 <= -200 && b('seafront').x0 <= -200);
+  });
+
+  it('puts Sant Pau i Prim northeast of Carrer del Mar, off the Rambla', () => {
+    const sp = byId.get('santpau')!;
+    assert.equal(sp.bounds.x1, b('town').x0, 'next to the town, on its -x side');
+    assert.equal(sp.bounds.z0, b('rambla').z1 + 0.5);
+    const streets = (sp as unknown as { streets: { id: string; points: [number, number][] }[] }).streets;
+    for (const id of ['sant-pau', 'prim']) {
+      const st = streets.find((t) => t.id === id)!;
+      for (const [x, z] of st.points) assert.ok(inside(sp.bounds, x, z), `${id} leaves the district`);
+      assert.equal(st.points[0][1], 34, `${id} starts at the Rambla`);
+    }
+  });
+});
+
 describe('saved progress across district moves', () => {
   // A save made before the re-orientation (walk3d-progress-v1). Goal ids and done keys
   // carry no positions, so moving districts must never invalidate them.

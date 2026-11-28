@@ -1458,7 +1458,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     const pier = level.layout.pier;
     const onPier = (p: { x: number; z: number }) => p.x > pier.x0 - 0.5 && p.x < pier.x1 + 0.5 && p.z < pier.root;
     // The sand runs from the western groin to the port's breakwater (whose pontoons and quays are not beach).
-    const onBeach = (p: { x: number; z: number }) => p.x > -94 && p.x < MARINA.minX && p.z < -20.3 && !onPier(p);
+    const onBeach = (p: { x: number; z: number }) => p.x > level.beachX0 && p.x < MARINA.minX && p.z < -20.3 && !onPier(p);
     return onBeach(human) !== onBeach(dog);
   };
 
