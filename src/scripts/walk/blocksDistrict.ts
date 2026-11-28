@@ -10,7 +10,7 @@ import { bakeSteps } from './bake';
 import { buildDistrictBlocksSteps, type DistrictData, type InstanceSink, type MetroDef } from './layout';
 import { groundAroundMetro } from './metro';
 import type { ColliderGrid, District } from './world';
-import type { BoxCollider } from './level';
+import type { BoxCollider, Surface } from './level';
 
 export interface BlocksEnv {
   groundY: number;
@@ -27,6 +27,10 @@ export interface BlocksEnv {
   };
   /** Metro stairwells inside this district's paving. */
   metros?: MetroDef[];
+  /** Ground surface (paving unless given, e.g. sand in a pipicà). */
+  surface?: (x: number, z: number) => Surface;
+  /** Extra build steps after the paving and blocks (squares, props, pipicàs), in world coordinates. */
+  extra?: (root: THREE.Group, builder: DirectBuilder) => Generator<void, void, void>;
   r: () => number;
 }
 
@@ -50,7 +54,7 @@ export function makeBlocksDistrict(env: BlocksEnv): District {
     bounds: L.bounds,
     root: new THREE.Group(),
     floor: () => env.groundY,
-    surface: () => 'paving',
+    surface: (x, z) => env.surface?.(x, z) ?? 'paving',
     built: false,
     baked: false,
     state: 'standin',
@@ -80,6 +84,7 @@ export function makeBlocksDistrict(env: BlocksEnv): District {
     });
     while (!blocks.next().done) yield;
     for (const b of boxes) grid.addBox(b);
+    if (env.extra) yield* env.extra(d.root, builder);
     const flush = builder.flushSteps(d.root);
     while (!flush.next().done) yield;
     inst.build(() => d.root);

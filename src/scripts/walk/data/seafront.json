@@ -72,6 +72,8 @@
     { "id": "fabricaSquare", "x0": 126, "x1": 172, "z0": 58, "z1": 96, "mapColor": "#cfc3ad" },
     { "id": "santpauFill", "x0": -204, "x1": -104, "z0": 34, "z1": 172, "mapColor": "#62584c" },
     { "id": "santpauStreets", "x0": -170, "x1": -118, "z0": 34, "z1": 126, "mapColor": "#bdb19e" },
+    { "id": "santpauPlaceta", "x0": -162, "x1": -126, "z0": 60, "z1": 77, "mapColor": "#cfc3ad" },
+    { "id": "pipica8", "x0": -160, "x1": -148, "z0": 62, "z1": 74, "mapColor": "#9bc46a" },
     { "id": "progresSquare", "x0": 206, "x1": 220, "z0": 34, "z1": 46, "mapColor": "#bdb19e" },
     { "id": "progresFill", "x0": 176, "x1": 252, "z0": 34, "z1": 196, "mapColor": "#62584c" },
     { "id": "metroProgres", "x0": 211, "x1": 216.6, "z0": 39, "z1": 41.4, "mapColor": "#9b2d8f" },
@@ -329,7 +331,7 @@
       "blocks": [
         { "x0": -118, "x1": -104, "z0": 34, "z1": 77, "floors": 4, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
         { "x0": -118, "x1": -104, "z0": 83, "z1": 126, "floors": 4, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
-        { "x0": -162, "x1": -126, "z0": 34, "z1": 77, "floors": 3, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-x", "+x", "-z", "+z"], "groundFloor": true },
+        { "x0": -162, "x1": -126, "z0": 34, "z1": 60, "floors": 3, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-x", "+x", "-z", "+z"], "groundFloor": true },
         { "x0": -162, "x1": -126, "z0": 83, "z1": 126, "floors": 3, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "+x", "-z"], "groundFloor": true },
         { "x0": -204, "x1": -170, "z0": 34, "z1": 126, "floors": 4, "color": "#d9b48a", "roofColor": "#a87561", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": true },
         { "x0": -204, "x1": -104, "z0": 126, "z1": 172, "floors": 4, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": false }
@@ -338,7 +340,9 @@
       "landmarks": [],
       "pois": [
         { "id": "sant-pau", "kind": "street", "label": "Carrer de Sant Pau", "x": -122, "z": 60, "color": "#f4f1ea" },
-        { "id": "prim", "kind": "street", "label": "Carrer de Prim", "x": -166, "z": 60, "color": "#f4f1ea" }
+        { "id": "prim", "kind": "street", "label": "Carrer de Prim", "x": -166, "z": 60, "color": "#f4f1ea" },
+        { "id": "placeta", "kind": "place", "label": "Placeta", "x": -138, "z": 70, "color": "#e3b45c" },
+        { "id": "pipica8", "kind": "pipica", "label": "Pipicà", "x": -154, "z": 68, "color": "#8bcb3c" }
       ]
     },
     {
@@ -397,5 +401,6 @@
   "pipica4": { "x0": 314, "x1": 328, "z0": -14, "z1": -4, "gateZ0": -10.2, "gateZ1": -7.8 },
   "pipica5": { "x0": 316, "x1": 330, "z0": 21, "z1": 31, "gateZ0": 24.8, "gateZ1": 27.2 },
   "pipica6": { "x0": 272, "x1": 286, "z0": 168, "z1": 182, "gateZ0": 172.5, "gateZ1": 175.5 },
-  "pipica7": { "x0": 150, "x1": 164, "z0": 62, "z1": 74, "gateZ0": 66.5, "gateZ1": 69.5 }
+  "pipica7": { "x0": 150, "x1": 164, "z0": 62, "z1": 74, "gateZ0": 66.5, "gateZ1": 69.5 },
+  "pipica8": { "x0": -160, "x1": -148, "z0": 62, "z1": 74, "gateZ0": 66.8, "gateZ1": 69.2 }
 }
