@@ -5,6 +5,9 @@ import { boneSpots, mapPlaceMarks, poiPos } from '../src/scripts/walk/placements
 import { GOAL_DEFS } from '../src/scripts/walk/goalDefs.ts';
 import { AREAS, loadProgress } from '../src/scripts/walk/progress.ts';
 import { HILL_DX, shiftX } from '../src/scripts/walk/hillOffset.ts';
+import { MARINA_DX } from '../src/scripts/walk/marinaOffset.ts';
+import { BREAKWATER, CANAL } from '../src/scripts/walk/marinaGeom.ts';
+import { MICO_ARENA as MICO_ARENA_LOCAL } from '../src/scripts/walk/micoLogic.ts';
 
 /*
   Guards for the map re-orientation (docs/superpowers/specs/2026-11-28-walk-reorientation-design.md):
@@ -142,6 +145,32 @@ describe('the moved hill and the metro (re-orientation step 2)', () => {
   it('shifts x fields and [x, z] pairs only', () => {
     assert.deepEqual(shiftX({ x: 1, z: 2, x0: 3, x1: 4, minX: 5, maxX: 6, y: 7, pts: [[1, 2]], label: 'a' }, 10),
       { x: 11, z: 2, x0: 13, x1: 14, minX: 15, maxX: 16, y: 7, pts: [[11, 2]], label: 'a' });
+  });
+});
+
+describe('the port (re-orientation step 3)', () => {
+  const marina = byId.get('marina')!;
+  const seafront = byId.get('seafront')!;
+  const zone = (id: string) => (layout as unknown as { zones: (Rect & { id: string })[] }).zones.find((z) => z.id === id)!;
+
+  it('sits southwest of the old pier, where the beach ends', () => {
+    assert.ok(marina.bounds.x0 > layout.pier.x1, 'southwest (+x) of the pier');
+    assert.equal(marina.bounds.x0, seafront.bounds.x1, 'the beach and promenade run straight into the port');
+  });
+
+  it('starts at the breakwater root, with the canal right beside it', () => {
+    const stem = zone('marinaBreakwater');
+    const canal = zone('marinaCanal');
+    assert.equal(stem.x0, marina.bounds.x0);
+    assert.equal(stem.x0, BREAKWATER.x0 + MARINA_DX);
+    assert.equal(canal.x0, CANAL.x0 + MARINA_DX);
+    assert.ok(canal.x0 - stem.x1 < 40, 'the canal opens close to the breakwater root');
+  });
+
+  it('keeps El Mico de Bronze and the lighthouse inside the port', () => {
+    const a = MICO_ARENA_LOCAL;
+    assert.ok(inside(marina.bounds, a.x0 + MARINA_DX, a.z0) && inside(marina.bounds, a.x1 + MARINA_DX, a.z1));
+    assert.ok(inside(marina.bounds, poiPos(layout, 'marina', 'lighthouse').x, poiPos(layout, 'marina', 'lighthouse').z));
   });
 });
 

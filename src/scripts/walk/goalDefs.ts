@@ -22,7 +22,7 @@ export const GOAL_DEFS: readonly Readonly<GoalRow>[] = [
   { id: 'marina_lighthouse', label: 'Reach the breakwater lighthouse', done: false, area: 'marina' },
   { id: 'marina_boats', label: 'Stroll both marina pontoons', done: false, count: 0, target: 2, area: 'marina' },
   { id: 'marina_wake', label: 'Outrun the harbor boat wake on a pontoon', done: false, area: 'marina' },
-  { id: 'marina_mico', label: 'Outsmart El Mico de Bronze at Moll de Ponent', done: false, area: 'marina' },
+  { id: 'marina_mico', label: 'Outsmart El Mico de Bronze at Moll de Llevant', done: false, area: 'marina' },
   { id: 'gorg_quests', label: 'Help out around Canal i Galeria', done: false, count: 0, target: 3, area: 'gorg' },
   { id: 'gorg_bridges', label: 'Cross both bridges over the canal', done: false, count: 0, target: 2, area: 'gorg' },
   { id: 'gorg_carts', label: 'Dodge the runaway shopping carts at Galeria', done: false, area: 'gorg' },

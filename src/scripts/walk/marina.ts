@@ -1,7 +1,7 @@
 /*
   Phase 6: The Marina & Breakwater (west beyond the promenade breakwater rocks).
   Connects seamlessly along x = -104 via stone quays, leads across a timber
-  canal footbridge to West Quay (Moll de Ponent), drops down floating timber
+  canal footbridge to the quay by the breakwater's root (Moll de Llevant), drops down floating timber
   pontoons beside moored boats, hosts a fourth pipicà, and runs out along an
   armored breakwater to a green-beacon harbor lighthouse (Far del Port).
 
@@ -10,10 +10,10 @@
 */
 import * as THREE from 'three';
 import {
-  M, box, cyl, rod, shadowed,
+  M, box, cyl, shadowed,
   makeBench, makeWaterBowl, makeFountain, makeBollard, makeCafeSet, makeHeras,
 } from './models';
-import { makeLanternPost, makeFingerpost, railFenceGeometry } from './props';
+import { makeLanternPost, makeFingerpost } from './props';
 import { DirectBuilder } from './meshbuilder';
 import { bakeSteps } from './bake';
 import { SEAFRONT_LAYOUT, type DistrictData, type InstanceSink } from './layout';
@@ -23,15 +23,25 @@ import type { BoxCollider, CircleCollider } from './level';
 import {
   BREAKWATER, BREAKWATER_Y, CANAL, MARINA_GROUND_Y, MARINA_PIPICA,
   MARINA_WATER_Y, PONTOON_A, PONTOON_B, PONTOON_Y,
-  inMarinaPipica, marinaFloor, marinaSurface,
+  marinaFloor as marinaFloorLocal, marinaSurface as marinaSurfaceLocal, inMarinaPipica as inMarinaPipicaLocal,
 } from './marinaGeom';
+import { MARINA_DX, shiftX } from './marinaOffset';
 
-export { inMarinaPipica, marinaFloor, marinaSurface, PONTOON_Y, BREAKWATER_Y };
+export { PONTOON_Y, BREAKWATER_Y };
 
-const PIP = SEAFRONT_LAYOUT.pipica4 ?? MARINA_PIPICA;
+/** Ground height in the port, in world coordinates (marinaGeom.ts works in the marina's local frame). */
+export const marinaFloor = (x: number, z: number) => marinaFloorLocal(x - MARINA_DX, z);
+export const marinaSurface = (x: number, z: number) => marinaSurfaceLocal(x - MARINA_DX, z);
+export const inMarinaPipica = (x: number, z: number) => inMarinaPipicaLocal(x - MARINA_DX, z);
 
-/** Anchors shared between marina geometry (marina.ts) and runtime quests (marinaLife.ts). */
-export const MARINA = {
+/** The fourth pipicà in the marina's local frame (the layout data holds world positions). */
+const PIP = SEAFRONT_LAYOUT.pipica4 ? shiftX(SEAFRONT_LAYOUT.pipica4, -MARINA_DX) : MARINA_PIPICA;
+
+/**
+ * Anchors shared between marina geometry (marina.ts) and its runtime (marinaLife.ts, micoBoss.ts),
+ * in the marina's local frame. MARINA below is the same in world coordinates.
+ */
+export const MARINA_LOCAL = {
   id: 'marina',
   x1: -104,
   minX: -214,
@@ -74,6 +84,12 @@ export const MARINA = {
   ] as [number, number][][],
 };
 
+/** The marina's anchors in world coordinates (the district is built locally and shifted by MARINA_DX). */
+export const MARINA = {
+  ...shiftX(MARINA_LOCAL, MARINA_DX),
+  boats: MARINA_LOCAL.boats.map(([x, ...rest]) => [x + MARINA_DX, ...rest]) as unknown as typeof MARINA_LOCAL.boats,
+};
+
 export interface MarinaEnv {
   groundY: number;
   grid: ColliderGrid;
@@ -102,32 +118,10 @@ const tmpP = new THREE.Vector3();
 const mtx = (x: number, y: number, z: number, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) =>
   tmpM.compose(tmpP.set(x, y, z), tmpQ.setFromEuler(tmpE.set(rx, ry, rz)), tmpS.set(sx, sy, sz));
 
-function mergeGeos(parts: THREE.BufferGeometry[]) {
-  const ps = parts.map((p) => (p.index ? p.toNonIndexed() : p));
-  let n = 0;
-  for (const p of ps) n += p.attributes.position.count;
-  const pos = new Float32Array(n * 3);
-  const nor = new Float32Array(n * 3);
-  const uv = new Float32Array(n * 2);
-  let o = 0;
-  for (const p of ps) {
-    pos.set(p.attributes.position.array as Float32Array, o * 3);
-    nor.set(p.attributes.normal.array as Float32Array, o * 3);
-    if (p.attributes.uv) uv.set(p.attributes.uv.array as Float32Array, o * 2);
-    o += p.attributes.position.count;
-    p.dispose();
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  return g;
-}
-
 /** The Marina & Breakwater as a streamable waterfront district. */
 export function makeMarinaDistrict(env: MarinaEnv): District {
   const d: District = {
-    id: MARINA.id,
+    id: MARINA_LOCAL.id,
     label: env.layout.label,
     bounds: env.layout.bounds,
     root: new THREE.Group(),
@@ -143,7 +137,9 @@ export function makeMarinaDistrict(env: MarinaEnv): District {
       d.root.clear();
     },
   };
-  d.root.name = MARINA.id;
+  d.root.name = MARINA_LOCAL.id;
+  // Everything below is built in the marina's local frame; the root carries it into place.
+  d.root.position.x = MARINA_DX;
   return d;
 }
 
@@ -156,12 +152,13 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
     root.add(o);
     return o;
   };
-  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, district: MARINA.id });
+  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, x0: b.x0 + MARINA_DX, x1: b.x1 + MARINA_DX, district: MARINA_LOCAL.id });
   const addCircle = (x: number, z: number, rr: number, top: number, kind: string, canPee: boolean, canWhirl: boolean, minY?: number) => {
-    const c: CircleCollider = { x, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: MARINA.id };
+    const wx = x + MARINA_DX;
+    const c: CircleCollider = { x: wx, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: MARINA_LOCAL.id };
     if (minY !== undefined) c.minY = minY;
-    if (canWhirl || kind === 'tree') c.obstacle = { x, z, r: rr, kind: 'pole' };
-    else if (['bench', 'bollard', 'bin', 'fountain', 'table'].includes(kind)) c.obstacle = { x, z, r: rr, kind: 'furniture' };
+    if (canWhirl || kind === 'tree') c.obstacle = { x: wx, z, r: rr, kind: 'pole' };
+    else if (['bench', 'bollard', 'bin', 'fountain', 'table'].includes(kind)) c.obstacle = { x: wx, z, r: rr, kind: 'furniture' };
     grid.addCircle(c);
   };
 
@@ -173,7 +170,7 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
   // East side of canal: inland promenade + seaward concrete apron.
   root.add(env.ground(-162, -104, -14, 4, Y + 0.002, mats.panot, mats.panotTile));
   root.add(env.ground(-162, -104, -18, -14, Y + 0.003, mats.conc, mats.concTile));
-  // West side of canal + Moll de Ponent boss quay.
+  // Beach side of the canal + the Moll de Llevant boss quay by the breakwater's root.
   root.add(env.ground(-214, -178, -14, 4, Y + 0.002, mats.panot, mats.panotTile));
   root.add(env.ground(-214, -178, -18, -14, Y + 0.003, mats.conc, mats.concTile));
   root.add(env.ground(-214, -180, -26, -18, Y + 0.003, mats.conc, mats.concTile));
@@ -197,7 +194,7 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
   // West quay east & south & west sea walls.
   builder.addBox(-180.4, botY, -26.0, -179.8, Y + 0.01, -18.0, quayCol, { skipBottom: true });
   builder.addBox(-206.0, botY, -26.2, -180.0, Y + 0.01, -25.6, quayCol, { skipBottom: true });
-  builder.addBox(-214.4, botY, -26.2, -213.8, Y + 0.01, 4.0, quayCol, { skipBottom: true });
+  builder.addBox(-214.4, botY, -26.2, -213.8, Y + 0.01, -20.2, quayCol, { skipBottom: true });
   // Bridge steel deck trim + north/south wooden railings.
   for (const rz of [CANAL.bridgeZ0 + 0.08, CANAL.bridgeZ1 - 0.08]) {
     builder.addBox(CANAL.x0, Y + 0.02, rz - 0.06, CANAL.x1, Y + 0.96, rz + 0.06, 0x7c5a3a);
@@ -240,9 +237,9 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
     place(makeBench(), bx, Y, bz, 0);
     addBox({ x0: bx - 0.9, x1: bx + 0.9, z0: bz - 0.45, z1: bz + 0.45, top: Y + 0.5, kind: 'bench', face: [0, 1] });
   }
-  place(makeFountain(), MARINA.drink.x, Y, MARINA.drink.z, Math.PI / 2);
-  addCircle(MARINA.drink.x, MARINA.drink.z, 0.25, Y + 1.1, 'fountain', true, false);
-  for (const [x, z] of MARINA.lamps) {
+  place(makeFountain(), MARINA_LOCAL.drink.x, Y, MARINA_LOCAL.drink.z, Math.PI / 2);
+  addCircle(MARINA_LOCAL.drink.x, MARINA_LOCAL.drink.z, 0.25, Y + 1.1, 'fountain', true, false);
+  for (const [x, z] of MARINA_LOCAL.lamps) {
     const lamp = makeLanternPost();
     lamp.group.traverse((o) => { const m = o as THREE.Mesh; if (m.material === lamp.glass) m.material = mats.lampGlass; });
     const ly = z < -27 ? BREAKWATER_Y : Y;
@@ -278,17 +275,17 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
     new THREE.MeshStandardMaterial({ map: signTexture('Pipicà', 'Off-leash area', '#8bcb3c', { aspect: 2.2 / 0.7 }), roughness: 0.7 }),
   );
   place(pipSign, PIP.x1 + 0.1, Y + 1.75, PIP.gateZ0 - 1.4);
-  place(makeWaterBowl(), MARINA.bowl.x, Y, MARINA.bowl.z);
-  place(makeBench(), MARINA.pipicaBench.x + 0.35, Y, MARINA.pipicaBench.z, -Math.PI / 2);
-  addBox({ x0: MARINA.pipicaBench.x - 0.15, x1: MARINA.pipicaBench.x + 0.85, z0: MARINA.pipicaBench.z - 0.9, z1: MARINA.pipicaBench.z + 0.9, top: Y + 0.5, kind: 'bench' });
+  place(makeWaterBowl(), MARINA_LOCAL.bowl.x, Y, MARINA_LOCAL.bowl.z);
+  place(makeBench(), MARINA_LOCAL.pipicaBench.x + 0.35, Y, MARINA_LOCAL.pipicaBench.z, -Math.PI / 2);
+  addBox({ x0: MARINA_LOCAL.pipicaBench.x - 0.15, x1: MARINA_LOCAL.pipicaBench.x + 0.85, z0: MARINA_LOCAL.pipicaBench.z - 0.9, z1: MARINA_LOCAL.pipicaBench.z + 0.9, top: Y + 0.5, kind: 'bench' });
   builder.addBox(-154.5, Y, -11.4, -151.5, Y + 0.32, -10.8, 0x7a5a3c);
   builder.addBox(-149.2, Y, -6.5, -146.8, Y + 0.28, -5.9, 0x7a5a3c);
   addBox({ x0: -154.5, x1: -151.5, z0: -11.4, z1: -10.8, top: Y + 0.32, kind: 'log' });
   addBox({ x0: -149.2, x1: -146.8, z0: -6.5, z1: -5.9, top: Y + 0.28, kind: 'log' });
   yield;
 
-  // ---- West Quay (Moll de Ponent): open boss plaza, crane, mooring bollards, safety rails ----
-  for (const [bx, bz] of MARINA.arenaBollards) {
+  // ---- Moll de Llevant: open boss plaza, crane, mooring bollards, safety rails ----
+  for (const [bx, bz] of MARINA_LOCAL.arenaBollards) {
     const b = makeBollard();
     b.scale.setScalar(1.25);
     place(b, bx, Y, bz);
@@ -344,7 +341,10 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
   quayRail(-179.95, -17.95, -178.05, -17.95);
   quayRail(-180.05, -25.95, -180.05, -18.05);
   quayRail(-205.8, -25.95, -180.05, -25.95);
-  quayRail(-213.95, -25.95, -213.95, 3.6);
+  quayRail(-213.95, -25.95, -213.95, -20.3);
+  // The far end of the port (toward the boatyard) is closed off for now.
+  quayRail(-104.05, -17.95, -104.05, 3.6);
+  for (let i = 0; i < 5; i++) place(makeHeras(4.0), -103.6, Y, -15.8 + i * 4, Math.PI / 2);
   yield;
 
   // ---- Floating wooden pontoons & sloped gangways ----
@@ -436,45 +436,11 @@ function* buildMarinaSteps(env: MarinaEnv, d: District): Generator<void, void, v
     cap.position.y = deckY + 1.85;
     lh.add(cap);
     shadowed(lh);
-    place(lh, MARINA.lighthouse.x, BREAKWATER_Y, MARINA.lighthouse.z);
-    addCircle(MARINA.lighthouse.x, MARINA.lighthouse.z, 2.3, BREAKWATER_Y + 11.5, 'lighthouse', true, true, BREAKWATER_Y - 0.5);
+    place(lh, MARINA_LOCAL.lighthouse.x, BREAKWATER_Y, MARINA_LOCAL.lighthouse.z);
+    addCircle(MARINA_LOCAL.lighthouse.x, MARINA_LOCAL.lighthouse.z, 2.3, BREAKWATER_Y + 11.5, 'lighthouse', true, true, BREAKWATER_Y - 0.5);
   }
   yield;
 
-  // ---- Railway continuation behind North & West Quays (x -226..-148) ----
-  const ballast = box(78, 0.18, 9.4, M(0x8e877b, 1));
-  ballast.position.set(-187, Y + 0.05, 9);
-  ballast.receiveShadow = true;
-  root.add(ballast);
-  const sleeperGeo = new THREE.BoxGeometry(0.24, 0.1, 2.5);
-  const sleeperMat = M(0x7a7368, 0.9);
-  for (const tz of [7.4, 10.6]) {
-    for (let x = -225.5; x < -148; x += 0.85) inst.add('msleep', sleeperGeo, sleeperMat, mtx(x, Y + 0.18, tz), false);
-    for (const dz of [-0.72, 0.72]) {
-      const rail = box(78, 0.12, 0.08, M(0x9aa0a8, 0.3, 0.9));
-      rail.position.set(-187, Y + 0.28, tz + dz);
-      root.add(rail);
-    }
-    const wire = box(78, 0.025, 0.025, M(0x3a3a40, 0.5, 0.6));
-    wire.position.set(-187, Y + 5.8, tz);
-    root.add(wire);
-  }
-  const mastM = M(0x3a3f48, 0.5, 0.6);
-  for (const mx of [-170, -200]) {
-    root.add(rod(new THREE.Vector3(mx, Y, 13.2), new THREE.Vector3(mx, Y + 7, 13.2), 0.14, mastM, 6));
-    root.add(rod(new THREE.Vector3(mx, Y + 6.4, 13.2), new THREE.Vector3(mx, Y + 6.4, 6.8), 0.06, mastM, 4));
-  }
-  const fenceMat = M(0x1f2a24, 0.5, 0.5);
-  const fenceGeo = mergeGeos(railFenceGeometry(8));
-  for (const fz of [4, 14]) {
-    for (let x = -226; x < -148; x += 8) {
-      const segLen = Math.min(8, -148 - x);
-      const m = new THREE.Mesh(segLen === 8 ? fenceGeo : mergeGeos(railFenceGeometry(segLen)), fenceMat);
-      m.position.set(x + segLen / 2, Y, fz);
-      root.add(m);
-    }
-  }
-  addBox({ x0: -226, x1: -148, z0: 3.8, z1: 14.0, top: 9, kind: 'tracks' });
 
   const flush = builder.flushSteps(root);
   while (!flush.next().done) yield;
