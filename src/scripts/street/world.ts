@@ -264,31 +264,8 @@ export function drawStatic(c: CanvasRenderingContext2D, w: World) {
 
 function drawGround(c: CanvasRenderingContext2D, w: World) {
   const rand = rng(7);
-  // Sidewalk: Barcelona panot tiles, the four-circle pattern.
-  c.fillStyle = '#e4dbca';
-  c.fillRect(0, FACADE, w.width, CURB - FACADE);
-  c.strokeStyle = '#d3c8b2';
-  c.lineWidth = 1;
-  c.beginPath();
-  for (let tx = 0; tx < w.width; tx += 22) {
-    c.moveTo(tx, FACADE);
-    c.lineTo(tx, CURB);
-  }
-  for (let ty = FACADE; ty < CURB; ty += 22) {
-    c.moveTo(0, ty);
-    c.lineTo(w.width, ty);
-  }
-  c.stroke();
-  c.fillStyle = '#d7ccb5';
-  for (let tx = 0; tx < w.width; tx += 22) {
-    for (let ty = FACADE; ty < CURB - 11; ty += 22) {
-      for (const [ox, oy] of [[6, 6], [16, 6], [6, 16], [16, 16]]) {
-        c.beginPath();
-        c.arc(tx + ox, ty + oy, 2.6, 0, Math.PI * 2);
-        c.fill();
-      }
-    }
-  }
+  // Sidewalk: Barcelona panots, the four-tablet pattern.
+  fillPanots(c, 0, FACADE, w.width, CURB, rand);
   // Curb
   c.fillStyle = '#c4baa6';
   c.fillRect(0, CURB - 4, w.width, 6);
@@ -300,8 +277,13 @@ function drawGround(c: CanvasRenderingContext2D, w: World) {
   c.fillStyle = '#e8e4da';
   c.fillRect(0, LANE_TOP + 1, w.width, 1.5);
   for (let tx = 0; tx < w.width; tx += 30) c.fillRect(tx, LANE - 0.75, 14, 1.5);
-  for (let tx = 90; tx < w.width; tx += 260) bikeIcon(c, tx, LANE - 11, 1);
-  for (let tx = 220; tx < w.width; tx += 260) bikeIcon(c, tx, LANE + 11, -1);
+  // Lane symbols, nudged clear of the zebra crossings painted over the lane.
+  const clearOfCrossings = (tx: number) => {
+    for (const zx of w.crossings) if (tx + 30 > zx - 8 && tx - 14 < zx + 64) return zx + 64 + 18;
+    return tx;
+  };
+  for (let tx = 90; tx < w.width; tx += 260) bikeIcon(c, clearOfCrossings(tx), LANE - 11, 1);
+  for (let tx = 220; tx < w.width; tx += 260) bikeIcon(c, clearOfCrossings(tx), LANE + 11, -1);
   // Road, with a little grain
   c.fillStyle = '#4a4f5c';
   c.fillRect(0, ROAD_TOP, w.width, ROAD_BOT - ROAD_TOP);
@@ -336,30 +318,7 @@ function drawFarSide(c: CanvasRenderingContext2D, w: World) {
   c.fillRect(0, ROAD_BOT - 2, w.width, 2);
   c.fillStyle = '#c4baa6';
   c.fillRect(0, ROAD_BOT, w.width, FAR_CURB - ROAD_BOT);
-  c.fillStyle = '#e4dbca';
-  c.fillRect(0, FAR_CURB, w.width, FAR_EDGE - FAR_CURB);
-  c.strokeStyle = '#d3c8b2';
-  c.lineWidth = 1;
-  c.beginPath();
-  for (let tx = 0; tx < w.width; tx += 22) {
-    c.moveTo(tx, FAR_CURB);
-    c.lineTo(tx, FAR_EDGE);
-  }
-  for (let ty = FAR_CURB + 22; ty < FAR_EDGE; ty += 22) {
-    c.moveTo(0, ty);
-    c.lineTo(w.width, ty);
-  }
-  c.stroke();
-  c.fillStyle = '#d7ccb5';
-  for (let tx = 0; tx < w.width; tx += 22) {
-    for (let ty = FAR_CURB; ty < FAR_EDGE - 11; ty += 22) {
-      for (const [ox, oy] of [[6, 6], [16, 6], [6, 16], [16, 16]]) {
-        c.beginPath();
-        c.arc(tx + ox, ty + oy, 2.6, 0, Math.PI * 2);
-        c.fill();
-      }
-    }
-  }
+  fillPanots(c, 0, FAR_CURB, w.width, FAR_EDGE, rng(11));
   // Peeking storefront awnings & floral crates along the south sidewalk edge.
   const awnings: { x: number; w: number; c: string; label: string }[] = [
     { x: 392, w: 112, c: '#e5487a', label: 'GELATERIA' },
@@ -548,6 +507,61 @@ export function drawMetroTop(c: CanvasRenderingContext2D, l: Extract<Lot, { type
   c.fillText('L2', tx + 17, ty - 29.6);
 }
 
+// ---- Panots ------------------------------------------------------------------------------
+// The classic Barcelona sidewalk tile: a square with four raised round tablets.
+// One tile is drawn once at 4x and repeated as a pattern, so the sidewalk costs a
+// single fill, then a few worn tiles are toned by hand.
+const PANOT = 16;
+const PANOT_RES = 4;
+let panotTile: HTMLCanvasElement | null = null;
+function panotCanvas() {
+  if (panotTile) return panotTile;
+  const t = document.createElement('canvas');
+  t.width = t.height = PANOT * PANOT_RES;
+  const g = t.getContext('2d')!;
+  g.scale(PANOT_RES, PANOT_RES);
+  g.fillStyle = '#e3d9c6';
+  g.fillRect(0, 0, PANOT, PANOT);
+  // Grout along two edges (the neighbours supply the other two).
+  g.fillStyle = '#cbbfa7';
+  g.fillRect(0, PANOT - 0.6, PANOT, 0.6);
+  g.fillRect(PANOT - 0.6, 0, 0.6, PANOT);
+  // A faint bevel on the tile itself.
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  g.fillRect(0, 0, PANOT - 0.6, 0.5);
+  g.fillRect(0, 0, 0.5, PANOT - 0.6);
+  for (const [ox, oy] of [[4, 4], [11.4, 4], [4, 11.4], [11.4, 11.4]]) {
+    const r = 2.75;
+    g.fillStyle = '#c9bca3'; // shadow under the raised tablet
+    g.beginPath(); g.arc(ox + 0.55, oy + 0.6, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f1ebde'; // lit rim
+    g.beginPath(); g.arc(ox - 0.35, oy - 0.4, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#dcd1bc'; // the tablet's face
+    g.beginPath(); g.arc(ox, oy, r - 0.35, 0, Math.PI * 2); g.fill();
+  }
+  panotTile = t;
+  return t;
+}
+
+function fillPanots(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, rand: () => number) {
+  const pat = c.createPattern(panotCanvas(), 'repeat');
+  c.save();
+  if (pat) {
+    pat.setTransform(new DOMMatrix().translate(0, y0).scale(1 / PANOT_RES));
+    c.fillStyle = pat;
+  } else c.fillStyle = '#e3d9c6';
+  c.fillRect(x0, y0, x1 - x0, y1 - y0);
+  // Wear: the odd tile a shade darker or lighter, like a street patched over the years.
+  for (let tx = x0; tx < x1; tx += PANOT) {
+    for (let ty = y0; ty < y1 - PANOT / 2; ty += PANOT) {
+      const k = rand();
+      if (k < 0.06) { c.fillStyle = 'rgba(90, 70, 40, 0.07)'; c.fillRect(tx, ty, PANOT - 0.6, PANOT - 0.6); }
+      else if (k > 0.965) { c.fillStyle = 'rgba(255, 255, 255, 0.16)'; c.fillRect(tx, ty, PANOT - 0.6, PANOT - 0.6); }
+    }
+  }
+  c.restore();
+}
+
 function bikeIcon(c: CanvasRenderingContext2D, bx: number, by: number, dir: number) {
   c.strokeStyle = 'rgba(255,255,255,0.6)';
   c.lineWidth = 1.4;
@@ -707,24 +721,29 @@ function drawStation(c: CanvasRenderingContext2D, w: World, l: Extract<Lot, { ty
     }
   }
   // Station nameplate and R1 roundel
+  // The roundel gets its own column so the text never runs under it.
+  const plateL = cx - 64, plateW = 128;
+  const ringX = plateL + 14;
+  const textL = ringX + 8.5 + 5, textR = plateL + plateW - 5;
+  const textX = (textL + textR) / 2, textW = textR - textL;
   c.fillStyle = '#e5302a';
   c.beginPath();
-  c.roundRect(cx - 56, 52, 112, 26, 4);
+  c.roundRect(plateL, 52, plateW, 26, 4);
   c.fill();
   c.fillStyle = '#f4f1ea';
   c.beginPath();
-  c.arc(cx - 42, 65, 8.5, 0, Math.PI * 2);
+  c.arc(ringX, 65, 8.5, 0, Math.PI * 2);
   c.fill();
   c.fillStyle = '#e5302a';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.font = `800 8px ${FONT}`;
-  c.fillText('R1', cx - 42, 65.5);
+  c.fillText('R1', ringX, 65.5);
   c.fillStyle = '#f4f1ea';
   c.font = `800 13px ${FONT}`;
-  c.fillText('Estació', cx + 8, 61.5);
-  c.font = `700 7.5px ${BODY}`;
-  c.fillText('TRAIN TO 3D SEAFRONT', cx + 8, 71.5);
+  c.fillText('Estació', textX, 61.5, textW);
+  c.font = `700 7px ${BODY}`;
+  c.fillText('TRAIN TO 3D SEAFRONT', textX, 71.5, textW);
   // Central arched entrance
   c.fillStyle = '#e9ddc2';
   c.beginPath();

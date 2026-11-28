@@ -20,8 +20,9 @@ import { StreetSound } from './audio';
 import { trackVisibleViewport } from '../viewport';
 import {
   EatPreyNapSim, DopepodSim, CAT_PALETTES, CAT_SIZES,
-} from '../walk/booths';
+} from '../walk/boothSims';
 import { CoriolisSimulator, type SimKey, type SimCommand } from '../coriolis/sim';
+import { Leash, capStretch, WhirlDetector, type Obstacle } from '../walk/leash';
 
 type P = { x: number; y: number };
 type Bubble = { text: string; ttl: number; who: P; lift: number; loud: boolean };
@@ -36,7 +37,16 @@ type Stain = { x: number; y: number; r: number };
 type Fx = { kind: 'ring' | 'dust' | 'splash' | 'heart' | 'crumb'; x: number; y: number; vx: number; vy: number; t: number; max: number };
 type Confetti = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; w: number; h: number; color: string; t: number; max: number };
 
-const ROPE_N = 18;
+/**
+  The leash is the real game's, shared with the 3D walk (walk/leash.ts works in meters):
+  the 130 px leash is its 5 m, so 26 px = 1 m. It wraps lampposts with stick-slip and
+  can swing the human round a pole (the pole spin).
+*/
+const PX = 26;
+const ROPE_N = 23; // Leash.N - 1
+/** Solids the rope wraps like poles; the rest (bins, tables, the fountain) it slides over like furniture. */
+const POLE_KINDS = new Set(['lamp', 'bollard', 'hydrant', 'tree']);
+const TAU = Math.PI * 2;
 const ROPE_BASE = 130;
 const DOG_R = 9;
 const HUMAN_R = 13;
@@ -80,12 +90,21 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
   // ---- State ----------------------------------------------------------------------
   const dog = { x: 70, y: 168, heading: 0, moving: false, sprint: false, peeing: 0, step: 0, dig: false, squat: 0 };
-  const human = { x: 34, y: 150, heading: 0, walking: false, patience: 1, stop: 0, step: 0, stuck: 0, ghost: 0 };
-  const rope = Array.from({ length: ROPE_N + 1 }, (_, i) => {
-    const t = i / ROPE_N;
-    const x = human.x + (dog.x - human.x) * t, y = human.y + (dog.y - human.y) * t;
-    return { x, y, px: x, py: y };
-  });
+  const human = { x: 34, y: 150, heading: 0, walking: false, patience: 1, stop: 0, step: 0, stuck: 0, ghost: 0, vx: 0, vy: 0, stumble: 0 };
+  const toM = (q: P) => ({ x: q.x / PX, z: q.y / PX });
+  // The rope in meters (walk/leash.ts: pts[0] is Millie, the last is the hand) and a
+  // pixel view of it, human end first, for drawing and for the human to follow.
+  const line = new Leash(toM(dog), toM(human));
+  const rope: P[] = Array.from({ length: ROPE_N + 1 }, () => ({ x: 0, y: 0 }));
+  const leashObstacles: Obstacle[] = world.solids
+    .filter((o): o is Circle => o.shape === 'circle')
+    .map((o) => ({ x: o.x / PX, z: o.y / PX, r: o.r / PX, kind: POLE_KINDS.has(o.what) ? 'pole' : 'furniture' }));
+  const nearObs: Obstacle[] = [];
+  const whirlDet = new WhirlDetector();
+  type Whirl = { pole: Obstacle; theta: number; omega: number; swept: number; budget: number; dir: number; r: number; t: number; extra: number };
+  let whirl: Whirl | null = null;
+  let whooshAcc = 0;
+  let spins = 0, flings = 0;
   let leash = ROPE_BASE;
   let heyT = 0;
   let pee = 0.6, zoom = 1, barkCd = 0, digSfxCd = 0, marked = 0;
@@ -509,13 +528,28 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     if (bonesGot >= 5) complete('bones', 'find 5 bones');
   }
 
-  function resetRope() {
-    rope.forEach((p, i) => {
-      const t = i / ROPE_N;
-      p.x = p.px = human.x + (dog.x - human.x) * t;
-      p.y = p.py = human.y + (dog.y - human.y) * t;
-    });
+  function syncRope() {
+    const n = line.pts.length;
+    for (let i = 0; i < n; i++) {
+      const q = line.pts[n - 1 - i];
+      rope[i].x = q.x * PX;
+      rope[i].y = q.z * PX;
+    }
+    rope[0].x = human.x; rope[0].y = human.y;
+    rope[ROPE_N].x = dog.x; rope[ROPE_N].y = dog.y;
   }
+
+  function resetRope() {
+    whirl = null;
+    line.whirl = false;
+    line.freeSlip = 0;
+    whirlDet.reset(0);
+    human.stumble = 0;
+    human.vx = human.vy = 0;
+    line.reset(toM(dog), toM(human));
+    syncRope();
+  }
+  resetRope();
 
   // R starts the walk again, like the real game.
   function restart() {
@@ -567,45 +601,129 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
   }
 
   // ---- Simulation ----------------------------------------------------------------------
-  // Intentionally kept separate from walk/leash.ts (meter-scale Verlet + pole stick-slip
-  // + whirl) so the 2D home widget stays small and preserves its pixel-space game feel.
-  function solveRope() {
-    for (let i = 1; i < ROPE_N; i++) {
-      const p = rope[i];
-      const vx = (p.x - p.px) * 0.82, vy = (p.y - p.py) * 0.82;
-      p.px = p.x; p.py = p.y;
-      p.x += vx; p.y += vy;
+  // The rope is walk/leash.ts (the real game's leash, in meters): it wraps lampposts with
+  // stick-slip and its segments can't slip through a thin pole. Millie and her human move
+  // on their own; the rope then caps how far apart they can get along it.
+  function solveRope(dt: number) {
+    line.rest = leash / PX;
+    const cx = (dog.x + human.x) / 2, cy = (dog.y + human.y) / 2, reach = leash / 2 + 40;
+    nearObs.length = 0;
+    for (const o of leashObstacles) {
+      if (Math.abs(o.x * PX - cx) < reach && Math.abs(o.z * PX - cy) < reach) nearObs.push(o);
     }
-    const seg = leash / ROPE_N;
-    // Inverse masses: the rope is light, Millie heavier, her human four times her weight.
-    const inv = (i: number) => (i === 0 ? 0.08 : i === ROPE_N ? (dog.dig ? 0.01 : 0.32) : 1);
-    rope[0].x = human.x; rope[0].y = human.y;
-    rope[ROPE_N].x = dog.x; rope[ROPE_N].y = dog.y;
-    for (let it = 0; it < 22; it++) {
-      for (let i = 0; i < ROPE_N; i++) {
-        const a = rope[i], b = rope[i + 1];
-        const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
-        if (d <= seg) continue;
-        const wa = inv(i), wb = inv(i + 1), k = (d - seg) / d / (wa + wb);
-        a.x += dx * k * wa; a.y += dy * k * wa;
-        b.x -= dx * k * wb; b.y -= dy * k * wb;
-      }
-      for (let i = 1; i < ROPE_N; i++) pushOut(rope[i], 1.5);
-    }
-    human.x = rope[0].x; human.y = rope[0].y;
-    dog.x = rope[ROPE_N].x; dog.y = rope[ROPE_N].y;
-    pushOut(human, HUMAN_R, human.ghost > 0);
+    const d = toM(dog), h = toM(human);
+    line.step(d, h, nearObs, dt);
+    // Tight, like the old pixel leash: a few percent of give, Millie light, her human heavy.
+    capStretch(line, d, h, dog.dig ? 14 : 1, 4, 1.04);
+    dog.x = d.x * PX; dog.y = d.z * PX;
     pushOut(dog, DOG_R);
-    const dx = dog.x - human.x, dy = dog.y - human.y, d = Math.hypot(dx, dy);
-    if (d > leash) { dog.x = human.x + (dx / d) * leash; dog.y = human.y + (dy / d) * leash; }
-    rope[0].x = human.x; rope[0].y = human.y;
-    rope[ROPE_N].x = dog.x; rope[ROPE_N].y = dog.y;
+    if (!whirl) {
+      human.x = h.x * PX; human.y = h.z * PX;
+      pushOut(human, HUMAN_R, human.ghost > 0 || human.stumble > 0);
+    }
+    syncRope();
+    if (playing && !whirl && human.stumble <= 0) {
+      const hit = whirlDet.update(line, toM(human), dt);
+      if (hit) startWhirl(hit.pole, hit.coil);
+    }
+  }
+
+  // ---- Pole spin (the real game's whirl) ------------------------------------------------
+  // Wind the leash round a lamppost and pull: the human swings round the pole, and with
+  // enough wraps gets flung off it.
+  function startWhirl(pole: Obstacle, coil: number) {
+    const hx = human.x / PX, hz = human.y / PX;
+    const r = Math.max(0.56, Math.hypot(hx - pole.x, hz - pole.z));
+    const sp = Math.hypot(human.vx, human.vy) / PX;
+    const rx = hx - pole.x, rz = hz - pole.z;
+    const carry = rx * human.vy - rz * human.vx;
+    // Spin the way that unwinds the rope's coil round the pole.
+    const dir = Math.abs(coil) > 0.1 ? -Math.sign(coil) : carry >= 0 ? 1 : -1;
+    whirl = {
+      pole, r, t: 0, swept: 0, extra: 0, dir,
+      theta: Math.atan2(hz - pole.z, hx - pole.x),
+      omega: clamp(sp / r, 5, 9),
+      budget: clamp(Math.abs(coil) / TAU, 0.6, 4) * TAU,
+    };
+    line.whirl = true;
+    whooshAcc = 0;
+    spins++;
+    say(human, 'Wheee!', 28, true, 1.4);
+    toast = { text: 'Pole spin!', t: 1.6 };
+    sound.whoosh(1);
+  }
+
+  function updateWhirl(dt: number) {
+    const w = whirl!;
+    w.t += dt;
+    const tension = Math.max(0, line.stretch - 1) * 60;
+    w.omega = Math.min(20, w.omega + (7 + tension) * dt);
+    w.r += (0.56 - w.r) * Math.min(1, (dt * 2.9) / Math.max(0.1, w.r));
+    const dTheta = w.dir * w.omega * dt;
+    w.theta += dTheta;
+    w.swept += Math.abs(dTheta);
+    whooshAcc += Math.abs(dTheta);
+    if (whooshAcc > Math.PI) { whooshAcc = 0; sound.whoosh(0.75 + (w.omega / 20) * 0.75); }
+    const ox = w.pole.x + Math.cos(w.theta) * (w.r + w.pole.r);
+    const oz = w.pole.z + Math.sin(w.theta) * (w.r + w.pole.r);
+    human.vx = (ox * PX - human.x) / dt; human.vy = (oz * PX - human.y) / dt;
+    human.x = ox * PX; human.y = oz * PX;
+    human.heading = w.theta + Math.PI; // hand toward the pole
+    human.walking = true;
+    human.step += dt * 14;
+    const tx = -Math.sin(w.theta) * w.dir, tz = Math.cos(w.theta) * w.dir;
+    const toDogX = dog.x / PX - ox, toDogZ = dog.y / PX - oz;
+    const dl = Math.hypot(toDogX, toDogZ) || 1;
+    const dot = (tx * toDogX + tz * toDogZ) / dl;
+    const end = (lx: number, lz: number, speed: number, stumble: number, slip: number) => {
+      human.vx = lx * speed * PX; human.vy = lz * speed * PX;
+      human.stumble = stumble;
+      whirl = null; line.whirl = false; line.freeSlip = slip;
+      whirlDet.reset(0.9);
+    };
+    const fling = (lx: number, lz: number) => {
+      end(lx, lz, clamp(0.94 * w.omega, 5.3, 14), 1, 1.2);
+      flings++;
+      say(human, 'Aaaah!', 28, true, 1.4);
+      toast = { text: 'Pole spin: FLING!', t: 2 };
+      sound.fling();
+      for (let i = 0; i < 6; i++) spawnFx('dust', human.x, human.y + 4, -lx * 30 + (Math.random() - 0.5) * 30, -10 - Math.random() * 12, 0.45);
+    };
+    if (w.swept >= w.budget && dot > 0.5) { fling(tx, tz); return; }
+    if (w.swept >= w.budget) {
+      w.extra += Math.abs(dTheta);
+      if (w.extra > 0.6 * TAU) {
+        // Launch leaning toward Millie, by at most 60 degrees.
+        const a = Math.atan2(tz, tx), b = Math.atan2(toDogZ, toDogX);
+        let dd = b - a;
+        while (dd > Math.PI) dd -= TAU;
+        while (dd < -Math.PI) dd += TAU;
+        const lean = clamp(dd, -Math.PI / 3, Math.PI / 3);
+        fling(Math.cos(a + lean), Math.sin(a + lean));
+        return;
+      }
+    }
+    if (w.t > 3.5 || Math.hypot(ox - w.pole.x, oz - w.pole.z) > 2.2) {
+      // Bail: stagger off, dizzy.
+      end(tx, tz, clamp(w.omega * w.r, 0.9, 3.8), 0.7, 0.8);
+      say(human, "Ugh, I'm dizzy", 28);
+    }
+  }
+
+  /** After a fling the human slides to a stop and gathers themself before walking on. */
+  function updateStumble(dt: number) {
+    const f = Math.max(0, 1 - dt * 3.2);
+    human.vx *= f; human.vy *= f;
+    human.x += human.vx * dt; human.y += human.vy * dt;
+    human.walking = false;
+    pushOut(human, HUMAN_R);
   }
 
   function updatePlayer(dt: number) {
     barkCd -= dt;
     heyT -= dt;
     human.stop -= dt;
+    human.stumble -= dt;
 
     let dir = playing ? input() : autopilot(dt);
     if (dog.peeing > 0) { dog.peeing -= dt; dir = null; }
@@ -677,17 +795,12 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     }
     if (offLeash) {
       offT += dt;
+      if (whirl) { whirl = null; line.whirl = false; }
       dog.y = Math.min(dog.y, 212 - DOG_R);
-      const gx = world.park.x + 26 - human.x, gy = 168 - human.y, gd = Math.hypot(gx, gy);
-      human.walking = gd > 2;
-      if (human.walking) {
-        const hs = Math.min(70 * dt, gd);
-        human.x += (gx / gd) * hs;
-        human.y += (gy / gd) * hs;
-        human.step += dt * 9;
-      }
+      // Walk to the gate, squeezing past anything she wedges against (a lamp and a
+      // bench can leave a gap Millie fits through but her human doesn't).
+      walkHuman(world.park.x + 26, 168, 70, dt);
       human.heading = Math.atan2(dog.y - human.y, dog.x - human.x);
-      pushOut(human, HUMAN_R);
       if (offT > 1.5 && Math.hypot(dog.x - human.x, dog.y - human.y) < DOG_R + HUMAN_R + 8) {
         offLeash = false;
         clippedInPark = true;
@@ -699,9 +812,9 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
 
     // Patience: haul on them constantly and they snap and shorten the leash.
     const dx = dog.x - human.x, dy = dog.y - human.y, straight = Math.hypot(dx, dy) || 1;
-    const taut = straight > leash * 0.9;
+    const taut = straight > leash * 0.9 || line.stretch > 0.98;
     const away = dir ? (dir.x * dx + dir.y * dy) / straight : 0;
-    if (playing && taut && away > 0.3) human.patience -= dt * (dog.sprint ? 0.45 : 0.22);
+    if (playing && taut && away > 0.3 && !whirl) human.patience -= dt * (dog.sprint ? 0.45 : 0.22);
     else human.patience = Math.min(1, human.patience + dt * 0.12);
     if (human.patience <= 0) {
       say(human, 'HEY!', 28, true, 1.6);
@@ -714,30 +827,45 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
     const want = heyT > 0 ? ROPE_BASE * 0.6 : ROPE_BASE;
     leash += (want - leash) * Math.min(1, dt * 3);
 
-    // The human walks on autopilot along the leash, eyes on the phone.
-    let ropeLen = 0;
-    for (let i = 0; i < ROPE_N; i++) ropeLen += Math.hypot(rope[i + 1].x - rope[i].x, rope[i + 1].y - rope[i].y);
-    human.walking = human.stop <= 0 && (ropeLen > leash * 0.8 || straight > leash * 0.6);
+    // The human walks on autopilot along the leash, eyes on the phone (unless they're
+    // swinging round a pole or still staggering from it).
+    const hx0 = human.x, hy0 = human.y;
+    if (whirl) updateWhirl(dt);
+    else if (human.stumble > 0) updateStumble(dt);
+    else {
+      const ropeLen = line.length * PX;
+      if (human.stop <= 0 && (ropeLen > leash * 0.8 || straight > leash * 0.6)) {
+        const guide = rope[5];
+        walkHuman(guide.x, guide.y, playing ? 112 : 55, dt);
+        human.heading = Math.atan2(guide.y - human.y, guide.x - human.x);
+      } else walkHuman(human.x, human.y, 0, dt);
+    }
+    solveRope(dt);
+    if (!whirl && human.stumble <= 0 && dt > 0) { human.vx = (human.x - hx0) / dt; human.vy = (human.y - hy0) / dt; }
+  }
+
+  /**
+    Walk Millie's human toward (tx, ty). A gap Millie or the leash fits through can be
+    too narrow for a person: if they stop making progress, let them squeeze past
+    (a short ghost through solids) instead of sticking.
+  */
+  function walkHuman(tx: number, ty: number, speed: number, dt: number) {
+    const gx = tx - human.x, gy = ty - human.y, gd = Math.hypot(gx, gy);
+    human.walking = speed > 0 && gd > 2;
     const hx0 = human.x, hy0 = human.y;
     let hs = 0;
     if (human.walking) {
-      const guide = rope[4];
-      const gx = guide.x - human.x, gy = guide.y - human.y, gd = Math.hypot(gx, gy) || 1;
-      hs = Math.min((playing ? 112 : 55) * dt, gd);
+      hs = Math.min(speed * dt, gd);
       human.x += (gx / gd) * hs;
       human.y += (gy / gd) * hs;
-      human.heading = Math.atan2(gy, gx);
       human.step += dt * 9;
     }
     human.ghost -= dt;
     pushOut(human, HUMAN_R, human.ghost > 0);
-    // A gap the leash fits through can be too narrow for a person. If they
-    // stop making progress, let them squeeze past instead of sticking.
     const moved = Math.hypot(human.x - hx0, human.y - hy0);
     if (human.walking && hs > 0.5 && moved < hs * 0.3) human.stuck += dt;
     else human.stuck = Math.max(0, human.stuck - dt * 2);
     if (human.stuck > 0.4) { human.ghost = 0.9; human.stuck = 0; }
-    solveRope();
   }
 
   function updateBall(dt: number) {
@@ -2450,6 +2578,10 @@ export function startStreet(fig: HTMLElement, stops: Stop[]) {
       get goalsOpen() { return goalsOpen; },
       get banner() { return bannerText(); },
       get offLeash() { return offLeash; },
+      get whirl() { return whirl; },
+      get spins() { return spins; },
+      get flings() { return flings; },
+      line,
       get pee() { return pee; },
       get natureCalls() { return natureCalls; },
       set nature(v: number) { nature = v; },
