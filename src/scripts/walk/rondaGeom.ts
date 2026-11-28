@@ -22,6 +22,9 @@ export const RONDA_BRIDGE = {
   z1: 148,
 } as const;
 
+/** The safety clamp's reach for Ronda i Parc: entered between `enterZ0..enterZ1` beyond the Rambla's seam. */
+export const RONDA_CLAMP = { x0: -220, x1: -104.5, z0: 106.2, z1: 194.2, enterZ0: 106, enterZ1: 196 } as const;
+
 export const RONDA_PIPICA = {
   x0: -200,
   x1: -186,

@@ -27,6 +27,8 @@ import { createLife } from './life';
 import { createPlazaLife, type PlazaItem } from './plazaLife';
 import { createHillLife } from './hillLife';
 import { HILL } from './hill';
+import { PLAZA } from './plaza';
+import { boneSpots, mapPlaceMarks, poiPos } from './placements';
 import { createMarinaLife, type MarinaItem } from './marinaLife';
 import { MARINA } from './marina';
 import { createGorgLife, type GorgItem } from './gorgLife';
@@ -187,6 +189,10 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const telegraphs = new TelegraphPool(scene);
   let mapFrame = 0;
   const minimap = new Minimap(host, level);
+  // Fixed minimap markers, looked up once from the layout data and district constants (placements.ts).
+  const placeMarks: MapMarker[] = mapPlaceMarks(level.layout);
+  const miradorPos = poiPos(level.layout, 'hill', 'mirador');
+  const harborTagPos = poiPos(level.layout, 'marina', 'pipica4');
   // Sunbathers, anglers and terrace regulars hold still, so they get baked into the scenery.
   const statics = new THREE.Group();
   scene.add(statics);
@@ -284,8 +290,7 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const { burst, addStain } = particleSys;
 
   // ---- Collectibles ---------------------------------------------------------------------
-  const boneSpots: [number, number][] = [[0, 186], [14, 187], [0, 211], [12, 224], [10, 108], [-17, 148], [40, 158.4], [1.5, 48], [-20, 53], [22, 71], [-14, 89], [30, 88.8], [-40, 24], [40, 29], [60, 20], [-60, -5], [70, -3], [-48, -60], [-48, -100], [70, -27], [0, -40], [-1, 9]];
-  const bonesList = boneSpots.map(([x, z]) => {
+  const bonesList = boneSpots(level.layout).flatMap((g) => g.spots).map(([x, z]) => {
     const m = makeBone();
     scene.add(m);
     return { x, z, m, got: false };
@@ -2576,31 +2581,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
     if (minimap.enlarged || mapFrame % 2 === 0) {
       const marks: MapMarker[] = level.stops.filter((s) => s.id !== 'station').map((s) => ({ x: s.x, z: s.z - 4, color: s.color, label: s.label, short: s.id === 'leash' ? 'Leash game' : s.id === 'how' ? 'How I build' : undefined, kind: 'stop' as const }));
       marks.push(
-        { x: level.station.x, z: 17, color: '#e5302a', label: 'Estació', kind: 'place' },
-        { x: 70, z: -28, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
-        { x: 13, z: 131, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
-        { x: 0, z: 145, color: '#e5487a', label: 'Mercat', kind: 'place' },
-        { x: 0, z: 127, color: '#e5487a', label: 'Castellers', kind: 'place' },
-        { x: -48, z: -66, color: '#c9a26b', label: 'Old pier', kind: 'place' },
-        { x: 0, z: 9, color: '#f4f1ea', label: 'Underpass', kind: 'place' },
-        { x: 0, z: 62, color: '#f4f1ea', label: 'Carrer del Mar', kind: 'place' },
-        { x: 23, z: 203, color: '#ffb020', label: 'Museu', kind: 'place' },
-        { x: -19, z: 202.5, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
-        { x: 0, z: 232, color: '#f4f1ea', label: 'Església', kind: 'place' },
-        { x: 14, z: 219.5, color: '#1fc9b7', label: 'Mirador', kind: 'place' },
+        ...placeMarks,
         { x: HILL.home.x, z: HILL.home.z, color: '#8bcb3c', label: 'Home', kind: 'stop' },
-        { x: -129, z: -10, color: '#3d73c7', label: 'Port', kind: 'place' },
-        { x: -151, z: -9, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
-        { x: MARINA.lighthouse.x, z: MARINA.lighthouse.z, color: '#5eea8c', label: 'Far del Port', kind: 'place' },
-        { x: -170, z: 24, color: '#1fc9b7', label: 'Canal', kind: 'place' },
-        { x: -196, z: 64, color: '#ffb020', label: 'Galeria', kind: 'place' },
-        { x: -137, z: 88, color: '#3d73c7', label: 'Pavelló', kind: 'place' },
-        { x: -148, z: 34, color: '#5eea8c', label: 'Tramvia', kind: 'place' },
-        { x: -149, z: 26, color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
-        { x: -183, z: 64, color: '#ff6b5a', label: 'Carts', kind: 'threat' },
-        { x: -197, z: -12, color: '#ffb020', label: 'El Mico', kind: 'threat' },
-        { x: 7.5, z: 200.2, color: '#ffb020', label: 'Guardian', kind: 'threat' },
-        { x: 0, z: 187, color: '#a86a3a', label: 'Senglars', kind: 'threat' },
         { x: tabalers.state.x, z: tabalers.state.z, color: '#e5487a', label: 'Tabalers', kind: 'threat' },
       );
       if (!quest.ball) marks.push({ x: Q.kid.x, z: Q.kid.z - 1, color: '#ffc93c', label: 'Lost ball', kind: 'quest' });
@@ -2609,17 +2591,17 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
       if (!quest.bakery) marks.push({ x: Q.baker.x, z: Q.baker.z, color: '#ffc93c', label: 'Bakery', kind: 'quest' });
       if (!quest.selfie) marks.push({ x: Q.mural.x, z: Q.mural.z, color: '#ffc93c', label: 'Mural', kind: 'quest' });
       { const pq = plaza.quests();
-        if (!pq.paper) marks.push({ x: -11.5, z: 106.2, color: '#ffc93c', label: 'Newspaper', kind: 'quest' });
-        if (!pq.terrace) marks.push({ x: -14, z: 129, color: '#ffc93c', label: 'Terrace', kind: 'quest' });
-        if (!pq.fetch) marks.push({ x: 12.5, z: 131.5, color: '#ffc93c', label: 'Fetch', kind: 'quest' }); }
+        if (!pq.paper) marks.push({ x: PLAZA.paper.x, z: PLAZA.paper.z, color: '#ffc93c', label: 'Newspaper', kind: 'quest' });
+        if (!pq.terrace) marks.push({ x: (PLAZA.terrace.x0 + PLAZA.terrace.x1) / 2, z: (PLAZA.terrace.z0 + PLAZA.terrace.z1) / 2, color: '#ffc93c', label: 'Terrace', kind: 'quest' });
+        if (!pq.fetch) marks.push({ x: PLAZA.regular.x, z: PLAZA.regular.z, color: '#ffc93c', label: 'Fetch', kind: 'quest' }); }
       { const hq = hill.quests();
         if (!hq.bell) marks.push({ x: HILL.portal.x, z: HILL.portal.z, color: '#ffc93c', label: 'Church bell', kind: 'quest' });
-        if (!hq.mirador) marks.push({ x: 14, z: 219.5, color: '#ffc93c', label: 'Mirador', kind: 'quest' });
+        if (!hq.mirador) marks.push({ x: miradorPos.x, z: miradorPos.z, color: '#ffc93c', label: 'Mirador', kind: 'quest' });
         if (!hq.home) marks.push({ x: HILL.home.x, z: HILL.home.z, color: '#ffc93c', label: 'Home', kind: 'quest' }); }
       { const mq = marina.quests();
         if (!mq.buoy) marks.push({ x: MARINA.buoyPos.x, z: MARINA.buoyPos.z, color: '#ffc93c', label: 'Lifebuoy', kind: 'quest' });
         if (!mq.gulls) marks.push({ x: MARINA.cratePos.x, z: MARINA.cratePos.z, color: '#ffc93c', label: 'Crate gulls', kind: 'quest' });
-        if (!mq.playmate) marks.push({ x: -151, z: -9, color: '#ffc93c', label: 'Harbor tag', kind: 'quest' }); }
+        if (!mq.playmate) marks.push({ x: harborTagPos.x, z: harborTagPos.z, color: '#ffc93c', label: 'Harbor tag', kind: 'quest' }); }
       { const gq = gorg.quests();
         if (!gq.bag) marks.push({ x: GORG.bagPos.x, z: GORG.bagPos.z, color: '#ffc93c', label: 'Bag', kind: 'quest' });
         if (!gq.hoop) marks.push({ x: GORG.ballPos.x, z: GORG.ballPos.z, color: '#ffc93c', label: 'Streetball', kind: 'quest' });

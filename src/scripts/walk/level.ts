@@ -24,6 +24,9 @@ import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } f
 import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './marina';
 import { GORG, inGorgPipica, makeGorgDistrict } from './gorg';
 import { RONDA, inRondaPipica, makeRondaDistrict } from './ronda';
+import { MARINA_CLAMP } from './marinaGeom';
+import { GORG_CLAMP } from './gorgGeom';
+import { RONDA_CLAMP } from './rondaGeom';
 import { FABRICA, inFabricaPipica, makeFabricaDistrict } from './fabrica';
 import { RAMBLA_EAST, clampFabrica } from './fabricaGeom';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
@@ -60,8 +63,35 @@ const SAND_Y = -0.4;
 export const TRAIN_Y = GROUND_Y + 0.35;
 export const TRAIN_Z = 9;
 const CUT = { x: 3, tunnelX: 2, rambla0: 22, rambla1: 14, sea0: 4, sea1: -4, floor: -2.7 };
+/**
+ * Seams where the resident seafront and Rambla meet their streamed neighbors. The map
+ * re-orientation (docs/superpowers/specs/2026-11-28-walk-reorientation-design.md) moves
+ * these, so every ground strip, rail, groin and fingerpost on a seam reads them from here.
+ */
+const EDGE = {
+  /** The Rambla and the promenade meet Canal i Galeria and the marina. */
+  west: -104,
+  /** The western rock groin; the beach sand starts here. */
+  groinW: -94,
+  /** The marina transition quay ends and the boardwalk starts. */
+  quayE: -92,
+  /** The central strip's safety clamp, both sides. */
+  clamp: 91.5,
+  /** The promenade's end rail. */
+  promE: 92,
+  /** The eastern rock groin. */
+  groinE: 94,
+  /** The Rambla's end rail, at the mouth of Avinguda de la Fàbrica. */
+  ramblaE: 140,
+  /** The beach sand's far edge. */
+  sandE: 160,
+} as const;
+/** Harbor basin water inland of the open sea; moves with the marina. */
+const HARBOR_WATER = { x0: -232, x1: EDGE.groinW, z0: -40.02, z1: -17.5 } as const;
 const RAMPS = SEAFRONT_LAYOUT.ramps;
 const PIER = SEAFRONT_LAYOUT.pier;
+/** The pier's center line. */
+const PIER_X = (PIER.x0 + PIER.x1) / 2;
 /** The swimming zone, fenced by a buoy line: x0..x1 along the beach, out to z. */
 export const SWIM = SEAFRONT_LAYOUT.swim;
 export const PIPICA = SEAFRONT_LAYOUT.pipica;
@@ -223,28 +253,28 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   // The Rambla's slabs, the promenade's concrete, the boardwalk's planks.
   // Leave holes where the underpass cuts down below street level.
   // The metro entrance's stairwell is a hole in the Rambla's slabs too.
-  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(-104, 140, CUT.rambla0, 34, SEAFRONT_LAYOUT.metro)) {
+  for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(EDGE.west, EDGE.ramblaE, CUT.rambla0, 34, SEAFRONT_LAYOUT.metro)) {
     root.add(ground(gx0, gx1, gz0, gz1, GROUND_Y, slabMat, slab.tileMeters));
   }
-  root.add(ground(-104, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
-  root.add(ground(CUT.x, 140, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
-  root.add(ground(-104, 140, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
-  root.add(ground(-104, -92, -18, -10, GROUND_Y, panotMat, panot.tileMeters));
-  root.add(ground(-104, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
-  root.add(ground(CUT.x, 140, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
-  const promCurb = box(232, 0.05, 0.26, M(0xd8c3a5, 0.85));
-  promCurb.position.set(24, GROUND_Y + 0.025, -10.02);
+  root.add(ground(EDGE.west, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
+  root.add(ground(CUT.x, EDGE.ramblaE, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
+  root.add(ground(EDGE.west, EDGE.ramblaE, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(EDGE.west, EDGE.quayE, -18, -10, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(EDGE.west, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(CUT.x, EDGE.ramblaE, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  const promCurb = box(EDGE.ramblaE - EDGE.quayE, 0.05, 0.26, M(0xd8c3a5, 0.85));
+  promCurb.position.set((EDGE.quayE + EDGE.ramblaE) / 2, GROUND_Y + 0.025, -10.02);
   promCurb.receiveShadow = true;
   root.add(promCurb);
-  const deck = ground(-92, 140, -20, -10, GROUND_Y + 0.01, deckMat, 3);
+  const deck = ground(EDGE.quayE, EDGE.ramblaE, -20, -10, GROUND_Y + 0.01, deckMat, 3);
   root.add(deck);
   // Beach, under the sea too (stops at the western rock groin x -94 so it clears the marina basin).
-  root.add(ground(-94, 160, -120, -20, 0, sandMat, 6, 1, 50, (_x, z) => sandFloor(z)));
-  const wet = ground(-94, 160, -62, -54, 0, new THREE.MeshStandardMaterial({ color: 0x8a6c44, roughness: 0.5, transparent: true, opacity: 0.4 }), 4, 1, 8, (_x, z) => sandFloor(z) + 0.012);
+  root.add(ground(EDGE.groinW, EDGE.sandE, -120, -20, 0, sandMat, 6, 1, 50, (_x, z) => sandFloor(z)));
+  const wet = ground(EDGE.groinW, EDGE.sandE, -62, -54, 0, new THREE.MeshStandardMaterial({ color: 0x8a6c44, roughness: 0.5, transparent: true, opacity: 0.4 }), 4, 1, 8, (_x, z) => sandFloor(z) + 0.012);
   root.add(wet);
   // The step down from the boardwalk to the sand: a low white concrete wall.
-  const stepWall = box(232, 0.56, 0.4, M(0xeeebe4, 0.8));
-  stepWall.position.set(24, GROUND_Y - 0.26, -20.1);
+  const stepWall = box(EDGE.ramblaE - EDGE.quayE, 0.56, 0.4, M(0xeeebe4, 0.8));
+  stepWall.position.set((EDGE.quayE + EDGE.ramblaE) / 2, GROUND_Y - 0.26, -20.1);
   root.add(stepWall);
   for (const rx of RAMPS) {
     const shape = new THREE.Shape();
@@ -271,9 +301,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   sea.userData.always = true;
   root.add(sea);
   // Harbor basin water north of z -40 (kept separate from `sea` so there is no coplanar z-fighting).
-  const harborWater = new THREE.Mesh(new THREE.PlaneGeometry(138, 22.52), waterMat);
+  const harborWater = new THREE.Mesh(new THREE.PlaneGeometry(HARBOR_WATER.x1 - HARBOR_WATER.x0, HARBOR_WATER.z1 - HARBOR_WATER.z0), waterMat);
   harborWater.rotation.x = -Math.PI / 2;
-  harborWater.position.set(-163, WATER_Y, -28.76);
+  harborWater.position.set((HARBOR_WATER.x0 + HARBOR_WATER.x1) / 2, WATER_Y, (HARBOR_WATER.z0 + HARBOR_WATER.z1) / 2);
   harborWater.userData.always = true;
   root.add(harborWater);
   const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
@@ -427,36 +457,36 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(makeFingerpost([
     { title: 'Canal · Galeria', sub: 'Tramvia · Pavelló', color: '#1fc9b7', angle: Math.PI },
     { title: 'Rambla · Centre', sub: 'Metro · Estació', color: '#ffb020', angle: 0 },
-  ]), -94, GROUND_Y, 22);
-  addCircle(-94, 22, 0.14, GROUND_Y + 3.2, 'pole', true, true);
+  ]), EDGE.groinW, GROUND_Y, 22);
+  addCircle(EDGE.groinW, 22, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   // The Rambla runs on past x 92 to the mouth of Avinguda de la Fàbrica (fabrica.ts); its end rail is at x 140.
-  obresLine(140, 14.6, 140, 33.4);
+  obresLine(EDGE.ramblaE, 14.6, EDGE.ramblaE, 33.4);
   place(makeFingerpost([
     { title: 'Av. de la Fàbrica', sub: 'Forn · Xemeneia', color: '#d98c2b', angle: 0 },
     { title: 'Estació · Centre', sub: 'Metro · Platja', color: '#ffb020', angle: Math.PI },
-  ]), 94, GROUND_Y, 31.6);
-  addCircle(94, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
+  ]), EDGE.groinE, GROUND_Y, 31.6);
+  addCircle(EDGE.groinE, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   // Seafront promenade opens west at x -92 into El Port; edge rails keep Millie on the transition quay.
-  obresLine(92, -19.6, 92, 3.6);
+  obresLine(EDGE.promE, -19.6, EDGE.promE, 3.6);
   {
     const wallM = M(0xb9b2a4, 0.85);
     const railM = M(0x383e4a, 0.5, 0.5);
-    const qWall = box(12, 2.2, 0.5, wallM);
-    qWall.position.set(-98, GROUND_Y - 1.1, -18.1);
+    const qWall = box(EDGE.quayE - EDGE.west, 2.2, 0.5, wallM);
+    qWall.position.set((EDGE.west + EDGE.quayE) / 2, GROUND_Y - 1.1, -18.1);
     root.add(qWall);
-    const qRail = box(12, 0.9, 0.14, railM);
-    qRail.position.set(-98, GROUND_Y + 0.45, -18.1);
+    const qRail = box(EDGE.quayE - EDGE.west, 0.9, 0.14, railM);
+    qRail.position.set((EDGE.west + EDGE.quayE) / 2, GROUND_Y + 0.45, -18.1);
     root.add(qRail);
-    boxes.push({ x0: -104, x1: -92, z0: -18.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
+    boxes.push({ x0: EDGE.west, x1: EDGE.quayE, z0: -18.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
     const bwRail = box(0.16, 0.9, 2.4, railM);
-    bwRail.position.set(-92.0, GROUND_Y + 0.45, -19.1);
+    bwRail.position.set(EDGE.quayE, GROUND_Y + 0.45, -19.1);
     root.add(bwRail);
-    boxes.push({ x0: -92.2, x1: -91.8, z0: -20.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
+    boxes.push({ x0: EDGE.quayE - 0.2, x1: EDGE.quayE + 0.2, z0: -20.3, z1: -17.9, top: GROUND_Y + 1.4, kind: 'wall' });
     place(makeFingerpost([
       { title: 'Port · Espigó', sub: 'Boats · Far', color: '#3d73c7', angle: Math.PI },
       { title: 'Platja', sub: 'Passeig · Pier', color: '#ffb020', angle: 0 },
-    ]), -94, GROUND_Y, -8);
-    addCircle(-94, -8, 0.14, GROUND_Y + 3.2, 'pole', true, true);
+    ]), EDGE.groinW, GROUND_Y, -8);
+    addCircle(EDGE.groinW, -8, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   }
   place(makeExcavator(), 97, GROUND_Y, 22, -1.4);
   // Rock breakwaters close the beach.
@@ -476,7 +506,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       }
     }
   };
-  for (const ex of [-94, 94]) {
+  for (const ex of [EDGE.groinW, EDGE.groinE]) {
     rocksAt(ex, -20.5, -80);
     boxes.push({ x0: ex - 3, x1: ex + 3, z0: -90, z1: -20.3, top: 3, kind: 'rocks' });
   }
@@ -1510,27 +1540,27 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
     // La Fàbrica: the avenue and the chimney square inland of the Rambla's +x end.
-    if (p.x > 91.5 && p.z > RAMBLA_EAST.z1) {
+    if (p.x > EDGE.clamp && p.z > RAMBLA_EAST.z1) {
       const c = clampFabrica(p.x, p.z);
       p.x = c.x; p.z = c.z;
       return;
     }
     // The Rambla's +x stretch, up to its end rail.
-    if (p.x > 91.5 && p.z > 4) {
+    if (p.x > EDGE.clamp && p.z > 4) {
       p.x = Math.min(RAMBLA_EAST.x1, p.x);
       p.z = Math.max(RAMBLA_EAST.z0, p.z);
       return;
     }
     // Ronda i Parc north of Gorg (west strip inland).
-    if (p.z >= 106 && p.z <= 196 && p.x < -91.5) {
-      p.x = Math.max(-220, Math.min(-104.5, p.x));
-      p.z = Math.max(106.2, Math.min(194.2, p.z));
+    if (p.z >= RONDA_CLAMP.enterZ0 && p.z <= RONDA_CLAMP.enterZ1 && p.x < -EDGE.clamp) {
+      p.x = Math.max(RONDA_CLAMP.x0, Math.min(RONDA_CLAMP.x1, p.x));
+      p.z = Math.max(RONDA_CLAMP.z0, Math.min(RONDA_CLAMP.z1, p.z));
       return;
     }
     // Gorg / Canal i Galeria corridor west of the Rambla.
-    if (p.z >= 14 && p.z <= 106 && p.x < -91.5) {
-      p.x = Math.max(-220, p.x);
-      p.z = Math.max(14.3, Math.min(106.0, p.z));
+    if (p.z >= GORG_CLAMP.enterZ0 && p.z <= GORG_CLAMP.enterZ1 && p.x < -EDGE.clamp) {
+      p.x = Math.max(GORG_CLAMP.x0, p.x);
+      p.z = Math.max(GORG_CLAMP.z0, Math.min(GORG_CLAMP.z1, p.z));
       return;
     }
     // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
@@ -1545,12 +1575,12 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       p.x = Math.max(HILL.minX, Math.min(HILL.maxX, p.x));
       return;
     }
-    if (p.z < 4 && p.x < -91.5) {
-      p.x = Math.max(-222, p.x);
-      p.z = Math.max(-108, Math.min(3.6, p.z));
+    if (p.z < 4 && p.x < -EDGE.clamp) {
+      p.x = Math.max(MARINA_CLAMP.x0, p.x);
+      p.z = Math.max(MARINA_CLAMP.z0, Math.min(MARINA_CLAMP.z1, p.z));
       return;
     }
-    p.x = Math.max(-91.5, Math.min(91.5, p.x));
+    p.x = Math.max(-EDGE.clamp, Math.min(EDGE.clamp, p.x));
     // Out to the buoy line inside the swim zone; to the shallows elsewhere.
     if (!onPier(p.x, p.z)) p.z = Math.max(p.z, p.x > SWIM.x0 && p.x < SWIM.x1 ? SWIM.z + 0.3 : -64);
   };
@@ -1572,7 +1602,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     [[-44, -10.9], [-32, -11], [-20.5, -10.9]],
     [[-80, -10.7], [-66, -10.7], [-53, -10.7]],
     [[-80, -54], [0, -55], [80, -54]],
-    [[-48, -12], [-48, -60], [-48, -126]],
+    [[PIER_X, -12], [PIER_X, -60], [PIER_X, -126]],
     ...PLAZA.pedPaths,
     ...HILL.pedPaths,
     ...MARINA.pedPaths,

@@ -29,6 +29,9 @@ export const BREAKWATER = {
   armZ0: -104,
   armZ1: -96,
 };
+/** Where the safety clamp keeps Millie in the marina (beyond the promenade's seam). */
+export const MARINA_CLAMP = { x0: -222, z0: -108, z1: 3.6 } as const;
+
 export const CANAL = { x0: -178, x1: -162, bridgeZ0: -10, bridgeZ1: -2 };
 
 export const inMarinaPipica = (x: number, z: number) =>
