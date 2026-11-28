@@ -5,7 +5,7 @@
   "swim": { "x0": -40, "x1": 44, "z": -90, "shoreZ": -60 },
   "pipica": { "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "gateZ0": -29.2, "gateZ1": -26.8 },
   "pier": { "x0": 165, "x1": 169, "root": -10, "rise": -30, "end": -130, "high": 1.2 },
-  "ramps": [-64, -40, -23, 6, 21, 34, 46, 64, 112, 136, 188, 214, 240],
+  "ramps": [-184, -152, -120, -64, -40, -23, 6, 21, 34, 46, 64, 112, 136, 188, 214, 240],
   "tracks": [7.2, 10.8],
   "metros": [
     { "id": "plaza", "label": "Plaça del Mercat", "x0": 35, "x1": 40.6, "z0": 166.8, "z1": 169.2, "depth": 3, "line": "L2", "lineColor": "#9b2d8f" },
@@ -14,12 +14,12 @@
   ],
   "zones": [
     { "id": "sea", "x0": -228, "x1": 380, "z0": -134, "z1": -58, "mapColor": "#2d6a92" },
-    { "id": "shallow", "x0": -96, "x1": 258, "z0": -58, "z1": -51, "mapColor": "#3f86ad" },
-    { "id": "sand", "x0": -96, "x1": 258, "z0": -51, "z1": -20, "mapColor": "#dcc58f" },
+    { "id": "shallow", "x0": -204, "x1": 258, "z0": -58, "z1": -51, "mapColor": "#3f86ad" },
+    { "id": "sand", "x0": -194, "x1": 258, "z0": -51, "z1": -20, "mapColor": "#dcc58f" },
     { "id": "deck", "x0": -96, "x1": 258, "z0": -20, "z1": -10, "mapColor": "#a5794e" },
-    { "id": "prom", "x0": -104, "x1": 258, "z0": -10, "z1": 4, "mapColor": "#cfc9bb" },
+    { "id": "prom", "x0": -204, "x1": 258, "z0": -10, "z1": 4, "mapColor": "#cfc9bb" },
     { "id": "rail", "x0": -228, "x1": 380, "z0": 4, "z1": 14, "mapColor": "#6d665a" },
-    { "id": "rambla", "x0": -96, "x1": 96, "z0": 14, "z1": 34, "mapColor": "#e0d6c4" },
+    { "id": "rambla", "x0": -204, "x1": 96, "z0": 14, "z1": 34, "mapColor": "#e0d6c4" },
     { "id": "townFill", "x0": -96, "x1": 96, "z0": 34, "z1": 103, "mapColor": "#62584c" },
     { "id": "townStreet", "x0": -34, "x1": 34, "z0": 34, "z1": 103, "mapColor": "#bdb19e" },
     { "id": "pipica", "x0": 60, "x1": 80, "z0": -34, "z1": -22.5, "mapColor": "#9bc46a" },
@@ -70,6 +70,8 @@
     { "id": "fabricaFill", "x0": 96, "x1": 176, "z0": 34, "z1": 104, "mapColor": "#62584c" },
     { "id": "fabricaAvenue", "x0": 110, "x1": 126, "z0": 33.5, "z1": 104, "mapColor": "#bdb19e" },
     { "id": "fabricaSquare", "x0": 126, "x1": 172, "z0": 58, "z1": 96, "mapColor": "#cfc3ad" },
+    { "id": "santpauFill", "x0": -204, "x1": -104, "z0": 34, "z1": 172, "mapColor": "#62584c" },
+    { "id": "santpauStreets", "x0": -170, "x1": -118, "z0": 34, "z1": 126, "mapColor": "#bdb19e" },
     { "id": "progresSquare", "x0": 206, "x1": 220, "z0": 34, "z1": 46, "mapColor": "#bdb19e" },
     { "id": "progresFill", "x0": 176, "x1": 252, "z0": 34, "z1": 196, "mapColor": "#62584c" },
     { "id": "metroProgres", "x0": 211, "x1": 216.6, "z0": 39, "z1": 41.4, "mapColor": "#9b2d8f" },
@@ -80,9 +82,9 @@
     {
       "id": "seafront",
       "label": "The seafront",
-      "bounds": { "x0": -104, "x1": 258, "z0": -145, "z1": 4 },
+      "bounds": { "x0": -204, "x1": 258, "z0": -145, "z1": 4 },
       "streets": [
-        { "id": "promenade", "name": "Passeig Marítim", "width": 14, "surface": "paving", "points": [[-92, -3], [258, -3]] },
+        { "id": "promenade", "name": "Passeig Marítim", "width": 14, "surface": "paving", "points": [[-200, -3], [258, -3]] },
         { "id": "boardwalk", "name": "Boardwalk", "width": 10, "surface": "deck", "points": [[-92, -15], [258, -15]] },
         { "id": "pier", "name": "Old pier", "width": 4, "surface": "deck", "points": [[167, -10], [167, -130]] }
       ],
@@ -112,7 +114,7 @@
     {
       "id": "rambla",
       "label": "The Rambla",
-      "bounds": { "x0": -104, "x1": 252, "z0": 4, "z1": 33.5 },
+      "bounds": { "x0": -204, "x1": 252, "z0": 4, "z1": 33.5 },
       "streets": [
         { "id": "rambla", "name": "La Rambla", "width": 20, "surface": "paving", "points": [[-92, 24], [92, 24]] },
         { "id": "underpass", "name": "Underpass", "width": 4, "surface": "paving", "points": [[0, -4], [0, 22]] }
@@ -313,6 +315,30 @@
         { "id": "park", "kind": "place", "label": "Parc", "x": 307, "z": 170, "color": "#8bcb3c" },
         { "id": "skate", "kind": "place", "label": "Pista", "x": 314, "z": 166, "color": "#3d73c7" },
         { "id": "pipica6", "kind": "pipica", "label": "Pipicà", "x": 279, "z": 175, "color": "#8bcb3c" }
+      ]
+    },
+    {
+      "id": "santpau",
+      "label": "Sant Pau i Prim",
+      "bounds": { "x0": -204, "x1": -104, "z0": 34, "z1": 172 },
+      "streets": [
+        { "id": "sant-pau", "name": "Carrer de Sant Pau", "width": 8, "surface": "paving", "points": [[-122, 34], [-122, 126]] },
+        { "id": "prim", "name": "Carrer de Prim", "width": 8, "surface": "paving", "points": [[-166, 34], [-166, 126]] },
+        { "id": "santpau-cross", "name": "Side street", "width": 6, "surface": "paving", "points": [[-170, 80], [-118, 80]] }
+      ],
+      "blocks": [
+        { "x0": -118, "x1": -104, "z0": 34, "z1": 77, "floors": 4, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
+        { "x0": -118, "x1": -104, "z0": 83, "z1": 126, "floors": 4, "color": "#e3b45c", "roofColor": "#a87561", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "-z"], "groundFloor": true },
+        { "x0": -162, "x1": -126, "z0": 34, "z1": 77, "floors": 3, "color": "#e8d4a8", "roofColor": "#a87561", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["-x", "+x", "-z", "+z"], "groundFloor": true },
+        { "x0": -162, "x1": -126, "z0": 83, "z1": 126, "floors": 3, "color": "#eadcc0", "roofColor": "#b88566", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-x", "+x", "-z"], "groundFloor": true },
+        { "x0": -204, "x1": -170, "z0": 34, "z1": 126, "floors": 4, "color": "#d9b48a", "roofColor": "#a87561", "shutterColor": "#2f5a3a", "facadeStyle": "catalan", "faces": ["+x", "-z"], "groundFloor": true },
+        { "x0": -204, "x1": -104, "z0": 126, "z1": 172, "floors": 4, "color": "#efe4cc", "roofColor": "#b2563a", "shutterColor": "#2f6b4f", "facadeStyle": "catalan", "faces": ["-z"], "groundFloor": false }
+      ],
+      "pavilions": [],
+      "landmarks": [],
+      "pois": [
+        { "id": "sant-pau", "kind": "street", "label": "Carrer de Sant Pau", "x": -122, "z": 60, "color": "#f4f1ea" },
+        { "id": "prim", "kind": "street", "label": "Carrer de Prim", "x": -166, "z": 60, "color": "#f4f1ea" }
       ]
     },
     {
