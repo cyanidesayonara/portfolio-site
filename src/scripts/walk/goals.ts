@@ -40,6 +40,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
     { id: 'ronda_quests', label: 'Help out around Ronda i Parc', done: false, count: 0, target: 3, area: 'ronda' },
     { id: 'ronda_bridge', label: 'Cross the Pont de vianants overpass', done: false, area: 'ronda' },
     { id: 'ronda_scooters', label: 'Dodge the runaway delivery scooters on the Ronda', done: false, area: 'ronda' },
+    { id: 'fabrica_quests', label: 'Help out along Avinguda de la Fàbrica', done: false, count: 0, target: 3, area: 'fabrica' },
+    { id: 'fabrica_chimney', label: 'Sniff out the old factory chimney', done: false, area: 'fabrica' },
+    { id: 'fabrica_bins', label: 'Dodge the runaway recycling bins on the avenue', done: false, area: 'fabrica' },
     { id: 'town', label: 'Help out in the side streets', done: false, count: 0, target: 5, area: 'town' },
     { id: 'neteja', label: 'Outrun La Neteja down Carrer del Mar', done: false, area: 'town' },
     { id: 'correfoc', label: 'Survive the correfoc on the Rambla', done: false, area: 'town' },
@@ -123,6 +126,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
       if (goal('ronda_quests').done) ['deck', 'bridge', 'fetch'].forEach((k) => doneKeys.add(`ronda:${k}`));
       if (goal('ronda_bridge').done) doneKeys.add('ronda:bridgeCross');
       if (goal('ronda_scooters').done) doneKeys.add('ronda:scooters');
+      if (goal('fabrica_quests').done) ['bread', 'ball', 'shutter'].forEach((k) => doneKeys.add(`fabrica:${k}`));
+      if (goal('fabrica_chimney').done) doneKeys.add('fabrica:chimney');
+      if (goal('fabrica_bins').done) doneKeys.add('fabrica:bins');
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
       if (goal('plaza_castellers').done) doneKeys.add('plaza:castellers');
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));

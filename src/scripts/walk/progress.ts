@@ -23,6 +23,7 @@ export const AREAS: Area[] = [
   { id: 'marina', label: 'The Marina', districts: ['marina'] },
   { id: 'gorg', label: 'Canal i Galeria', districts: ['gorg'] },
   { id: 'ronda', label: 'Ronda i Parc', districts: ['ronda'] },
+  { id: 'fabrica', label: 'La Fàbrica', districts: ['fabrica'] },
   { id: 'town', label: 'Rambla and Carrer del Mar', districts: ['rambla', 'town'] },
   { id: 'plaza', label: 'Plaça del Mercat', districts: ['plaza'] },
   { id: 'hill', label: 'Dalt de la Vila', districts: ['hill'] },

@@ -24,6 +24,8 @@ import { HILL, hillFloor, inHillPipica, makeChurchLandmark, makeHillDistrict } f
 import { MARINA, inMarinaPipica, makeMarinaDistrict, BREAKWATER_Y } from './marina';
 import { GORG, inGorgPipica, makeGorgDistrict } from './gorg';
 import { RONDA, inRondaPipica, makeRondaDistrict } from './ronda';
+import { FABRICA, inFabricaPipica, makeFabricaDistrict } from './fabrica';
+import { RAMBLA_EAST, clampFabrica } from './fabricaGeom';
 import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, buildDistrictStandin } from './layout';
 import { groundAroundMetro, makeMetroEntrance } from './metro';
 import { ColliderGrid, inBounds, type District } from './world';
@@ -427,7 +429,13 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     { title: 'Rambla · Centre', sub: 'Metro · Estació', color: '#ffb020', angle: 0 },
   ]), -94, GROUND_Y, 22);
   addCircle(-94, 22, 0.14, GROUND_Y + 3.2, 'pole', true, true);
-  obresLine(92, 14.6, 92, 33.4);
+  // The Rambla runs on past x 92 to the mouth of Avinguda de la Fàbrica (fabrica.ts); its end rail is at x 140.
+  obresLine(140, 14.6, 140, 33.4);
+  place(makeFingerpost([
+    { title: 'Av. de la Fàbrica', sub: 'Forn · Xemeneia', color: '#d98c2b', angle: 0 },
+    { title: 'Estació · Centre', sub: 'Metro · Platja', color: '#ffb020', angle: Math.PI },
+  ]), 94, GROUND_Y, 31.6);
+  addCircle(94, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
   // Seafront promenade opens west at x -92 into El Port; edge rails keep Millie on the transition quay.
   obresLine(92, -19.6, 92, 3.6);
   {
@@ -1449,6 +1457,21 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   root.add(ronda.root);
   bowls.push({ ...RONDA.bowl });
   fountains.push({ ...RONDA.drink });
+  // La Fàbrica (fabrica.ts): streams in past the Rambla's +x end.
+  const fabricaGlass = makeLanternPost().glass;
+  lampGlass.push(fabricaGlass);
+  for (const [x, z] of FABRICA.lamps) lampSpots.push(new THREE.Vector3(x, GROUND_Y + 4.4, z));
+  const fabrica = makeFabricaDistrict({
+    groundY: GROUND_Y, grid, layout: layoutById.get('fabrica')!, ground, newInstancer: () => new Instancer(), r,
+    mats: {
+      flag: flagMat, flagTile: flag.tileMeters, panot: panotMat, panotTile: panot.tileMeters, sand: sandMat,
+      wall: wallPlasterMat, litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM, lampGlass: fabricaGlass,
+    },
+  });
+  districts.push(fabrica);
+  root.add(fabrica.root);
+  bowls.push({ ...FABRICA.bowl });
+  fountains.push({ ...FABRICA.drink });
   // Stand-ins: colored blocks, pavilions and landmarks built straight from the layout data.
   const standins = new THREE.Group();
   standins.name = 'standins';
@@ -1463,7 +1486,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  /** Which pipicà (x, z) is in: 0 beach, 1 Plaza, 2 Hill, 3 Marina, 4 Gorg, 5 Ronda, -1 neither. */
+  /** Which pipicà (x, z) is in: 0 beach, 1 Plaza, 2 Hill, 3 Marina, 4 Gorg, 5 Ronda, 6 La Fàbrica, -1 neither. */
   const pipicaAt = (x: number, z: number) => (
     x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0
       : inPlazaPipica(x, z) ? 1
@@ -1471,6 +1494,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       : inMarinaPipica(x, z) ? 3
       : inGorgPipica(x, z) ? 4
       : inRondaPipica(x, z) ? 5
+      : inFabricaPipica(x, z) ? 6
       : -1
   );
   const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
@@ -1482,8 +1506,21 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     { ...MARINA.pipicaBench, heading: Math.PI },
     { ...GORG.pipicaBench, heading: Math.PI },
     { ...RONDA.pipicaBench, heading: Math.PI },
+    { ...FABRICA.pipicaBench, heading: 0 },
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
+    // La Fàbrica: the avenue and the chimney square inland of the Rambla's +x end.
+    if (p.x > 91.5 && p.z > RAMBLA_EAST.z1) {
+      const c = clampFabrica(p.x, p.z);
+      p.x = c.x; p.z = c.z;
+      return;
+    }
+    // The Rambla's +x stretch, up to its end rail.
+    if (p.x > 91.5 && p.z > 4) {
+      p.x = Math.min(RAMBLA_EAST.x1, p.x);
+      p.z = Math.max(RAMBLA_EAST.z0, p.z);
+      return;
+    }
     // Ronda i Parc north of Gorg (west strip inland).
     if (p.z >= 106 && p.z <= 196 && p.x < -91.5) {
       p.x = Math.max(-220, Math.min(-104.5, p.x));
@@ -1541,6 +1578,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     ...MARINA.pedPaths,
     ...GORG.pedPaths,
     ...RONDA.pedPaths,
+    ...FABRICA.pedPaths,
   ];
 
   return {
