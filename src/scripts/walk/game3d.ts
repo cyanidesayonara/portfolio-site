@@ -1413,7 +1413,8 @@ export async function startWalk3D(root: HTMLElement, options: WalkOptions = {}) 
   const humanSay = (t: string, ttl = 2, tone: 'paper' | 'win' | 'loud' = 'paper') => hud.say('human', t, ttl, tone);
   const humanLevelBlocked = () => {
     // Human on the sand while the dog is up on the Rambla (or the reverse): head for a ramp.
-    const onPier = (p: { x: number; z: number }) => p.x > -50.5 && p.x < -45.5 && p.z < -10;
+    const pier = level.layout.pier;
+    const onPier = (p: { x: number; z: number }) => p.x > pier.x0 - 0.5 && p.x < pier.x1 + 0.5 && p.z < pier.root;
     const onBeach = (p: { x: number; z: number }) => p.x > -94 && p.z < -20.3 && !onPier(p);
     return onBeach(human) !== onBeach(dog);
   };

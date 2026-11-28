@@ -9,7 +9,8 @@
     z  14 ..  4   the R1 railway at grade, fenced, crossed by a sunken underpass
     z   4 .. −10  the seafront promenade (light concrete, spotlight masts)
     z −10 .. −20  a wooden boardwalk with the project pavilions
-    z −20 .. −60  the beach, then the sea; the old oil pier runs out at x −48
+    z −20 .. −60  the beach, then the sea; the old oil pier runs out at x 167, in front
+                  of the old distillery (+x is southwest, toward the city)
 
   Borders: works at the street ends, rock breakwaters, the railway fences and
   deep water.
@@ -75,16 +76,20 @@ const EDGE = {
   groinW: -94,
   /** The marina transition quay ends and the boardwalk starts. */
   quayE: -92,
-  /** The central strip's safety clamp, both sides. */
+  /** The central strip's safety clamp (and where the Rambla's +x stretch starts). */
   clamp: 91.5,
-  /** The promenade's end rail. */
-  promE: 92,
-  /** The eastern rock groin. */
-  groinE: 94,
+  /** The fingerpost at the mouth of Avinguda de la Fàbrica. */
+  fabricaPost: 94,
   /** The Rambla's end rail, at the mouth of Avinguda de la Fàbrica. */
   ramblaE: 140,
+  /** The promenade's end rail and the eastern rock groin, past the old pier toward the port. */
+  promE: 200,
+  /** How far +x the seafront's safety clamp lets Millie go. */
+  beachClampE: 197.4,
   /** The beach sand's far edge. */
-  sandE: 160,
+  sandE: 206,
+  /** Where the railway, its fences and catenary run out on the +x side. */
+  trackE: 220,
 } as const;
 /** Harbor basin water inland of the open sea; moves with the marina. */
 const HARBOR_WATER = { x0: -232, x1: EDGE.groinW, z0: -40.02, z1: -17.5 } as const;
@@ -92,6 +97,14 @@ const RAMPS = SEAFRONT_LAYOUT.ramps;
 const PIER = SEAFRONT_LAYOUT.pier;
 /** The pier's center line. */
 const PIER_X = (PIER.x0 + PIER.x1) / 2;
+const seafrontLandmark = (id: string) => {
+  const lm = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'seafront')?.landmarks.find((l) => l.id === id);
+  if (!lm) throw new Error(`walk layout: no seafront landmark "${id}"`);
+  return lm;
+};
+/** The old distillery and its chimney, at the old pier's root. */
+const SEAFRONT_DISTILLERY = seafrontLandmark('distillery');
+const SEAFRONT_CHIMNEY = seafrontLandmark('chimney');
 /** The swimming zone, fenced by a buoy line: x0..x1 along the beach, out to z. */
 export const SWIM = SEAFRONT_LAYOUT.swim;
 export const PIPICA = SEAFRONT_LAYOUT.pipica;
@@ -258,23 +271,23 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   root.add(ground(EDGE.west, -CUT.x, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
   root.add(ground(CUT.x, EDGE.ramblaE, 14, CUT.rambla0, GROUND_Y, slabMat, slab.tileMeters));
-  root.add(ground(EDGE.west, EDGE.ramblaE, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
+  root.add(ground(EDGE.west, EDGE.promE, -10, CUT.sea1, GROUND_Y, panotMat, panot.tileMeters));
   root.add(ground(EDGE.west, EDGE.quayE, -18, -10, GROUND_Y, panotMat, panot.tileMeters));
   root.add(ground(EDGE.west, -CUT.x, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
-  root.add(ground(CUT.x, EDGE.ramblaE, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
-  const promCurb = box(EDGE.ramblaE - EDGE.quayE, 0.05, 0.26, M(0xd8c3a5, 0.85));
-  promCurb.position.set((EDGE.quayE + EDGE.ramblaE) / 2, GROUND_Y + 0.025, -10.02);
+  root.add(ground(CUT.x, EDGE.promE, CUT.sea1, 4, GROUND_Y, panotMat, panot.tileMeters));
+  const promCurb = box(EDGE.promE - EDGE.quayE, 0.05, 0.26, M(0xd8c3a5, 0.85));
+  promCurb.position.set((EDGE.quayE + EDGE.promE) / 2, GROUND_Y + 0.025, -10.02);
   promCurb.receiveShadow = true;
   root.add(promCurb);
-  const deck = ground(EDGE.quayE, EDGE.ramblaE, -20, -10, GROUND_Y + 0.01, deckMat, 3);
+  const deck = ground(EDGE.quayE, EDGE.promE, -20, -10, GROUND_Y + 0.01, deckMat, 3);
   root.add(deck);
   // Beach, under the sea too (stops at the western rock groin x -94 so it clears the marina basin).
   root.add(ground(EDGE.groinW, EDGE.sandE, -120, -20, 0, sandMat, 6, 1, 50, (_x, z) => sandFloor(z)));
   const wet = ground(EDGE.groinW, EDGE.sandE, -62, -54, 0, new THREE.MeshStandardMaterial({ color: 0x8a6c44, roughness: 0.5, transparent: true, opacity: 0.4 }), 4, 1, 8, (_x, z) => sandFloor(z) + 0.012);
   root.add(wet);
   // The step down from the boardwalk to the sand: a low white concrete wall.
-  const stepWall = box(EDGE.ramblaE - EDGE.quayE, 0.56, 0.4, M(0xeeebe4, 0.8));
-  stepWall.position.set((EDGE.quayE + EDGE.ramblaE) / 2, GROUND_Y - 0.26, -20.1);
+  const stepWall = box(EDGE.promE - EDGE.quayE, 0.56, 0.4, M(0xeeebe4, 0.8));
+  stepWall.position.set((EDGE.quayE + EDGE.promE) / 2, GROUND_Y - 0.26, -20.1);
   root.add(stepWall);
   for (const rx of RAMPS) {
     const shape = new THREE.Shape();
@@ -307,9 +320,9 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   harborWater.userData.always = true;
   root.add(harborWater);
   const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
-  const foam = new THREE.Mesh(new THREE.PlaneGeometry(254, 1.4), foamMat);
+  const foam = new THREE.Mesh(new THREE.PlaneGeometry(EDGE.sandE - EDGE.groinW, 1.4), foamMat);
   foam.rotation.x = -Math.PI / 2;
-  foam.position.set(33, WATER_Y + 0.03, -57.4);
+  foam.position.set((EDGE.groinW + EDGE.sandE) / 2, WATER_Y + 0.03, -57.4);
   foam.userData.always = true;
   root.add(foam);
 
@@ -336,28 +349,36 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     ironMat: ironM,
     r,
   });
-  // The distillery: a long low cream building with red tile roofs and its chimney.
-  const dist = new THREE.Group();
-  const distBody = box(48, 7, 22, facadeMat(0xe6dcc6));
-  distBody.position.set(0, 3.5, 0);
-  dist.add(distBody);
-  for (let i = 0; i < 4; i++) {
-    const roofG = new THREE.CylinderGeometry(0.01, 6.5, 3, 4, 1);
-    roofG.rotateY(Math.PI / 4);
-    roofG.scale(1.0, 1, 2.3);
-    const rf = new THREE.Mesh(roofG, M(0xb2563a, 0.9));
-    rf.position.set(-18 + i * 12, 8.5, 0);
-    dist.add(rf);
+  // The old distillery: long low cream halls with red tile roofs and a brick chimney, between
+  // the tracks and the promenade at the old pier's root (seafront landmarks in the layout data).
+  {
+    const dl = SEAFRONT_DISTILLERY;
+    const w = dl.x1 - dl.x0, d = dl.z1 - dl.z0;
+    const dist = new THREE.Group();
+    const distBody = box(w, 7, d, facadeMat(0xe6dcc6));
+    distBody.position.set(0, 3.5, 0);
+    dist.add(distBody);
+    const halls = Math.max(1, Math.round(w / 12));
+    for (let i = 0; i < halls; i++) {
+      const roofG = new THREE.CylinderGeometry(0.01, d * 0.42, 2.4, 4, 1);
+      roofG.rotateY(Math.PI / 4);
+      roofG.scale((w / halls) / (d * 0.6), 1, 1);
+      const rf = new THREE.Mesh(roofG, M(0xb2563a, 0.9));
+      rf.position.set(-w / 2 + (i + 0.5) * (w / halls), 8.2, 0);
+      dist.add(rf);
+    }
+    // Arched windows face the promenade (-z).
+    for (let x = -w / 2 + 2.5; x < w / 2 - 1.5; x += 3.4) {
+      const win = box(1.4, 2.6, 0.1, darkWindowMat);
+      win.position.set(x, 3.6, -d / 2 - 0.05);
+      dist.add(win);
+    }
+    shadowed(dist);
+    place(dist, (dl.x0 + dl.x1) / 2, GROUND_Y, (dl.z0 + dl.z1) / 2);
+    boxes.push({ x0: dl.x0, x1: dl.x1, z0: dl.z0, z1: dl.z1, top: 9, kind: 'building' });
+    const ch = SEAFRONT_CHIMNEY;
+    place(makeChimney(ch.height), (ch.x0 + ch.x1) / 2, GROUND_Y, (ch.z0 + ch.z1) / 2);
   }
-  for (let i = 0; i < 9; i++) {
-    const w = box(1.6, 2.4, 0.1, darkWindowMat);
-    w.position.set(-20 + i * 5, 3.4, -11.05);
-    dist.add(w);
-  }
-  shadowed(dist);
-  place(dist, -66, GROUND_Y, 46);
-  boxes.push({ x0: -90, x1: -42, z0: 35, z1: 57, top: 9, kind: 'building' });
-  place(makeChimney(38), -50, GROUND_Y, 52);
 
   // Steel arches and bunting over Carrer del Mar.
   const archSign = signTexture('Carrer del Mar', 'Eix comercial', '#f4f1ea', { bg: '#2a5aa8', fg: '#f4f1ea', aspect: 1 });
@@ -464,9 +485,10 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(makeFingerpost([
     { title: 'Av. de la Fàbrica', sub: 'Forn · Xemeneia', color: '#d98c2b', angle: 0 },
     { title: 'Estació · Centre', sub: 'Metro · Platja', color: '#ffb020', angle: Math.PI },
-  ]), EDGE.groinE, GROUND_Y, 31.6);
-  addCircle(EDGE.groinE, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
-  // Seafront promenade opens west at x -92 into El Port; edge rails keep Millie on the transition quay.
+  ]), EDGE.fabricaPost, GROUND_Y, 31.6);
+  addCircle(EDGE.fabricaPost, 31.6, 0.14, GROUND_Y + 3.2, 'pole', true, true);
+  // The promenade runs on past the old pier to an end rail; it opens west at x -92 into El Port,
+  // where edge rails keep Millie on the transition quay.
   obresLine(EDGE.promE, -19.6, EDGE.promE, 3.6);
   {
     const wallM = M(0xb9b2a4, 0.85);
@@ -506,7 +528,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       }
     }
   };
-  for (const ex of [EDGE.groinW, EDGE.groinE]) {
+  for (const ex of [EDGE.groinW, EDGE.promE]) {
     rocksAt(ex, -20.5, -80);
     boxes.push({ x0: ex - 3, x1: ex + 3, z0: -90, z1: -20.3, top: 3, kind: 'rocks' });
   }
@@ -559,21 +581,21 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
 
   yield 'The railway at grade';
   // ---- The railway at grade --------------------------------------------------------------
-  const ballast = box(300, 0.18, 9.4, M(0x8e877b, 1));
-  ballast.position.set(0, GROUND_Y + 0.05, TRAIN_Z);
+  const ballast = box(150 + EDGE.trackE, 0.18, 9.4, M(0x8e877b, 1));
+  ballast.position.set((EDGE.trackE - 150) / 2, GROUND_Y + 0.05, TRAIN_Z);
   ballast.receiveShadow = true;
   root.add(ballast);
   for (const tz of [TRAIN_Z - 1.6, TRAIN_Z + 1.6]) {
-    for (let x = -148; x < 148; x += 0.75) inst.add('sleeper', () => new THREE.BoxGeometry(0.24, 0.1, 2.5), () => M(0x7a7368, 0.9), mtx(x, GROUND_Y + 0.18, tz), false);
+    for (let x = -148; x < EDGE.trackE - 2; x += 0.75) inst.add('sleeper', () => new THREE.BoxGeometry(0.24, 0.1, 2.5), () => M(0x7a7368, 0.9), mtx(x, GROUND_Y + 0.18, tz), false);
     for (const dz of [-0.72, 0.72]) {
-      const rail = box(300, 0.12, 0.08, M(0x9aa0a8, 0.3, 0.9));
-      rail.position.set(0, GROUND_Y + 0.28, tz + dz);
+      const rail = box(150 + EDGE.trackE, 0.12, 0.08, M(0x9aa0a8, 0.3, 0.9));
+      rail.position.set((EDGE.trackE - 150) / 2, GROUND_Y + 0.28, tz + dz);
       root.add(rail);
     }
   }
   // Catenary: dark masts with cantilever arms on the Rambla side.
   const mastM = M(0x3a3f48, 0.5, 0.6);
-  for (let x = -140; x <= 140; x += 30) {
+  for (let x = -140; x <= EDGE.trackE - 10; x += 30) {
     root.add(rod(new THREE.Vector3(x, GROUND_Y, 13.2), new THREE.Vector3(x, GROUND_Y + 7, 13.2), 0.14, mastM, 6));
     root.add(rod(new THREE.Vector3(x, GROUND_Y + 6.4, 13.2), new THREE.Vector3(x, GROUND_Y + 6.4, TRAIN_Z - 2.2), 0.06, mastM, 4));
     root.add(rod(new THREE.Vector3(x, GROUND_Y + 7.0, 13.2), new THREE.Vector3(x, GROUND_Y + 6.4, TRAIN_Z - 1), 0.04, mastM, 4));
@@ -582,8 +604,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     root.add(weights);
   }
   for (const tz of [TRAIN_Z - 1.6, TRAIN_Z + 1.6]) {
-    const wire = box(300, 0.025, 0.025, M(0x3a3a40, 0.5, 0.6));
-    wire.position.set(0, GROUND_Y + 5.8, tz);
+    const wire = box(150 + EDGE.trackE, 0.025, 0.025, M(0x3a3a40, 0.5, 0.6));
+    wire.position.set((EDGE.trackE - 150) / 2, GROUND_Y + 5.8, tz);
     root.add(wire);
   }
   // Fences: low curb with dark vertical bars, both sides, open only at the underpass cut.
@@ -597,7 +619,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     return g;
   };
   for (const fz of [14, 4]) {
-    for (const [fx0, fx1] of [[-148, -CUT.x], [CUT.x, 148]]) {
+    for (const [fx0, fx1] of [[-148, -CUT.x], [CUT.x, EDGE.trackE - 2]]) {
       for (let x = fx0; x < fx1; x += 8) {
         const len = Math.min(8, fx1 - x);
         const m = new THREE.Mesh(fenceGeo(len), fenceMat);
@@ -610,7 +632,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   // Keep everything off the tracks themselves.
   boxes.push({ x0: -148, x1: -CUT.x, z0: 4, z1: 14, top: 9, kind: 'tracks' });
-  boxes.push({ x0: CUT.x, x1: 148, z0: 4, z1: 14, top: 9, kind: 'tracks' });
+  boxes.push({ x0: CUT.x, x1: EDGE.trackE - 2, z0: 4, z1: 14, top: 9, kind: 'tracks' });
 
   yield 'The station: platforms under steel canopies, an oxblood building on the Rambla';
   // ---- The station: platforms under steel canopies, an oxblood building on the Rambla ----
@@ -718,7 +740,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   place(makeFingerpost([
     { title: 'Projects', sub: 'stemma · Leash · Cat · dopepod', color: '#ffb020', angle: W_ },
     { title: 'Projects', sub: 'Coriolis · About · Blog · How', color: '#1fc9b7', angle: E_ },
-    { title: 'Platja', sub: 'Beach · old pier', color: '#3d73c7', angle: SEA - 0.75 },
+    { title: 'Platja', sub: 'Beach · old pier', color: '#3d73c7', angle: SEA + 0.75 },
   ]), -4.3, GROUND_Y, -3.4);
   addCircle(-4.3, -3.4, 0.12, GROUND_Y + 3.5, 'pole', true, true);
   place(makeFingerpost([
@@ -816,10 +838,13 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     if (Math.abs(x) < 8) continue;
     addLamp(makeSpotMast(), x, GROUND_Y, -1.5);
   }
+  // Past the end of the boardwalk: masts on the open stretch on either side of the old distillery
+  // (its frontage is a narrow lane, kept clear).
+  for (const x of [108, 128, 182, 194]) addLamp(makeSpotMast(), x, GROUND_Y, -1.5);
   // Extra promenade mast right beside spawn so pole whirling is an immediate first-screen hook.
   addLamp(makeSpotMast(), -24, GROUND_Y, -1.5);
-  for (let x = -80; x <= 80; x += 12) {
-    if (Math.abs(x) < 6 || (x > -54 && x < -42)) continue;
+  for (let x = -80; x <= EDGE.promE - 4; x += 12) {
+    if (Math.abs(x) < 6 || (x > 80 && x < 100) || Math.abs(x - PIER_X) < 6) continue;
     // Concrete block bench with a wooden seat.
     const b = new THREE.Group();
     const blk = box(2.2, 0.42, 0.6, M(0xd8d2c4, 0.9));
@@ -840,7 +865,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     g.beginPath(); g.moveTo(70, 150); g.lineTo(120, 80); g.lineTo(186, 150); g.moveTo(120, 80); g.lineTo(170, 80); g.lineTo(186, 150); g.stroke();
   });
   const glyphMat = new THREE.MeshBasicMaterial({ map: cycleGlyph, transparent: true, depthWrite: false, color: 0xdddddd });
-  for (let x = -84; x <= 84; x += 28) {
+  for (let x = -84; x <= EDGE.promE - 8; x += 28) {
+    if (x > SEAFRONT_DISTILLERY.x0 - 2 && x < SEAFRONT_DISTILLERY.x1 + 2) continue;
     const gm = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), glyphMat);
     gm.rotation.x = -Math.PI / 2;
     gm.position.set(x, GROUND_Y + 0.012, -5.7);
@@ -1094,14 +1120,14 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   }
   place(makeLifeguardTower(), 8, sandFloor(-46), -46);
   addCircle(8, -46, 0.8, sandFloor(-46) + 2.2, 'tower', false, false);
-  // Tamarisks near the pier.
+  // Tamarisks on the beach by the pavilions.
   for (const [tx, tz] of [[-58, -25], [-54, -31], [-40, -26], [-62, -33], [-37, -33]]) {
     const t = makeTamarisk(Math.floor(tx * 3 + tz));
     place(t.group, tx, sandFloor(tz), tz);
     addCircle(tx, tz, t.radius, sandFloor(tz) + 4, 'tree', true, false);
   }
   // Pier-side fish bucket: draws greedy gulls if Millie barks near it.
-  const fishBucketPos = { x: -44.5, z: -21.5 };
+  const fishBucketPos = { x: PIER.x1 + 1.5, z: -21.5 };
   {
     const fbY = sandFloor(fishBucketPos.z);
     const fb = new THREE.Group();
@@ -1309,14 +1335,15 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   const fishers = [{ x: PIER.x1 - 0.5, z: -70, ry: Math.PI }, { x: PIER.x0 + 0.5, z: -96, ry: 0 }, { x: PIER.x1 - 0.5, z: -118, ry: Math.PI }];
 
   yield 'Horizon: the Tres Xemeneies to the southwest, the Serralada inland';
-  // ---- Horizon: the Tres Xemeneies to the southwest, the Serralada inland ------------
+  // ---- Horizon: the Tres Xemeneies to the southwest (+X), the Serralada inland ------
   const xem = makeXemeneies();
-  xem.position.set(-760, WATER_Y, -120);
+  xem.position.set(760, WATER_Y, -120);
   xem.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m) m.fog = false; });
   xem.scale.setScalar(0.9);
   xem.userData.always = true;
   root.add(xem);
-  // Hills inland (+Z), the city's skyline far down the coast behind the chimneys (-X).
+  // Hills inland (+Z) running down to a headland toward Montgat (-X), and the city's skyline
+  // far down the coast behind the chimneys (+X, southwest).
   root.add(makeInlandHills(WATER_Y - 12));
   root.add(makeCitySkyline(WATER_Y - 2));
   const churchLandmark = makeChurchLandmark();
@@ -1580,7 +1607,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       p.z = Math.max(MARINA_CLAMP.z0, Math.min(MARINA_CLAMP.z1, p.z));
       return;
     }
-    p.x = Math.max(-EDGE.clamp, Math.min(EDGE.clamp, p.x));
+    // The seafront runs on past the old pier; the Rambla stays between the two clamps.
+    p.x = Math.max(-EDGE.clamp, Math.min(p.z < 4 ? EDGE.beachClampE : EDGE.clamp, p.x));
     // Out to the buoy line inside the swim zone; to the shallows elsewhere.
     if (!onPier(p.x, p.z)) p.z = Math.max(p.z, p.x > SWIM.x0 && p.x < SWIM.x1 ? SWIM.z + 0.3 : -64);
   };
@@ -1596,7 +1624,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     [[-86, 24], [-40, 23.5], [0, 24.5], [40, 23.5], [62, 23.5], [66, 21.4], [76, 21.4], [86, 24]],
     [[86, 19], [30, 19.5], [6, 23.4], [-6, 23.4], [-30, 18.6], [-86, 19]],
     [[-86, 29], [-20, 28.4], [20, 29], [86, 28.5]],
-    [[-86, -7.6], [-30, -7.4], [10, -7.7], [86, -7.5]],
+    [[-86, -7.6], [-30, -7.4], [10, -7.7], [86, -7.5], [140, -7.6], [196, -7.5]],
     // Along the pavilion fronts (not through them), clear of the blog kiosk and the pier.
     [[-8, -10.9], [14, -11], [36, -10.9]],
     [[-44, -10.9], [-32, -11], [-20.5, -10.9]],
@@ -1637,7 +1665,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     pedPaths,
     birdSpots: {
       pigeons: [[-1.5, 45], [1, 47], [-0.5, 43.5], [8, 53], [-16, 52], [10, 71], [-6, 30], [6, 26], [-2, 24]] as [number, number][],
-      gulls: [[-20, -45], [-12, -50], [10, -52], [16, -49], [-48, -70], [-48, -100], [40, -51], [60, -52], [-48, -124]] as [number, number][],
+      gulls: [[-20, -45], [-12, -50], [10, -52], [16, -49], [PIER_X, -70], [PIER_X, -100], [40, -51], [60, -52], [PIER_X, -124]] as [number, number][],
     },
     quests: {
       kid: { x: -14, y: GROUND_Y + 4.25, z: 91.7, ry: Math.PI / 2 },

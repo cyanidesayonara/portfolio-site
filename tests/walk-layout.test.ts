@@ -85,6 +85,29 @@ describe('walk placements', () => {
   });
 });
 
+describe('real-town orientation (+x is southwest, toward the city)', () => {
+  const station = poiPos(layout, 'rambla', 'station');
+  const seafront = byId.get('seafront')!;
+  const lm = (id: string) => (seafront as unknown as { landmarks: (Rect & { id: string })[] }).landmarks.find((l) => l.id === id);
+
+  it('puts the old pier a little southwest of the station', () => {
+    const pierX = (layout.pier.x0 + layout.pier.x1) / 2;
+    assert.ok(pierX > station.x + 60 && pierX < station.x + 160, `pier at x ${pierX}`);
+    assert.ok(layout.pier.x1 <= seafront.bounds.x1);
+  });
+
+  it('puts the old distillery between the tracks and the promenade, at the pier root', () => {
+    const d = lm('distillery');
+    const c = lm('chimney');
+    assert.ok(d && c);
+    assert.ok(d.z1 <= 4 && d.z0 > -10, 'seaward of the tracks, inland of the boardwalk');
+    assert.ok(d.x0 > station.x, 'southwest of the station');
+    assert.ok(Math.abs(layout.pier.x0 - d.x1) < 10, 'beside the pier root');
+    assert.ok(c.x0 >= d.x0 && c.x1 <= d.x1 && c.z0 >= d.z0 && c.z1 <= d.z1, 'chimney inside the distillery');
+    assert.ok(!byId.get('town')!.pois.some((p) => p.id === 'distillery'));
+  });
+});
+
 describe('saved progress across district moves', () => {
   // A save made before the re-orientation (walk3d-progress-v1). Goal ids and done keys
   // carry no positions, so moving districts must never invalidate them.

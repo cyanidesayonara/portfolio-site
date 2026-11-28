@@ -2,7 +2,8 @@
   Distant scenery: flat silhouettes far beyond the playable town, faded into the
   current fog color every frame so they sit in the haze by day, go gray in the
   rain and dark at night. Two layers of hills inland (+Z), and the big city's
-  skyline down the coast to the southwest (-X), behind the three chimneys.
+  skyline down the coast to the southwest (+X), behind the three chimneys.
+  The hills run down to a headland on the coast to the northeast (-X).
   Nothing here is named on screen.
 */
 import * as THREE from 'three';
@@ -80,10 +81,12 @@ const DEG = Math.PI / 180;
 export function makeInlandHills(baseY: number): THREE.Object3D {
   const g = new THREE.Group();
   const far = new Silhouettes();
-  far.ridge(1320, -58 * DEG, 84 * DEG, 96, baseY, (p) => 150 + wave(p, [[38, 3.1, 0.6], [22, 7.3, 1.9], [9, 15.7, 0.3]]), 0.92, 1.08);
+  far.ridge(1320, -84 * DEG, 58 * DEG, 96, baseY, (p) => 150 + wave(-p, [[38, 3.1, 0.6], [22, 7.3, 1.9], [9, 15.7, 0.3]]), 0.92, 1.08);
   g.add(far.mesh(0x6c8a74, 0.5));
   const near = new Silhouettes();
-  near.ridge(1120, -50 * DEG, 78 * DEG, 96, baseY, (p) => 78 + wave(p, [[26, 4.3, 2.2], [14, 9.1, 0.4], [6, 21.0, 1.1]]), 0.88, 1.06);
+  near.ridge(1120, -78 * DEG, 50 * DEG, 96, baseY, (p) => 78 + wave(-p, [[26, 4.3, 2.2], [14, 9.1, 0.4], [6, 21.0, 1.1]]), 0.88, 1.06);
+  // A wooded headland where the coast bends seaward to the northeast.
+  near.card(-1150, -330, baseY, [[-190, 0], [190, 0], [150, 16], [90, 46], [40, 66], [0, 72], [-50, 64], [-110, 40], [-160, 14]], 0.86);
   g.add(near.mesh(0x557a4e, 0.3));
   g.userData.always = true;
   return g;
@@ -91,36 +94,39 @@ export function makeInlandHills(baseY: number): THREE.Object3D {
 
 /** The city down the coast: low hill with a castle, the sail hotel, twin towers, the bullet tower, basilica spires, and the ridge with its TV mast. */
 export function makeCitySkyline(baseY: number): THREE.Object3D {
-  const s = new Silhouettes();
+  const sil = new Silhouettes();
+  // Placed down the coast to the southwest (+X); profiles are drawn as if seen from town, so
+  // flip their across axis to keep the sea on the left and the ridge on the right.
+  const s = { card: (cx: number, cz: number, y: number, profile: Pt2[], shade: number, scale = 1) => sil.card(cx, cz, y, profile.map(([u, v]) => [-u, v] as Pt2), shade, scale) };
   const K = 1.6; // landmark scale: big enough to read at 1.2-1.4 km
   // Seaward end: a long hill with a squat castle on top.
-  s.card(-1400, -230, baseY, [[-140, 0], [140, 0], [110, 18], [60, 42], [20, 55], [8, 55], [8, 62], [-8, 62], [-8, 55], [-30, 52], [-80, 34], [-120, 14]], 1.04);
+  s.card(1400, -230, baseY, [[-140, 0], [140, 0], [110, 18], [60, 42], [20, 55], [8, 55], [8, 62], [-8, 62], [-8, 55], [-30, 52], [-80, 34], [-120, 14]], 1.04);
   // The sail-shaped hotel at the harbor mouth.
-  s.card(-1340, -330, baseY, [[-11, 0], [12, 0], [10, 20], [6, 36], [-2, 48], [-8, 52], [-9, 30]], 0.95, K);
+  s.card(1340, -330, baseY, [[-11, 0], [12, 0], [10, 20], [6, 36], [-2, 48], [-8, 52], [-9, 30]], 0.95, K);
   // A low, ragged band of city blocks along the shore, so the towers rise out of something.
   const band: Pt2[] = [[-300, 0], [300, 0]];
   for (let u = 300, i = 0; u > -300; u -= 14, i++) {
     const h = 9 + ((i * 37) % 11) + ((i * 13) % 5);
     band.push([u, h], [u - 14, h]);
   }
-  s.card(-1260, -70, baseY, band, 1.0);
+  s.card(1260, -70, baseY, band, 1.0);
   // Twin towers by the beach.
-  s.card(-1150, -165, baseY, [[-30, 0], [-14, 0], [-14, 72], [-30, 72]], 0.88, K);
-  s.card(-1150, -165, baseY, [[14, 0], [30, 0], [30, 70], [14, 70]], 0.88, K);
+  s.card(1150, -165, baseY, [[-30, 0], [-14, 0], [-14, 72], [-30, 72]], 0.88, K);
+  s.card(1150, -165, baseY, [[14, 0], [30, 0], [30, 70], [14, 70]], 0.88, K);
   // The bullet-shaped tower.
   const bullet: Pt2[] = [[-9, 0], [9, 0], [9, 44]];
   for (let i = 1; i < 10; i++) { const a = (i / 10) * Math.PI; bullet.push([Math.cos(a) * 9, 44 + Math.sin(a) * 18]); }
   bullet.push([-9, 44]);
-  s.card(-1230, -45, baseY, bullet, 0.92, K);
+  s.card(1230, -45, baseY, bullet, 0.92, K);
   // The basilica: a long body and a cluster of tapering spires.
-  s.card(-1270, 45, baseY, [[-30, 0], [30, 0], [30, 26], [-30, 26]], 0.94, K);
+  s.card(1270, 45, baseY, [[-30, 0], [30, 0], [30, 26], [-30, 26]], 0.94, K);
   for (const [u, h, w] of [[-20, 58, 4], [-11, 66, 4.5], [-2, 84, 5.5], [8, 70, 4.5], [17, 62, 4], [25, 52, 3.5]] as [number, number, number][]) {
-    s.card(-1270, 45, baseY, [[u - w, 20], [u + w, 20], [u + w * 0.55, h * 0.8], [u, h], [u - w * 0.55, h * 0.8]], 0.94, K);
+    s.card(1270, 45, baseY, [[u - w, 20], [u + w, 20], [u + w * 0.55, h * 0.8], [u, h], [u - w * 0.55, h * 0.8]], 0.94, K);
   }
   // Inland: the long ridge behind the city, with a needle-thin TV mast and a temple bump.
   const R = 0.62;
-  s.card(-1440, 320, baseY, [[-360, 0], [360, 0], [300, 40], [220, 70], [150, 96], [90, 112], [40, 124], [10, 128], [-30, 122], [-90, 104], [-170, 84], [-260, 56], [-320, 28]], 1.08, R);
-  s.card(-1440, 320, baseY, [[-3, 120], [3, 120], [1.5, 185], [-1.5, 185]], 1.02, R);
-  s.card(-1440, 320, baseY, [[-62, 100], [-44, 100], [-46, 116], [-53, 126], [-60, 116]], 1.08, R);
-  return s.mesh(0x4c5768, 0.42);
+  s.card(1440, 320, baseY, [[-360, 0], [360, 0], [300, 40], [220, 70], [150, 96], [90, 112], [40, 124], [10, 128], [-30, 122], [-90, 104], [-170, 84], [-260, 56], [-320, 28]], 1.08, R);
+  s.card(1440, 320, baseY, [[-3, 120], [3, 120], [1.5, 185], [-1.5, 185]], 1.02, R);
+  s.card(1440, 320, baseY, [[-62, 100], [-44, 100], [-46, 116], [-53, 126], [-60, 116]], 1.08, R);
+  return sil.mesh(0x4c5768, 0.42);
 }
