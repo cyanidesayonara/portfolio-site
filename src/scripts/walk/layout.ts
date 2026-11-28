@@ -51,6 +51,11 @@ export interface BlockDef {
   facadeStyle: FacadeStyle;
   faces: Face[];
   groundFloor: boolean;
+  /**
+    Ranges along a face (x for ±z faces, z for ±x faces) where the generated ground
+    floor is left plain so a hand-built shop front can go there instead.
+  */
+  groundFloorSkip?: [number, number][];
 }
 
 export interface PavilionDef {
@@ -111,6 +116,7 @@ export interface TownLayout {
   pipica4: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pipica5?: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pipica6?: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
+  pipica7?: { x0: number; x1: number; z0: number; z1: number; gateZ0: number; gateZ1: number };
   pier: { x0: number; x1: number; root: number; rise: number; end: number; high: number };
   ramps: number[];
   tracks: number[];
@@ -259,6 +265,7 @@ function emitFacade(b: BlockDef, h: number, ctx: BlockBuildCtx) {
 
     for (let c = 0; c < cols; c++) {
       const s = a0 + pitch * (c + 0.5);
+      if (b.groundFloorSkip?.some(([k0, k1]) => s + pitch / 2 > k0 && s - pitch / 2 < k1)) continue;
       const kind = r();
       const shopChance = rambla ? 0.62 : 0.5;
       if (!industrial && kind < shopChance) {
