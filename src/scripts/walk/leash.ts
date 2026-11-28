@@ -373,9 +373,9 @@ export function applyTug(leash: Leash, dog: Body, human: Body, o: TugOpts): numb
   return tension;
 }
 
-/** Hard cap at 1.15× stretch: move both ends back, split by inverse mass. Returns overshoot. */
-export function capStretch(leash: Leash, dog: { x: number; z: number }, human: { x: number; z: number }, dogMass: number, humanMass: number) {
-  const over = leash.length - leash.rest * 1.15;
+/** Hard cap at `maxStretch` × rest (1.15 by default): move both ends back, split by inverse mass. Returns overshoot. */
+export function capStretch(leash: Leash, dog: { x: number; z: number }, human: { x: number; z: number }, dogMass: number, humanMass: number, maxStretch = 1.15) {
+  const over = leash.length - leash.rest * maxStretch;
   if (over <= 0) return 0;
   const { dog: dd, human: hd } = leash.ends();
   const iD = 1 / dogMass, iH = 1 / humanMass;

@@ -190,6 +190,19 @@ export class StreetSound {
     this.tone(370, t, 0.32, 'square', 0.09, this.sfx!, 1200);
     this.tone(440, t, 0.32, 'square', 0.07, this.sfx!, 1200);
   }
+  /** One swoop of the human swinging round a lamppost. */
+  whoosh(pitch = 1) {
+    const t = this.now();
+    if (t < 0) return;
+    this.hiss(t, 0.16, 0.07, 900 * pitch, 'bandpass', this.sfx!);
+  }
+  /** The human flung off the pole: a rising 8-bit slide. */
+  fling() {
+    const t = this.now();
+    if (t < 0) return;
+    this.tone(220, t, 0.34, 'square', 0.1, this.sfx!, 2200, 880);
+    this.hiss(t, 0.22, 0.06, 1400, 'bandpass', this.sfx!);
+  }
   pickup() {
     const t = this.now();
     if (t < 0) return;
