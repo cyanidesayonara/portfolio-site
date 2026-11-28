@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { boneSpots, mapPlaceMarks, poiPos } from '../src/scripts/walk/placements.ts';
 import { GOAL_DEFS } from '../src/scripts/walk/goalDefs.ts';
 import { AREAS, loadProgress } from '../src/scripts/walk/progress.ts';
+import { HILL_DX, shiftX } from '../src/scripts/walk/hillOffset.ts';
 
 /*
   Guards for the map re-orientation (docs/superpowers/specs/2026-11-28-walk-reorientation-design.md):
@@ -105,6 +106,42 @@ describe('real-town orientation (+x is southwest, toward the city)', () => {
     assert.ok(Math.abs(layout.pier.x0 - d.x1) < 10, 'beside the pier root');
     assert.ok(c.x0 >= d.x0 && c.x1 <= d.x1 && c.z0 >= d.z0 && c.z1 <= d.z1, 'chimney inside the distillery');
     assert.ok(!byId.get('town')!.pois.some((p) => p.id === 'distillery'));
+  });
+});
+
+describe('the moved hill and the metro (re-orientation step 2)', () => {
+  const zone = (id: string) => (layout as unknown as { zones: (Rect & { id: string })[] }).zones.find((z) => z.id === id)!;
+
+  it('puts the old town on the hill northeast (-x) of Carrer del Mar', () => {
+    const church = poiPos(layout, 'hill', 'church');
+    const street = poiPos(layout, 'town', 'carrer-del-mar');
+    assert.equal(church.x, HILL_DX);
+    assert.ok(church.x < street.x - 30, `church at x ${church.x}`);
+  });
+
+  it('opens Carrer Major at the foot of the climb', () => {
+    const approach = zone('hillApproach');
+    const climb = zone('hillClimb');
+    assert.ok(approach.x0 >= climb.x0 && approach.x1 <= climb.x1);
+    const plaza = byId.get('plaza') as unknown as { blocks: Rect[] };
+    for (const b of plaza.blocks) {
+      const ox = Math.min(b.x1, approach.x1) - Math.max(b.x0, approach.x0);
+      const oz = Math.min(b.z1, approach.z1) - Math.max(b.z0, approach.z0);
+      assert.ok(ox <= 0 || oz <= 0, 'a plaza block covers the way up to the hill');
+    }
+  });
+
+  it('puts the metro entrance in its square off Carrer Major, not on the Rambla', () => {
+    const metro = (layout as unknown as { metro: Rect }).metro;
+    const sq = zone('metroSquare');
+    assert.ok(metro.x0 > sq.x0 && metro.x1 < sq.x1 && metro.z0 > sq.z0 && metro.z1 < sq.z1);
+    assert.ok(inside(byId.get('plaza')!.bounds, poiPos(layout, 'plaza', 'metro').x, poiPos(layout, 'plaza', 'metro').z));
+    assert.ok(!byId.get('rambla')!.pois.some((p) => p.id === 'metro'));
+  });
+
+  it('shifts x fields and [x, z] pairs only', () => {
+    assert.deepEqual(shiftX({ x: 1, z: 2, x0: 3, x1: 4, minX: 5, maxX: 6, y: 7, pts: [[1, 2]], label: 'a' }, 10),
+      { x: 11, z: 2, x0: 13, x1: 14, minX: 15, maxX: 16, y: 7, pts: [[11, 2]], label: 'a' });
   });
 });
 

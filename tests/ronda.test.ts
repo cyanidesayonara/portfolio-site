@@ -47,7 +47,7 @@ describe('Ronda / Parc geometry and streaming bounds', () => {
     assert.ok(RONDA_BRIDGE.x1 > RONDA_BRIDGE.x0);
   });
 
-  it('keeps ronda beyond warm distance at spawn and unloads eastern hill from west ronda', () => {
+  it('keeps ronda beyond warm distance at spawn and the hill past live distance from west ronda', () => {
     const raw = JSON.parse(
       readFileSync(new URL('../src/scripts/walk/data/seafront.json', import.meta.url), 'utf8'),
     ) as { districts: { id: string; bounds: { x0: number; x1: number; z0: number; z1: number } }[] };
@@ -56,8 +56,9 @@ describe('Ronda / Parc geometry and streaming bounds', () => {
     assert.ok(ronda && hill);
 
     assert.ok(distToBounds(ronda.bounds, -22, -3.4) > 80);
-    // Far SW corner of Ronda: hill should fully unload (Streamer.unloadAt = 170).
-    assert.ok(distToBounds(hill.bounds, -220, 120) > 170);
+    // Far corner of Ronda: since the hill moved toward -x (re-orientation step 2) it stays a
+    // stand-in there (Streamer.far = 100) rather than unloading, until Ronda moves to +x in step 4.
+    assert.ok(distToBounds(hill.bounds, -220, 120) > 100);
   });
 });
 

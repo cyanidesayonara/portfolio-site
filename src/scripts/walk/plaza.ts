@@ -19,6 +19,8 @@ import { SEAFRONT_LAYOUT, buildDistrictBlocksSteps, type DistrictData, type Inst
 import { signTexture } from './textures';
 import type { ColliderGrid, District } from './world';
 import type { BoxCollider, CircleCollider } from './level';
+import { HILL_DX } from './hillOffset';
+import { groundAroundMetro } from './metro';
 
 const PIP = SEAFRONT_LAYOUT.pipica2;
 
@@ -30,6 +32,8 @@ export const PLAZA = {
   center: { x: 0, z: 128 },
   square: { x0: -20, x1: 20, z0: 101, z1: 139 },
   street: { x0: -62, x1: 62, z0: 155, z1: 161 },
+  /** A small square off Carrer Major's north side with the metro entrance (`metro` in the layout data). */
+  metroSquare: { x0: 30, x1: 44, z0: 161, z1: 173 },
   fountain: { x: 0, z: 114, r: 2.7 },
   /** A small drinking fountain by the square's entrance. */
   drink: { x: -18.6, z: 103.4 },
@@ -122,7 +126,20 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   // ---- Ground: flagstones on the square, panots elsewhere, sand in the pipicà ----
   root.add(env.ground(-20, 20, 101, 139, Y + 0.002, mats.flag, mats.flagTile));
   root.add(env.ground(-62, 62, 139, 161, Y, mats.panot, mats.panotTile));
-  root.add(env.ground(-3.2, 3.2, 161, 173.2, Y + 0.001, mats.panot, mats.panotTile));
+  // The way up to Dalt de la Vila, through the north side of Carrer Major at the foot of the climb.
+  root.add(env.ground(HILL_DX - 3.2, HILL_DX + 3.2, 161, 173.2, Y + 0.001, mats.panot, mats.panotTile));
+  // The metro square's paving, around the stairwell (the entrance itself is resident, built in level.ts).
+  {
+    const MS = PLAZA.metroSquare;
+    for (const [gx0, gx1, gz0, gz1] of groundAroundMetro(MS.x0, MS.x1, MS.z0, MS.z1, SEAFRONT_LAYOUT.metro)) {
+      root.add(env.ground(gx0, gx1, gz0, gz1, Y + 0.001, mats.panot, mats.panotTile));
+    }
+    // Behind it, a low wall with a planter, then a small courtyard before the next row of houses.
+    root.add(env.ground(24, 48, MS.z1, MS.z1 + 11, Y, mats.panot, mats.panotTile));
+    root.add(box(MS.x1 - MS.x0, 0.9, 0.4, M(0xd8cdb8, 0.85)).translateX((MS.x0 + MS.x1) / 2).translateY(Y + 0.45).translateZ(MS.z1 - 0.2));
+    root.add(box(MS.x1 - MS.x0 - 1, 0.5, 0.9, M(0x5f8a46, 0.9)).translateX((MS.x0 + MS.x1) / 2).translateY(Y + 1.15).translateZ(MS.z1 - 0.2));
+    addBox({ x0: MS.x0, x1: MS.x1, z0: MS.z1 - 0.4, z1: MS.z1, top: Y + 1.4, kind: 'wall' });
+  }
   root.add(env.ground(-41, -20, 101, 139, Y - 0.001, mats.panot, mats.panotTile));
   root.add(env.ground(20, 41, 101, 139, Y - 0.001, mats.panot, mats.panotTile));
   root.add(env.ground(PIP.x0, PIP.x1, PIP.z0, PIP.z1, Y + 0.006, mats.sand, 4));
@@ -362,7 +379,7 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
     place(m, x, Y + 3.7, z, face > 0 ? 0 : Math.PI);
   };
   const shops: [string, string, string, number, number, 1 | -1][] = [
-    ['Ferreteria', 'Hardware', '#b5700a', -46, 160.9, -1],
+    ['Ferreteria', 'Hardware', '#b5700a', -36, 160.9, -1],
     ['Forn', 'Bakery', '#e3b45c', -18, 160.9, -1],
     ['Llibreria', 'Books', '#2a5aa8', 12, 160.9, -1],
     ['Fruiteria', 'Fruit and veg', '#5f9e4a', 23, 160.9, -1],
@@ -398,8 +415,8 @@ function* buildPlazaSteps(env: PlazaEnv, d: District): Generator<void, void, voi
   place(makeFingerpost([
     { title: 'Dalt de la Vila', sub: 'Església · Museu', color: '#8bcb3c', angle: Math.PI / 2 },
     { title: 'Plaça del Mercat', sub: 'Carrer Major', color: '#ffb020', angle: -Math.PI / 2 },
-  ]), 3.6, Y, 160.4);
-  addCircle(3.6, 160.4, 0.12, Y + 3.5, 'pole', true, true);
+  ]), HILL_DX + 3.6, Y, 160.4);
+  addCircle(HILL_DX + 3.6, 160.4, 0.12, Y + 3.5, 'pole', true, true);
   shadowed(sign);
   yield;
 

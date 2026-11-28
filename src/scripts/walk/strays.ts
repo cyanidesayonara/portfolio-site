@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { makeCat } from './models';
 import { collapseRig } from './bake';
 import type { WalkAudio } from './audio';
+import { HILL_DX, shiftX } from './hillOffset';
 
 const VIEW = 60;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -32,13 +33,14 @@ export interface StraysCtx {
   onDone?: (key: string) => void;
 }
 
-/** Home spots on the hill: lower square, mid terrace, mirador, church square. */
-const SPOTS: { x: number; z: number; color: number; heading: number }[] = [
+/** Home spots on the hill: lower square, mid terrace, mirador, church square (hill-local x, shifted into place below). */
+const LOCAL_SPOTS: { x: number; z: number; color: number; heading: number }[] = [
   { x: 6.5, z: 176.2, color: 0xd98a3a, heading: -Math.PI / 2 },
   { x: -5.5, z: 199.5, color: 0x2b2a2e, heading: Math.PI },
   { x: 20.5, z: 222.6, color: 0xe8e4dc, heading: -Math.PI / 2 },
   { x: -18.5, z: 233.2, color: 0x8d8a86, heading: 0 },
 ];
+const SPOTS = shiftX(LOCAL_SPOTS, HILL_DX);
 
 export function createStrays(ctx: StraysCtx) {
   const { scene, audio, dog } = ctx;

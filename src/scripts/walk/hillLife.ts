@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { makePerson, makeDog, makeBird, M, cyl } from './models';
 import { collapseRig } from './bake';
 import { HILL, inHillPipica } from './hill';
+import { HILL_DX } from './hillOffset';
 import { createMosaicBoss } from './mosaicBoss';
 import { createSenglars, type SenglarsChase } from './senglars';
 import type { Hud } from './hud';
@@ -81,34 +82,60 @@ export function createHillLife(ctx: HillCtx) {
   };
 
   // ---- Boss #3 (Roman Mosaic Guardian at Museu) + Chase #2 (Senglars) ----
+  // Their logic runs in the hill's local frame (hillOffset.ts): they see Millie shifted into it,
+  // and their models, telegraphs, particles and sounds are shifted back out into the world.
+  const space = new THREE.Group();
+  space.position.x = HILL_DX;
+  add(space);
+  const addLocal = <T extends THREE.Object3D>(o: T) => { space.add(o); return o; };
+  const localDog = {
+    get x() { return dog.x - HILL_DX; },
+    get y() { return dog.y; },
+    get z() { return dog.z; },
+    get vx() { return dog.vx; },
+    get vz() { return dog.vz; },
+  };
+  const toWorldArg = (a: unknown) => (a && typeof a === 'object' && 'x' in a && 'z' in a ? { ...(a as P), x: (a as P).x + HILL_DX } : a);
+  const localAudio = new Proxy(audio, {
+    get(t, k) {
+      const v = (t as unknown as Record<PropertyKey, unknown>)[k];
+      return typeof v === 'function' ? (...args: unknown[]) => (v as (...a: unknown[]) => unknown).apply(t, args.map(toWorldArg)) : v;
+    },
+  });
+  const localTelegraphs = {
+    ring: (x: number, y: number, z: number, r: number, fill01: number, color: number) => ctx.telegraphs.ring(x + HILL_DX, y, z, r, fill01, color),
+    lane: (x0: number, z0: number, x1: number, z1: number, y: number, width: number, fill01: number, color: number) => ctx.telegraphs.lane(x0 + HILL_DX, z0, x1 + HILL_DX, z1, y, width, fill01, color),
+    beacon: (x: number, y: number, z: number, r: number, time: number, color: number) => ctx.telegraphs.beacon(x + HILL_DX, y, z, r, time, color),
+  } as unknown as TelegraphPool;
+  const localBurst: HillCtx['burst'] = (x, ...rest) => ctx.burst(x + HILL_DX, ...rest);
   let senglars!: SenglarsChase;
   const mosaic = createMosaicBoss({
-    addObject: add,
+    addObject: addLocal,
     hud,
-    audio,
-    telegraphs: ctx.telegraphs,
+    audio: localAudio,
+    telegraphs: localTelegraphs,
     feel: ctx.feel,
-    dog,
+    dog: localDog,
     humanSay: ctx.humanSay,
     addBones: ctx.addBones,
     completeGoal: ctx.completeGoal,
     onDone: ctx.onDone,
-    burst: ctx.burst,
+    burst: localBurst,
     onHitDog: (vx, vz, vy) => ctx.onHitDog?.(vx, vz, vy),
     canStart: () => (ctx.canStartThreat?.() ?? true) && !senglars.active,
   });
   senglars = createSenglars({
-    scene,
+    scene: { add: addLocal } as unknown as THREE.Scene,
     hud,
-    audio,
-    telegraphs: ctx.telegraphs,
+    audio: localAudio,
+    telegraphs: localTelegraphs,
     feel: ctx.feel,
-    dog,
+    dog: localDog,
     humanSay: ctx.humanSay,
     addBones: ctx.addBones,
     completeGoal: ctx.completeGoal,
     onDone: ctx.onDone,
-    burst: ctx.burst,
+    burst: localBurst,
     onHitDog: (vx, vz, vy) => ctx.onHitDog?.(vx, vz, vy),
     canStart: () => (ctx.canStartThreat?.() ?? true) && !mosaic.active,
   });
@@ -124,11 +151,11 @@ export function createHillLife(ctx: HillCtx) {
   );
   const miradorLocal = person(
     { top: 0x9e4c47, trousers: 0x2a2f3d, hair: 0x8a8a8a, hairStyle: 'short', prop: 'coffee', height: 0.96 },
-    17.5, TOP_Y, 219.6, -Math.PI / 2,
+    17.5 + HILL_DX, TOP_Y, 219.6, -Math.PI / 2,
   );
   const squareLocal = person(
     { top: 0x667a5c, trousers: 0x6b5a48, hair: 0x2a1d14, hairStyle: 'ponytail', prop: 'phone', height: 0.98 },
-    15.4, TOP_Y, 224.0, Math.PI,
+    15.4 + HILL_DX, TOP_Y, 224.0, Math.PI,
   );
 
   // ---- Animated bronze church bell ----
@@ -145,7 +172,7 @@ export function createHillLife(ctx: HillCtx) {
   }
 
   // ---- Hilltop pigeons ----
-  const pigeonSpots: [number, number][] = [[-3, 229], [-1.5, 228.4], [2.5, 229.2], [4.0, 228.5]];
+  const pigeonSpots: [number, number][] = ([[-3, 229], [-1.5, 228.4], [2.5, 229.2], [4.0, 228.5]] as [number, number][]).map(([x, z]) => [x + HILL_DX, z]);
   const pigeons = pigeonSpots.map(([hx, hz]) => {
     const b = makeBird('pigeon');
     add(b.group);
@@ -163,7 +190,7 @@ export function createHillLife(ctx: HillCtx) {
       any = true;
     }
     if (any) {
-      audio.flutter({ x: 0.5, z: 228.8 });
+      audio.flutter({ x: 0.5 + HILL_DX, z: 228.8 });
       ctx.completeGoal('birds');
     }
   };
@@ -213,7 +240,7 @@ export function createHillLife(ctx: HillCtx) {
     if (dist(dog, HILL.caretaker) < 5.0 && dog.y >= TOP_Y - 1 && !quests.bell) {
       say('caretaker', 'Quines vistes des d\'aquí dalt!', 2.0, 'paper', 14);
     }
-    if (dist(dog, { x: 17.5, z: 219.7 }) < 3.5 && dog.y >= TOP_Y - 1) {
+    if (dist(dog, { x: 17.5 + HILL_DX, z: 219.7 }) < 3.5 && dog.y >= TOP_Y - 1) {
       say('miradorLocal', 'Es veu tot el mar des d\'aquí!', 2.0, 'paper', 16);
     }
 
@@ -365,8 +392,8 @@ export function createHillLife(ctx: HillCtx) {
     bubbles: () => [
       { id: 'guide', x: HILL.guide.x, y: MID_Y + 2.1, z: HILL.guide.z },
       { id: 'caretaker', x: HILL.caretaker.x, y: TOP_Y + 2.1, z: HILL.caretaker.z },
-      { id: 'miradorLocal', x: 17.5, y: TOP_Y + 1.7, z: 219.7 },
-      { id: 'mosaic', ...mosaic.bubblePos() },
+      { id: 'miradorLocal', x: 17.5 + HILL_DX, y: TOP_Y + 1.7, z: 219.7 },
+      (() => { const b = mosaic.bubblePos(); return { id: 'mosaic', ...b, x: b.x + HILL_DX }; })(),
     ],
     debug: {
       get bellRingT() { return bellRingT; },

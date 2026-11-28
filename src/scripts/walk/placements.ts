@@ -13,6 +13,7 @@ import { MOSAIC_HOME } from './mosaicLogic.ts';
 import { SENGLARS_MAP_POS } from './senglarsLogic.ts';
 import { MICO_HOME } from './micoLogic.ts';
 import { CARTS_MAP_POS } from './gorgLogic.ts';
+import { HILL_DX, shiftX } from './hillOffset.ts';
 
 export interface Pt { x: number; z: number }
 
@@ -61,8 +62,9 @@ const MAP_PLACES: (Ref & { color: string; label: string; kind: 'place' | 'threat
   { district: 'gorg', poi: 'pipica5', color: '#8bcb3c', label: 'Pipicà', kind: 'place' },
   { at: CARTS_MAP_POS, color: '#ff6b5a', label: 'Carts', kind: 'threat' },
   { at: MICO_HOME, color: '#ffb020', label: 'El Mico', kind: 'threat' },
-  { at: MOSAIC_HOME, color: '#ffb020', label: 'Guardian', kind: 'threat' },
-  { at: SENGLARS_MAP_POS, color: '#a86a3a', label: 'Senglars', kind: 'threat' },
+  // The hill's boss and chase logic run in its local frame (hillOffset.ts).
+  { at: shiftX(MOSAIC_HOME, HILL_DX), color: '#ffb020', label: 'Guardian', kind: 'threat' },
+  { at: shiftX(SENGLARS_MAP_POS, HILL_DX), color: '#a86a3a', label: 'Senglars', kind: 'threat' },
 ];
 
 /** The minimap's fixed place and threat markers. */
@@ -80,7 +82,7 @@ export function mapPlaceMarks(layout: PlacementLayout): PlaceMark[] {
 export function boneSpots(layout: PlacementLayout): { district: string; spots: [number, number][] }[] {
   const pierX = (layout.pier.x0 + layout.pier.x1) / 2;
   return [
-    { district: 'hill', spots: [[0, 186], [14, 187], [0, 211], [12, 224]] },
+    { district: 'hill', spots: shiftX([[0, 186], [14, 187], [0, 211], [12, 224]] as [number, number][], HILL_DX) },
     { district: 'plaza', spots: [[10, 108], [-17, 148], [40, 158.4]] },
     { district: 'town', spots: [[1.5, 48], [-20, 53], [22, 71], [-14, 89], [30, 88.8]] },
     { district: 'rambla', spots: [[-40, 24], [40, 29], [60, 20], [-1, 9]] },

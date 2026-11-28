@@ -42,7 +42,7 @@ describe('Gorg (Canal i Galeria) geometry and streaming bounds', () => {
     assert.ok(GORG_CANAL.z1 > GORG_CANAL.bridgeN.z1);
   });
 
-  it('keeps gorg beyond warm distance at spawn and unloads eastern hill from west gorg', () => {
+  it('keeps gorg beyond warm distance at spawn and the hill past live distance from west gorg', () => {
     const raw = JSON.parse(
       readFileSync(new URL('../src/scripts/walk/data/seafront.json', import.meta.url), 'utf8'),
     ) as { districts: { id: string; bounds: { x0: number; x1: number; z0: number; z1: number } }[] };
@@ -51,7 +51,9 @@ describe('Gorg (Canal i Galeria) geometry and streaming bounds', () => {
     assert.ok(gorg && hill);
 
     assert.ok(distToBounds(gorg.bounds, -22, -3.4) > 80);
-    assert.ok(distToBounds(hill.bounds, -200, 64) > 170);
+    // Since the hill moved toward -x (re-orientation step 2) it no longer unloads from Gorg, but it
+    // stays a stand-in there (Streamer.far = 100) until Gorg moves to the +x side in step 4.
+    assert.ok(distToBounds(hill.bounds, -200, 64) > 100);
   });
 });
 

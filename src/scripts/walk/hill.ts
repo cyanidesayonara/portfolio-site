@@ -18,11 +18,13 @@ import { signTexture } from './textures';
 import { HeightGrid, stairFloor, addStairsToBuilder, type StairDef } from './terrain';
 import type { ColliderGrid, District } from './world';
 import type { BoxCollider, CircleCollider, Surface } from './level';
+import { HILL_DX, shiftX } from './hillOffset';
 
 const BASE_Y = 0.12;
 const MID_Y = 5.2;
 const TOP_Y = 10.5;
-const PIP = SEAFRONT_LAYOUT.pipica3;
+/** The third pipicà in the hill's local frame (the layout data holds world positions). */
+const PIP = shiftX(SEAFRONT_LAYOUT.pipica3, -HILL_DX);
 
 const STAIRS_E: StairDef = {
   x0: 12, x1: 16, z0: 178, z1: 196, y0: BASE_Y, y1: MID_Y, steps: 24,
@@ -33,7 +35,8 @@ const STAIRS_TOP: StairDef = {
   stepColor: 0xdcd2be, wallColor: 0xc2b6a0, wallHeight: 0.95,
 };
 
-export const HILL = {
+/** Dalt de la Vila's shared positions in its own local frame (church on x 0). */
+const HL = {
   id: 'hill',
   z0: 173,
   minX: -40,
@@ -77,6 +80,12 @@ export const HILL = {
     [[2.0, 200], [2.0, 221.5], [14, 221.5], [19, 227], [0, 227], [-2.0, 221], [-2.0, 200], [11.5, 200]],
   ] as [number, number][][],
 };
+
+/**
+ * Dalt de la Vila's shared positions in world coordinates: the district is built in
+ * its local frame and shifted by HILL_DX (hillOffset.ts) along the coast.
+ */
+export const HILL = shiftX(HL, HILL_DX);
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smoothVal = (a: number, b: number, t: number) => {
@@ -135,29 +144,36 @@ const buildHillGrids = () => {
 const { phys: hillPhysGrid, vis: hillVisGrid } = buildHillGrids();
 
 /** Ground height anywhere on Dalt de la Vila (continuous across roads, stairs and terraces). */
-export function hillFloor(x: number, z: number): number {
+/** Ground height in the hill's local frame (see hillFloor for world positions). */
+export function hillFloorLocal(x: number, z: number): number {
   const sE = stairFloor(STAIRS_E, x, z);
   if (sE !== null) return sE;
   const sT = stairFloor(STAIRS_TOP, x, z);
   if (sT !== null) return sT;
-  if (z >= 178 && z <= 196 && x >= HILL.climb.x0 && x <= HILL.climb.x1) {
+  if (z >= 178 && z <= 196 && x >= HL.climb.x0 && x <= HL.climb.x1) {
     return BASE_Y + ((z - 178) / 18) * (MID_Y - BASE_Y);
   }
-  if (z >= 204 && z <= 218 && x >= HILL.rampTop.x0 && x <= HILL.rampTop.x1) {
+  if (z >= 204 && z <= 218 && x >= HL.rampTop.x0 && x <= HL.rampTop.x1) {
     return MID_Y + ((z - 204) / 14) * (TOP_Y - MID_Y);
   }
   if (z <= 178 && x >= -24 && x <= 24) return BASE_Y;
   if (
     (z >= 196 && z <= 204 && x >= -26 && x <= 26)
     || (x >= PIP.x0 && x <= PIP.x1 && z >= PIP.z0 && z <= PIP.z1)
-    || (x >= HILL.museu.x0 && x <= HILL.museu.x1 && z >= HILL.museu.z0 && z <= HILL.museu.z1)
+    || (x >= HL.museu.x0 && x <= HL.museu.x1 && z >= HL.museu.z0 && z <= HL.museu.z1)
   ) return MID_Y;
   if (z >= 218 && x >= -38 && x <= 38) return TOP_Y;
   return hillPhysGrid.sample(x, z);
 }
 
-export const inHillPipica = (x: number, z: number) =>
-  x > PIP.x0 && x < PIP.x1 && z > PIP.z0 && z < PIP.z1;
+/** Ground height anywhere on Dalt de la Vila, in world coordinates. */
+export const hillFloor = (x: number, z: number): number => hillFloorLocal(x - HILL_DX, z);
+
+/** Whether a world position is inside the third pipicà. */
+export const inHillPipica = (x: number, z: number) => {
+  const lx = x - HILL_DX;
+  return lx > PIP.x0 && lx < PIP.x1 && z > PIP.z0 && z < PIP.z1;
+};
 
 export interface HillEnv {
   groundY: number;
@@ -181,7 +197,7 @@ export interface HillEnv {
 /** Dalt de la Vila as a streamable hillside district. */
 export function makeHillDistrict(env: HillEnv): District {
   const d: District = {
-    id: HILL.id,
+    id: HL.id,
     label: env.layout.label,
     bounds: env.layout.bounds,
     root: new THREE.Group(),
@@ -191,13 +207,15 @@ export function makeHillDistrict(env: HillEnv): District {
     baked: false,
     state: 'standin',
     build: () => buildHillSteps(env, d),
-    bake: () => bakeSteps(d.root, HILL.z0),
+    bake: () => bakeSteps(d.root, HL.z0),
     unload: () => {
       d.root.traverse((o) => { (o as THREE.Mesh).geometry?.dispose(); });
       d.root.clear();
     },
   };
-  d.root.name = HILL.id;
+  d.root.name = HL.id;
+  // Everything below is built in the hill's local frame; the root carries it into place.
+  d.root.position.x = HILL_DX;
   return d;
 }
 
@@ -228,12 +246,13 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
     root.add(o);
     return o;
   };
-  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, district: HILL.id });
+  const addBox = (b: Omit<BoxCollider, 'district'>) => grid.addBox({ ...b, x0: b.x0 + HILL_DX, x1: b.x1 + HILL_DX, district: HL.id });
   const addCircle = (x: number, z: number, rr: number, top: number, kind: string, canPee: boolean, canWhirl: boolean, minY?: number) => {
-    const c: CircleCollider = { x, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: HILL.id };
+    const wx = x + HILL_DX;
+    const c: CircleCollider = { x: wx, z, r: rr, top, kind, canPee, canWhirl, marked: false, district: HL.id };
     if (minY !== undefined) c.minY = minY;
-    if (canWhirl || kind === 'tree') c.obstacle = { x, z, r: rr, kind: 'pole' };
-    else if (['bench', 'bin', 'fountain', 'table'].includes(kind)) c.obstacle = { x, z, r: rr, kind: 'furniture' };
+    if (canWhirl || kind === 'tree') c.obstacle = { x: wx, z, r: rr, kind: 'pole' };
+    else if (['bench', 'bin', 'fountain', 'table'].includes(kind)) c.obstacle = { x: wx, z, r: rr, kind: 'furniture' };
     grid.addCircle(c);
   };
 
@@ -249,9 +268,9 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
 
   // Base terrace, lower sloped street, mid terrace, upper ramp, square, pipicà sand.
   root.add(env.ground(-22, 22, 173, 178, BASE_Y + 0.002, mats.panot, mats.panotTile));
-  root.add(env.ground(HILL.climb.x0, HILL.climb.x1, HILL.climb.z0, HILL.climb.z1, 0, mats.flag, mats.flagTile, 2, 18, (x, z) => hillFloor(x, z) + 0.01));
+  root.add(env.ground(HL.climb.x0, HL.climb.x1, HL.climb.z0, HL.climb.z1, 0, mats.flag, mats.flagTile, 2, 18, (x, z) => hillFloorLocal(x, z) + 0.01));
   root.add(env.ground(-26, 26, 196, 204, MID_Y + 0.002, mats.panot, mats.panotTile));
-  root.add(env.ground(HILL.rampTop.x0, HILL.rampTop.x1, HILL.rampTop.z0, HILL.rampTop.z1, 0, mats.flag, mats.flagTile, 2, 14, (x, z) => hillFloor(x, z) + 0.01));
+  root.add(env.ground(HL.rampTop.x0, HL.rampTop.x1, HL.rampTop.z0, HL.rampTop.z1, 0, mats.flag, mats.flagTile, 2, 14, (x, z) => hillFloorLocal(x, z) + 0.01));
   root.add(env.ground(-24, 24, 218, 236, TOP_Y + 0.002, mats.flag, mats.flagTile));
   root.add(env.ground(-24, -10, 236, 244, TOP_Y + 0.002, mats.flag, mats.flagTile));
   root.add(env.ground(10, 24, 236, 244, TOP_Y + 0.002, mats.flag, mats.flagTile));
@@ -259,15 +278,15 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   yield;
 
   // ---- Layout blocks ----
-  const builder = new DirectBuilder(HILL.z0);
+  const builder = new DirectBuilder(HL.z0);
   const inst = env.newInstancer();
   const boxes: BoxCollider[] = [];
-  const blocks = buildDistrictBlocksSteps(env.layout, {
+  const blocks = buildDistrictBlocksSteps(shiftX(env.layout, -HILL_DX), {
     groundY, builder, wallMat: mats.wall, inst, boxes,
     litWindowMat: mats.litWindow, darkWindowMat: mats.darkWindow, ironMat: mats.iron, r,
   });
   while (!blocks.next().done) yield;
-  for (const b of boxes) grid.addBox(b);
+  for (const b of boxes) addBox(b);
 
   // ---- Retaining walls, sloped cheek curbs, mirador balustrade ----
   const stone = 0xc9beaa, coping = 0xdad0be;
@@ -326,7 +345,7 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   yield;
 
   // ---- Museu (mid-terrace east, base at MID_Y) ----
-  const MU = HILL.museu;
+  const MU = HL.museu;
   builder.addBox(MU.x0, MID_Y, MU.z0, MU.x1, MID_Y + 8.8, MU.z1, 0xdfc8a2);
   builder.addBox(MU.x0 - 0.25, MID_Y + 8.8, MU.z0 - 0.25, MU.x1 + 0.25, MID_Y + 9.4, MU.z1 + 0.25, 0xa85c42);
   builder.addBox(MU.x0 - 0.1, MID_Y + 4.3, MU.z0 - 0.1, MU.x1 + 0.1, MID_Y + 4.55, MU.z1 + 0.1, 0xece4d2);
@@ -350,7 +369,7 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   // ---- Església & Campanar (hilltop square, base at TOP_Y) ----
   // Ochre nave and pale stone portal matched to the public look of the hilltop
   // parish church. No saints, reliefs, or town name on screen.
-  const CH = HILL.church;
+  const CH = HL.church;
   const wallCol = 0xd2a66a, trimCol = 0xe8dfc8, roofCol = 0xb2563a, pale = 0xf2ebe0;
   // Main ochre nave.
   builder.addBox(CH.x0, TOP_Y, CH.z0, CH.x1, TOP_Y + 13.6, CH.z1, wallCol);
@@ -440,7 +459,7 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   yield;
 
   // ---- Generic Home Door (west townhouse at x = -24, no street/house identifiers) ----
-  const hz = HILL.home.z;
+  const hz = HL.home.z;
   builder.addBox(-24.02, TOP_Y, hz - 0.82, -23.86, TOP_Y + 2.65, hz + 0.82, trimCol);
   builder.addBox(-23.96, TOP_Y + 0.02, hz - 0.62, -23.82, TOP_Y + 2.45, hz + 0.62, 0x6f4b30);
   builder.addBox(-23.84, TOP_Y + 1.08, hz + 0.42, -23.76, TOP_Y + 1.18, hz + 0.5, 0xd8b04a); // brass knob
@@ -478,33 +497,33 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
     new THREE.MeshStandardMaterial({ map: signTexture('Pipicà', 'Off-leash area', '#8bcb3c', { aspect: 2.2 / 0.7 }), roughness: 0.7 }),
   );
   place(pSign, PIP.x1 + 0.1, MID_Y + 1.75, PIP.gateZ0 - 1.5);
-  place(makeWaterBowl(), HILL.bowl.x, MID_Y, HILL.bowl.z);
+  place(makeWaterBowl(), HL.bowl.x, MID_Y, HL.bowl.z);
   builder.addBox(-22.2, MID_Y, 204.2, -19.2, MID_Y + 0.35, 204.8, 0x7a5a3c);
   addBox({ x0: -22.2, x1: -19.2, z0: 204.2, z1: 204.8, top: MID_Y + 0.35, kind: 'log' });
   // Bench beside the pipicà gate for Millie's human. The seat point (where the
   // human stops, facing the park) stays just clear of the collider's front edge.
-  place(makeBench(), HILL.pipicaBench.x + 0.35, MID_Y, HILL.pipicaBench.z, -Math.PI / 2);
-  addBox({ x0: HILL.pipicaBench.x + 0.15, x1: HILL.pipicaBench.x + 0.7, z0: HILL.pipicaBench.z - 0.9, z1: HILL.pipicaBench.z + 0.9, top: MID_Y + 0.5, kind: 'bench' });
+  place(makeBench(), HL.pipicaBench.x + 0.35, MID_Y, HL.pipicaBench.z, -Math.PI / 2);
+  addBox({ x0: HL.pipicaBench.x + 0.15, x1: HL.pipicaBench.x + 0.7, z0: HL.pipicaBench.z - 0.9, z1: HL.pipicaBench.z + 0.9, top: MID_Y + 0.5, kind: 'bench' });
   yield;
 
   // ---- Trees, cypresses, lamps, hilltop benches, drinking fountain & fingerpost ----
-  for (let i = 0; i < HILL.trees.length; i++) {
-    const [x, z] = HILL.trees[i];
-    const y = hillFloor(x, z);
+  for (let i = 0; i < HL.trees.length; i++) {
+    const [x, z] = HL.trees[i];
+    const y = hillFloorLocal(x, z);
     const t = makePlaneTree(500 + i);
     place(t.group, x, y, z, r() * Math.PI);
     addCircle(x, z, t.radius, y + 3.4, 'tree', true, true, y - 0.2);
     if (i % 2 === 1) yield;
   }
-  for (let i = 0; i < HILL.cypresses.length; i++) {
-    const [x, z] = HILL.cypresses[i];
-    const y = hillFloor(x, z);
+  for (let i = 0; i < HL.cypresses.length; i++) {
+    const [x, z] = HL.cypresses[i];
+    const y = hillFloorLocal(x, z);
     place(makeCypress(5.5 + (i % 3) * 0.9), x, y - 0.1, z);
     addCircle(x, z, 0.22, y + 4.0, 'tree', true, false, y - 0.2);
   }
   yield;
-  for (const [x, z] of HILL.lamps) {
-    const y = hillFloor(x, z);
+  for (const [x, z] of HL.lamps) {
+    const y = hillFloorLocal(x, z);
     const lamp = makeLanternPost();
     lamp.group.traverse((o) => { const m = o as THREE.Mesh; if (m.material === lamp.glass) m.material = mats.lampGlass; });
     place(lamp.group, x, y, z);
@@ -521,8 +540,8 @@ function* buildHillSteps(env: HillEnv, d: District): Generator<void, void, void>
   bench(17.5, 219.7, '-z', TOP_Y);
   bench(-15.5, 224.0, '+x', TOP_Y);
   bench(15.5, 224.0, '-x', TOP_Y);
-  place(makeFountain(), HILL.drink.x, TOP_Y, HILL.drink.z, Math.PI / 2);
-  addCircle(HILL.drink.x, HILL.drink.z, 0.25, TOP_Y + 1.1, 'fountain', true, false, TOP_Y - 0.2);
+  place(makeFountain(), HL.drink.x, TOP_Y, HL.drink.z, Math.PI / 2);
+  addCircle(HL.drink.x, HL.drink.z, 0.25, TOP_Y + 1.1, 'fountain', true, false, TOP_Y - 0.2);
   place(makeFingerpost([
     { title: 'Església · Mirador', sub: 'Dalt', color: '#8bcb3c', angle: Math.PI / 2 },
     { title: 'Museu', sub: 'Terrassa', color: '#ffb020', angle: 0 },
@@ -579,6 +598,7 @@ export function makeChurchLandmark(): THREE.Group {
   cupola.userData.dynamic = true;
   g.add(cupola);
 
+  g.position.x = HILL_DX;
   g.userData.always = true;
   g.userData.dynamic = true;
   return g;
