@@ -28,6 +28,7 @@ import { RONDA, inRondaPipica, makeRondaDistrict } from './ronda';
 import { MARINA_CLAMP } from './marinaGeom';
 import { GORG_DX } from './marinaOffset';
 import { makeBlocksDistrict } from './blocksDistrict';
+import { SANTPAU, inSantPauPipica, makeSantPauDistrict } from './santpau';
 import { HILL_DX } from './hillOffset';
 import { GORG_CLAMP } from './gorgGeom';
 import { RONDA_CLAMP } from './rondaGeom';
@@ -98,7 +99,7 @@ const EDGE = {
 const HARBOR_WATER = { x0: 266, x1: 372, z0: -40.02, z1: -17.5 } as const;
 const RAMPS = SEAFRONT_LAYOUT.ramps;
 /** Sant Pau i Prim, the old streets on the Montgat side (blocksDistrict.ts), and where its streets end inland. */
-const SANTPAU = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'santpau')!.bounds;
+const SANTPAU_BOUNDS = SEAFRONT_LAYOUT.districts.find((d) => d.id === 'santpau')!.bounds;
 const SANTPAU_STREET_END = 125.6;
 /** The small square off the Rambla on Carrer del Progrés, with its metro entrance. */
 const PROGRES_SQUARE = SEAFRONT_LAYOUT.zones.find((z) => z.id === 'progresSquare')!;
@@ -1540,11 +1541,18 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   });
   districts.push(progres);
   root.add(progres.root);
-  // Sant Pau i Prim: the old streets northeast of Carrer del Mar, off the Rambla (blocks only for now).
-  const santpau = makeBlocksDistrict({
+  // Sant Pau i Prim (santpau.ts): the old streets northeast of Carrer del Mar, off the Rambla,
+  // with the Placeta and the eighth pipicà.
+  const santpauGlass = makeLanternPost().glass;
+  lampGlass.push(santpauGlass);
+  for (const [x, z] of SANTPAU.lamps) lampSpots.push(new THREE.Vector3(x, GROUND_Y + 4.4, z));
+  const santpau = makeSantPauDistrict({
     groundY: GROUND_Y, grid, layout: layoutById.get('santpau')!, ground, newInstancer: () => new Instancer(), r,
     mats: { panot: panotMat, panotTile: panot.tileMeters, wall: wallPlasterMat, litWindow: litWindowMat, darkWindow: darkWindowMat, iron: ironM },
+    lampGlass: santpauGlass, sand: sandMat,
   });
+  bowls.push({ ...SANTPAU.bowl });
+  fountains.push({ ...SANTPAU.drink });
   districts.push(santpau);
   root.add(santpau.root);
   // The shopping center just inland of the highway beyond Ronda i Parc: a big pale box with a glass
@@ -1579,7 +1587,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
   /** Add a collider after the build (props placed by the game's systems). */
   const addRuntimeCircle = (c: CircleCollider) => { c.district = districtAt(c.x, c.z).id; circles.push(c); grid.addCircle(c); };
 
-  /** Which pipicà (x, z) is in: 0 beach, 1 Plaza, 2 Hill, 3 Marina, 4 Gorg, 5 Ronda, 6 La Fàbrica, -1 neither. */
+  /** Which pipicà (x, z) is in: 0 beach, 1 Plaza, 2 Hill, 3 Marina, 4 Gorg, 5 Ronda, 6 La Fàbrica, 7 Sant Pau i Prim, -1 neither. */
   const pipicaAt = (x: number, z: number) => (
     x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 ? 0
       : inPlazaPipica(x, z) ? 1
@@ -1588,6 +1596,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
       : inGorgPipica(x, z) ? 4
       : inRondaPipica(x, z) ? 5
       : inFabricaPipica(x, z) ? 6
+      : inSantPauPipica(x, z) ? 7
       : -1
   );
   const inPipica = (x: number, z: number) => pipicaAt(x, z) >= 0;
@@ -1600,6 +1609,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     { ...GORG.pipicaBench, heading: Math.PI },
     { ...RONDA.pipicaBench, heading: Math.PI },
     { ...FABRICA.pipicaBench, heading: 0 },
+    { ...SANTPAU.pipicaBench, heading: Math.PI },
   ];
   const clampBounds = (p: { x: number; z: number; y: number }) => {
     // Canal i Galeria and Ronda i Parc, inland of the port (they share its frame).
@@ -1633,8 +1643,8 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     }
     // Carrer del Mar and its side streets; beyond it the plaza, Carrer Major, and Dalt de la Vila.
     // Sant Pau i Prim: the old streets off the Rambla's -x stretch (blocks keep Millie on the streets).
-    if (p.x < SANTPAU.x1 && p.z > 33.6 && p.z < HILL.z0) {
-      p.x = Math.max(SANTPAU.x0 + 0.4, p.x);
+    if (p.x < SANTPAU_BOUNDS.x1 && p.z > 33.6 && p.z < HILL.z0) {
+      p.x = Math.max(SANTPAU_BOUNDS.x0 + 0.4, p.x);
       p.z = Math.min(p.z, SANTPAU_STREET_END);
       return;
     }
@@ -1689,6 +1699,7 @@ export function* buildLevelSteps(scene: THREE.Scene, opts: LevelOpts) {
     ...GORG.pedPaths,
     ...RONDA.pedPaths,
     ...FABRICA.pedPaths,
+    ...SANTPAU.pedPaths,
   ];
 
   return {

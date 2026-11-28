@@ -93,6 +93,9 @@ export function createGoalSystem(opts: GoalSystemOpts) {
       if (goal('fabrica_quests').done) ['bread', 'ball', 'shutter'].forEach((k) => doneKeys.add(`fabrica:${k}`));
       if (goal('fabrica_chimney').done) doneKeys.add('fabrica:chimney');
       if (goal('fabrica_bins').done) doneKeys.add('fabrica:bins');
+      if (goal('santpau_quests').done) ['sheet', 'music', 'esmolet'].forEach((k) => doneKeys.add(`santpau:${k}`));
+      if (goal('santpau_pipica').done) doneKeys.add('santpau:pipica');
+      if (goal('santpau_bottles').done) doneKeys.add('santpau:bottles');
       if (goal('plaza').done) ['paper', 'terrace', 'fetch'].forEach((k) => doneKeys.add(`plaza:${k}`));
       if (goal('plaza_castellers').done) doneKeys.add('plaza:castellers');
       if (goal('hill_quests').done) ['bell', 'mirador'].forEach((k) => doneKeys.add(`hill:${k}`));
